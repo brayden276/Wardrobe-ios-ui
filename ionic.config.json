@@ -1,0 +1,8 @@
+{
+  "name": "Wardrobe AI",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular",
+  "id": "wardrobe-ai"
+}

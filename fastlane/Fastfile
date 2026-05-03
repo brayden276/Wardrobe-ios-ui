@@ -1,0 +1,66 @@
+default_platform(:ios)
+
+REPO_ROOT = File.expand_path("..", __dir__)
+APP_IDENTIFIER = ENV.fetch("APP_IDENTIFIER", "com.braydendekoning.bidwinner.dev")
+APPLE_TEAM_ID = ENV.fetch("APPLE_TEAM_ID", "454Z8R39M9")
+PROFILE_NAME = ENV.fetch("PROVISIONING_PROFILE_SPECIFIER", "Memory App Dev")
+IOS_PROJECT = File.join(REPO_ROOT, "ios", "App", "App.xcodeproj")
+IOS_SCHEME = ENV.fetch("IOS_SCHEME", "App")
+IOS_CONFIGURATION = ENV.fetch("IOS_CONFIGURATION", "Release")
+IOS_OUTPUT_DIRECTORY = ENV.fetch("IOS_OUTPUT_DIRECTORY", File.join(REPO_ROOT, "build", "ios"))
+
+platform :ios do
+  desc "Build the Angular app and sync the Capacitor iOS project"
+  lane :sync do
+    ensure_node_dependencies
+
+    Dir.chdir(REPO_ROOT) do
+      sh("npm run build")
+      sh("npx cap sync ios")
+    end
+  end
+
+  desc "Build a manually signed development IPA for Wardrobe AI"
+  lane :build_dev do
+    sync
+
+    build_app(
+      project: IOS_PROJECT,
+      scheme: IOS_SCHEME,
+      configuration: IOS_CONFIGURATION,
+      clean: true,
+      export_method: "development",
+      output_directory: IOS_OUTPUT_DIRECTORY,
+      output_name: "WardrobeAI-dev.ipa",
+      include_symbols: true,
+      include_bitcode: false,
+      xcargs: signing_xcargs,
+      export_options: {
+        method: "development",
+        signingStyle: "manual",
+        teamID: APPLE_TEAM_ID,
+        provisioningProfiles: {
+          APP_IDENTIFIER => PROFILE_NAME
+        }
+      }
+    )
+  end
+
+  private_lane :ensure_node_dependencies do
+    unless File.directory?(File.join(REPO_ROOT, "node_modules"))
+      Dir.chdir(REPO_ROOT) do
+        sh("npm ci")
+      end
+    end
+  end
+end
+
+def signing_xcargs
+  [
+    "CODE_SIGN_STYLE=Manual",
+    "CODE_SIGN_IDENTITY=\"iPhone Developer\"",
+    "DEVELOPMENT_TEAM=#{APPLE_TEAM_ID}",
+    "PRODUCT_BUNDLE_IDENTIFIER=#{APP_IDENTIFIER}",
+    "PROVISIONING_PROFILE_SPECIFIER=\"#{PROFILE_NAME}\""
+  ].join(" ")
+end
