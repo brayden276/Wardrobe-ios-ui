@@ -19,7 +19,11 @@ export class WardrobeApiService {
   private lookupsPromise: Promise<WardrobeLookupsDto> | null = null;
 
   async getLookups(): Promise<WardrobeLookupsDto> {
-    this.lookupsPromise ??= this.authorized(() => firstValueFrom(this.http.get<WardrobeLookupsDto>(this.url('/api/lookups/wardrobe'), this.authOptions())));
+    this.lookupsPromise ??= this.authorized(() => firstValueFrom(this.http.get<WardrobeLookupsDto>(this.url('/api/lookups/wardrobe'), this.authOptions())))
+      .catch((error) => {
+        this.lookupsPromise = null;
+        throw error;
+      });
     return this.lookupsPromise;
   }
 

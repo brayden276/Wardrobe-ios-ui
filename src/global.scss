@@ -166,19 +166,16 @@ ion-searchbar.wardrobe-search {
 
 .chip-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 7px;
-  margin-right: -18px;
-  overflow-x: auto;
-  padding: 1px 18px 3px 0;
-  scrollbar-width: none;
-}
-
-.chip-row::-webkit-scrollbar {
-  display: none;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 1px 0 3px;
 }
 
 .chip {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  max-width: 100%;
   border: 1px solid var(--app-border);
   border-radius: 14px;
   background: rgba(255, 250, 243, 0.74);
@@ -186,6 +183,8 @@ ion-searchbar.wardrobe-search {
   padding: 7px 11px;
   font: inherit;
   font-size: 13px;
+  overflow-wrap: anywhere;
+  text-align: left;
 }
 
 .chip.active {
@@ -223,6 +222,43 @@ ion-searchbar.wardrobe-search {
 .filter-group {
   display: grid;
   gap: 7px;
+}
+
+.advanced-filter {
+  display: grid;
+  gap: 12px;
+}
+
+.advanced-filter summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  color: #4b4036;
+  font-size: 13px;
+  font-weight: 650;
+  list-style: none;
+}
+
+.advanced-filter summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-filter summary ion-icon {
+  transition: transform 160ms ease;
+}
+
+.advanced-filter[open] {
+  gap: 12px;
+}
+
+.advanced-filter[open] summary {
+  margin-bottom: 12px;
+}
+
+.advanced-filter[open] summary ion-icon {
+  transform: rotate(180deg);
 }
 
 .filter-select-grid {

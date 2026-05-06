@@ -113,82 +113,88 @@ export class TabsPage {}
               <button type="button" class="chip" *ngFor="let category of lookups?.categories || []" [class.active]="categoryId === category.id" (click)="setCategory(category.id)">{{ category.label }}</button>
             </div>
           </div>
-          <div class="filter-group">
-            <span class="filter-label">Subcategory</span>
-            <div class="chip-row">
-              <button type="button" class="chip" [class.active]="!subcategoryId" (click)="setSubcategory(null)">Any</button>
-              <button type="button" class="chip" *ngFor="let option of subcategoryOptions" [class.active]="subcategoryId === option.id" (click)="setSubcategory(option.id)">{{ option.label }}</button>
+          <details class="advanced-filter">
+            <summary>
+              <span>Advanced filters</span>
+              <ion-icon name="chevron-down-outline"></ion-icon>
+            </summary>
+            <div class="filter-group">
+              <span class="filter-label">Subcategory</span>
+              <div class="chip-row">
+                <button type="button" class="chip" [class.active]="!subcategoryId" (click)="setSubcategory(null)">Any</button>
+                <button type="button" class="chip" *ngFor="let option of subcategoryOptions" [class.active]="subcategoryId === option.id" (click)="setSubcategory(option.id)">{{ option.label }}</button>
+              </div>
             </div>
-          </div>
-          <div class="filter-group">
-            <span class="filter-label">Colour</span>
-            <div class="chip-row">
-              <button type="button" class="chip" [class.active]="!colourId" (click)="setColour(null)">Any</button>
-              <button type="button" class="chip" *ngFor="let option of lookups?.colours || []" [class.active]="colourId === option.id" (click)="setColour(option.id)">{{ option.label }}</button>
+            <div class="filter-group">
+              <span class="filter-label">Colour</span>
+              <div class="chip-row">
+                <button type="button" class="chip" [class.active]="!colourId" (click)="setColour(null)">Any</button>
+                <button type="button" class="chip" *ngFor="let option of lookups?.colours || []" [class.active]="colourId === option.id" (click)="setColour(option.id)">{{ option.label }}</button>
+              </div>
             </div>
-          </div>
-          <div class="filter-group">
-            <span class="filter-label">Pattern</span>
-            <div class="chip-row">
-              <button type="button" class="chip" [class.active]="!patternId" (click)="setPattern(null)">Any</button>
-              <button type="button" class="chip" *ngFor="let option of lookups?.patterns || []" [class.active]="patternId === option.id" (click)="setPattern(option.id)">{{ option.label }}</button>
+            <div class="filter-group">
+              <span class="filter-label">Pattern</span>
+              <div class="chip-row">
+                <button type="button" class="chip" [class.active]="!patternId" (click)="setPattern(null)">Any</button>
+                <button type="button" class="chip" *ngFor="let option of lookups?.patterns || []" [class.active]="patternId === option.id" (click)="setPattern(option.id)">{{ option.label }}</button>
+              </div>
             </div>
-          </div>
-          <div class="filter-select-grid">
-            <label>
-              Material
-              <ion-select class="field" [(ngModel)]="visibleMaterialId" name="visibleMaterialId" (ionChange)="load()">
-                <ion-select-option [value]="null">Any</ion-select-option>
-                <ion-select-option *ngFor="let option of lookups?.visibleMaterials || []" [value]="option.id">{{ option.label }}</ion-select-option>
-              </ion-select>
-            </label>
-            <label>
-              Neckline
-              <ion-select class="field" [(ngModel)]="necklineId" name="necklineId" (ionChange)="load()">
-                <ion-select-option [value]="null">Any</ion-select-option>
-                <ion-select-option *ngFor="let option of lookups?.necklines || []" [value]="option.id">{{ option.label }}</ion-select-option>
-              </ion-select>
-            </label>
-            <label>
-              Sleeve
-              <ion-select class="field" [(ngModel)]="sleeveLengthId" name="sleeveLengthId" (ionChange)="load()">
-                <ion-select-option [value]="null">Any</ion-select-option>
-                <ion-select-option *ngFor="let option of lookups?.sleeveLengths || []" [value]="option.id">{{ option.label }}</ion-select-option>
-              </ion-select>
-            </label>
-            <label>
-              Fit
-              <ion-select class="field" [(ngModel)]="fitId" name="fitId" (ionChange)="load()">
-                <ion-select-option [value]="null">Any</ion-select-option>
-                <ion-select-option *ngFor="let option of lookups?.fits || []" [value]="option.id">{{ option.label }}</ion-select-option>
-              </ion-select>
-            </label>
-            <label>
-              Length
-              <ion-select class="field" [(ngModel)]="lengthId" name="lengthId" (ionChange)="load()">
-                <ion-select-option [value]="null">Any</ion-select-option>
-                <ion-select-option *ngFor="let option of lookups?.garmentLengths || []" [value]="option.id">{{ option.label }}</ion-select-option>
-              </ion-select>
-            </label>
-            <label>
-              Shape
-              <ion-select class="field" [(ngModel)]="bottomShapeId" name="bottomShapeId" (ionChange)="load()">
-                <ion-select-option [value]="null">Any</ion-select-option>
-                <ion-select-option *ngFor="let option of lookups?.bottomShapes || []" [value]="option.id">{{ option.label }}</ion-select-option>
-              </ion-select>
-            </label>
-            <label>
-              Rise
-              <ion-select class="field" [(ngModel)]="riseId" name="riseId" (ionChange)="load()">
-                <ion-select-option [value]="null">Any</ion-select-option>
-                <ion-select-option *ngFor="let option of lookups?.rises || []" [value]="option.id">{{ option.label }}</ion-select-option>
-              </ion-select>
-            </label>
-          </div>
-          <div class="toggle-row">
-            <span>Include archived</span>
-            <ion-toggle [checked]="includeArchived" (ionChange)="setIncludeArchived($event.detail.checked)"></ion-toggle>
-          </div>
+            <div class="filter-select-grid">
+              <label>
+                Material
+                <ion-select class="field" [(ngModel)]="visibleMaterialId" name="visibleMaterialId" (ionChange)="load()">
+                  <ion-select-option [value]="null">Any</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.visibleMaterials || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                </ion-select>
+              </label>
+              <label>
+                Neckline
+                <ion-select class="field" [(ngModel)]="necklineId" name="necklineId" (ionChange)="load()">
+                  <ion-select-option [value]="null">Any</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.necklines || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                </ion-select>
+              </label>
+              <label>
+                Sleeve
+                <ion-select class="field" [(ngModel)]="sleeveLengthId" name="sleeveLengthId" (ionChange)="load()">
+                  <ion-select-option [value]="null">Any</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.sleeveLengths || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                </ion-select>
+              </label>
+              <label>
+                Fit
+                <ion-select class="field" [(ngModel)]="fitId" name="fitId" (ionChange)="load()">
+                  <ion-select-option [value]="null">Any</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.fits || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                </ion-select>
+              </label>
+              <label>
+                Length
+                <ion-select class="field" [(ngModel)]="lengthId" name="lengthId" (ionChange)="load()">
+                  <ion-select-option [value]="null">Any</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.garmentLengths || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                </ion-select>
+              </label>
+              <label>
+                Shape
+                <ion-select class="field" [(ngModel)]="bottomShapeId" name="bottomShapeId" (ionChange)="load()">
+                  <ion-select-option [value]="null">Any</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.bottomShapes || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                </ion-select>
+              </label>
+              <label>
+                Rise
+                <ion-select class="field" [(ngModel)]="riseId" name="riseId" (ionChange)="load()">
+                  <ion-select-option [value]="null">Any</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.rises || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                </ion-select>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <span>Include archived</span>
+              <ion-toggle [checked]="includeArchived" (ionChange)="setIncludeArchived($event.detail.checked)"></ion-toggle>
+            </div>
+          </details>
         </article>
         <article class="panel state-panel" *ngIf="isLoading">
           <ion-spinner name="crescent"></ion-spinner>
@@ -271,7 +277,9 @@ export class WardrobePage {
     }
 
     if (!this.categoryId) {
-      return this.lookups.categories.flatMap((category) => category.subcategories);
+      return this.lookups.categories.reduce<{ id: string; label: string }[]>(
+        (options, category) => options.concat(category.subcategories),
+        []);
     }
 
     return this.lookups.categories.find((category) => category.id === this.categoryId)?.subcategories ?? [];
