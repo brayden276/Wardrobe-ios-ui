@@ -729,6 +729,34 @@ ion-textarea.outfit-query {
   padding: 3px;
 }
 
+.outfit-open {
+  display: block;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  width: 100%;
+}
+
+.outfit-hero-image,
+.outfit-detail-image {
+  display: block;
+  width: 100%;
+  border: 1px solid rgba(61, 49, 40, 0.08);
+  border-radius: 8px;
+  background: #fff;
+  object-fit: contain;
+}
+
+.outfit-hero-image {
+  aspect-ratio: 4 / 5;
+  max-height: 280px;
+}
+
+.outfit-detail-image {
+  max-height: 420px;
+}
+
 .outfit-copy {
   display: grid;
   gap: 5px;
@@ -738,10 +766,65 @@ ion-textarea.outfit-query {
   font-size: 12px;
 }
 
+.outfit-item-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+}
+
+.outfit-item-list span {
+  color: #6f6256;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
 .outfit-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.outfit-detail-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.outfit-detail-items {
+  display: grid;
+  gap: 8px;
+}
+
+.outfit-detail-item {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.outfit-detail-item img {
+  width: 52px;
+  height: 68px;
+  border: 1px solid rgba(61, 49, 40, 0.08);
+  border-radius: 7px;
+  background: #fff;
+  object-fit: contain;
+  padding: 3px;
+}
+
+.outfit-detail-item div {
+  display: grid;
+  gap: 3px;
+}
+
+.outfit-detail-item strong {
+  color: var(--app-ink);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.outfit-detail-item span {
+  color: #6f6256;
+  font-size: 12px;
 }
 
 .form-stack {

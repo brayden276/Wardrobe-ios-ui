@@ -937,12 +937,16 @@ export class ItemDetailPage {
         </article>
         <h2 class="section-title" *ngIf="results.length">Outfit ideas</h2>
         <article class="outfit-card idea-card" *ngFor="let outfit of results">
-          <div class="outfit-images">
+          <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [src]="outfit.imageUrl" [alt]="outfit.title">
+          <div class="outfit-images" *ngIf="!outfit.imageUrl">
             <img *ngFor="let id of outfit.itemIds" [src]="imageFor(id)" [alt]="nameFor(id)">
           </div>
           <div class="outfit-copy">
             <h3>{{ outfit.title }}</h3>
             <p class="muted">{{ outfit.explanation }}</p>
+            <div class="outfit-item-list">
+              <span *ngFor="let id of outfit.itemIds">{{ nameFor(id) }}</span>
+            </div>
             <ion-button class="primary-button small-action" (click)="save(outfit)">Save outfit</ion-button>
           </div>
         </article>
@@ -1039,7 +1043,7 @@ export class BuilderPage {
   async save(outfit: GeneratedOutfitDto): Promise<void> {
     this.message = '';
     try {
-      await this.api.saveOutfit(outfit.title, this.query, outfit.explanation, outfit.itemIds);
+      await this.api.saveOutfit(outfit.title, this.query, outfit.explanation, outfit.itemIds, outfit.imageUrl);
       this.message = 'Outfit saved.';
     } catch (error) {
       this.message = readMessage(error, 'Could not save outfit.');
@@ -1139,16 +1143,41 @@ export class BuilderPage {
           <p class="muted">{{ message }}</p>
         </article>
         <article class="outfit-card" *ngFor="let outfit of outfits">
-          <div class="outfit-images">
+          <button type="button" class="outfit-open" (click)="open(outfit)">
+            <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [src]="outfit.imageUrl" [alt]="outfit.name">
+          </button>
+          <div class="outfit-images" *ngIf="!outfit.imageUrl">
             <img *ngFor="let item of outfit.items" [src]="item.image.displayUrl" [alt]="item.name">
           </div>
           <div class="outfit-copy">
             <h3>{{ outfit.name }}</h3>
             <p class="muted">{{ outfit.explanation || 'Saved from your wardrobe.' }}</p>
+            <div class="outfit-item-list">
+              <span *ngFor="let item of outfit.items">{{ item.name }}</span>
+            </div>
           </div>
           <div class="outfit-actions">
+            <ion-button class="secondary-button compact-button" fill="outline" (click)="open(outfit)">Open</ion-button>
             <ion-button class="secondary-button compact-button" fill="outline" (click)="markWorn(outfit)">Mark worn</ion-button>
             <ion-button class="quiet-button compact-button" fill="clear" (click)="remove(outfit)">Delete</ion-button>
+          </div>
+        </article>
+        <article class="panel outfit-detail-panel" *ngIf="selectedOutfit">
+          <div class="panel-heading">
+            <h2 class="section-title">{{ selectedOutfit.name }}</h2>
+            <button type="button" class="icon-button" aria-label="Close outfit details" (click)="close()">
+              <ion-icon name="close-outline"></ion-icon>
+            </button>
+          </div>
+          <img class="outfit-detail-image" *ngIf="selectedOutfit.imageUrl" [src]="selectedOutfit.imageUrl" [alt]="selectedOutfit.name">
+          <div class="outfit-detail-items">
+            <div class="outfit-detail-item" *ngFor="let item of selectedOutfit.items">
+              <img [src]="item.image.displayUrl" [alt]="item.name">
+              <div>
+                <strong>{{ item.name }}</strong>
+                <span>{{ item.subcategoryId }}</span>
+              </div>
+            </div>
           </div>
         </article>
         <article class="panel" *ngIf="!isLoading && !message && !outfits.length">
@@ -1162,6 +1191,7 @@ export class BuilderPage {
 export class OutfitsPage {
   private readonly api = inject(WardrobeApiService);
   outfits: OutfitDto[] = [];
+  selectedOutfit: OutfitDto | null = null;
   isLoading = true;
   message = '';
 
@@ -1174,12 +1204,23 @@ export class OutfitsPage {
     this.message = '';
     try {
       this.outfits = await this.api.getOutfits();
+      if (this.selectedOutfit) {
+        this.selectedOutfit = this.outfits.find((outfit) => outfit.id === this.selectedOutfit?.id) ?? null;
+      }
     } catch (error) {
       this.message = readMessage(error, 'Could not load outfits.');
       this.outfits = [];
     } finally {
       this.isLoading = false;
     }
+  }
+
+  open(outfit: OutfitDto): void {
+    this.selectedOutfit = outfit;
+  }
+
+  close(): void {
+    this.selectedOutfit = null;
   }
 
   async markWorn(outfit: OutfitDto): Promise<void> {

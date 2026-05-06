@@ -71,11 +71,14 @@ export class WardrobeApiService {
 
   async searchOutfits(query: string, requiredItemId: string | null = null): Promise<GeneratedOutfitDto[]> {
     const response = await this.authorized(() => firstValueFrom(this.http.post<{ outfits: GeneratedOutfitDto[] }>(this.url('/api/outfits/search'), { query, requiredItemId }, this.authOptions())));
-    return response.outfits;
+    return response.outfits.map((outfit) => ({
+      ...outfit,
+      imageUrl: this.normaliseAssetUrl(outfit.imageUrl)
+    }));
   }
 
-  async saveOutfit(name: string, prompt: string | null, explanation: string | null, itemIds: string[]): Promise<OutfitDto> {
-    const response = await this.authorized(() => firstValueFrom(this.http.post<{ outfit: OutfitDto }>(this.url('/api/outfits'), { name, prompt, explanation, itemIds }, this.authOptions())));
+  async saveOutfit(name: string, prompt: string | null, explanation: string | null, itemIds: string[], imageUrl: string | null = null): Promise<OutfitDto> {
+    const response = await this.authorized(() => firstValueFrom(this.http.post<{ outfit: OutfitDto }>(this.url('/api/outfits'), { name, prompt, explanation, itemIds, imageUrl }, this.authOptions())));
     return this.normaliseOutfit(response.outfit);
   }
 
@@ -127,7 +130,11 @@ export class WardrobeApiService {
   }
 
   private normaliseOutfit(outfit: OutfitDto): OutfitDto {
-    return { ...outfit, items: outfit.items.map((item) => this.normaliseItem(item)) };
+    return {
+      ...outfit,
+      imageUrl: this.normaliseAssetUrl(outfit.imageUrl),
+      items: outfit.items.map((item) => this.normaliseItem(item))
+    };
   }
 
   private normaliseItem(item: WardrobeItemDto): WardrobeItemDto {

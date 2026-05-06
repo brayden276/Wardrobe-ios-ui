@@ -106,6 +106,7 @@ export interface GeneratedOutfitDto {
   title: string;
   itemIds: string[];
   explanation: string;
+  imageUrl: string | null;
 }
 
 export interface OutfitDto {
@@ -113,6 +114,7 @@ export interface OutfitDto {
   name: string;
   prompt: string | null;
   explanation: string | null;
+  imageUrl: string | null;
   items: WardrobeItemDto[];
   wearCount: number;
   lastWornAt: string | null;
