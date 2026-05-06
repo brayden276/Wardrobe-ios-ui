@@ -22,6 +22,7 @@ platform :ios do
 
   desc "Build a manually signed development IPA for Wardrobe AI"
   lane :build_dev do
+    ENV["UI_ALLOW_LOCALHOST_API"] = "true"
     sync
 
     build_app(
@@ -46,6 +47,39 @@ platform :ios do
     )
   end
 
+  desc "Build a production IPA for Wardrobe AI"
+  lane :build_release do
+    app_identifier = required_env("APP_IDENTIFIER")
+    apple_team_id = required_env("APPLE_TEAM_ID")
+    profile_name = required_env("PROVISIONING_PROFILE_SPECIFIER")
+    export_method = ENV.fetch("IOS_EXPORT_METHOD", "app-store")
+    required_env("UI_API_BASE_URL")
+
+    ENV["UI_REQUIRE_PRODUCTION_API"] = "true"
+    sync
+
+    build_app(
+      project: IOS_PROJECT,
+      scheme: IOS_SCHEME,
+      configuration: IOS_CONFIGURATION,
+      clean: true,
+      export_method: export_method,
+      output_directory: IOS_OUTPUT_DIRECTORY,
+      output_name: "WardrobeAI.ipa",
+      include_symbols: true,
+      include_bitcode: false,
+      xcargs: release_signing_xcargs(app_identifier, apple_team_id, profile_name, export_method),
+      export_options: {
+        method: export_method,
+        signingStyle: "manual",
+        teamID: apple_team_id,
+        provisioningProfiles: {
+          app_identifier => profile_name
+        }
+      }
+    )
+  end
+
   private_lane :ensure_node_dependencies do
     unless File.directory?(File.join(REPO_ROOT, "node_modules"))
       Dir.chdir(REPO_ROOT) do
@@ -55,6 +89,12 @@ platform :ios do
   end
 end
 
+def required_env(name)
+  value = ENV[name]
+  UI.user_error!("#{name} is required for production builds") if value.to_s.strip.empty?
+  value
+end
+
 def signing_xcargs
   [
     "CODE_SIGN_STYLE=Manual",
@@ -62,5 +102,16 @@ def signing_xcargs
     "DEVELOPMENT_TEAM=#{APPLE_TEAM_ID}",
     "PRODUCT_BUNDLE_IDENTIFIER=#{APP_IDENTIFIER}",
     "PROVISIONING_PROFILE_SPECIFIER=\"#{PROFILE_NAME}\""
+  ].join(" ")
+end
+
+def release_signing_xcargs(app_identifier, apple_team_id, profile_name, export_method)
+  identity = export_method == "development" ? "iPhone Developer" : "iPhone Distribution"
+  [
+    "CODE_SIGN_STYLE=Manual",
+    "CODE_SIGN_IDENTITY=\"#{identity}\"",
+    "DEVELOPMENT_TEAM=#{apple_team_id}",
+    "PRODUCT_BUNDLE_IDENTIFIER=#{app_identifier}",
+    "PROVISIONING_PROFILE_SPECIFIER=\"#{profile_name}\""
   ].join(" ")
 end

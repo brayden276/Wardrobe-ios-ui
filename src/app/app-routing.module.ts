@@ -27,12 +27,17 @@ const routes: Routes = [
     component: TabsPage,
     canActivate: [requireSession],
     children: [
-      { path: 'wardrobe', component: WardrobePage },
-      { path: 'wardrobe/:id', component: ItemDetailPage },
-      { path: 'add', component: AddItemPage },
-      { path: 'outfits', component: OutfitsPage },
-      { path: 'builder', component: BuilderPage },
-      { path: 'settings', component: SettingsPage },
+      {
+        path: 'wardrobe',
+        children: [
+          { path: '', component: WardrobePage },
+          { path: ':id', component: ItemDetailPage }
+        ]
+      },
+      { path: 'add', children: [{ path: '', component: AddItemPage }] },
+      { path: 'outfits', children: [{ path: '', component: OutfitsPage }] },
+      { path: 'builder', children: [{ path: '', component: BuilderPage }] },
+      { path: 'settings', children: [{ path: '', component: SettingsPage }] },
       { path: '', redirectTo: 'wardrobe', pathMatch: 'full' }
     ]
   },

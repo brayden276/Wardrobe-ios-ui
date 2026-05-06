@@ -1,5 +1,6 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, ElementRef, ViewChild, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { AuthService } from './auth.service';
 import { ApiMessage, GeneratedOutfitDto, OutfitDto, UpdateWardrobeItemRequest, WardrobeItemDto, WardrobeLookupsDto } from './models';
@@ -74,13 +75,12 @@ export class LoginPage {
   standalone: false,
   template: `
     <ion-tabs>
-      <ion-router-outlet></ion-router-outlet>
       <ion-tab-bar slot="bottom">
-        <ion-tab-button tab="wardrobe" routerLink="/tabs/wardrobe"><ion-icon name="shirt-outline"></ion-icon><ion-label>Wardrobe</ion-label></ion-tab-button>
-        <ion-tab-button tab="add" routerLink="/tabs/add"><ion-icon name="add-circle-outline"></ion-icon><ion-label>Add</ion-label></ion-tab-button>
-        <ion-tab-button tab="outfits" routerLink="/tabs/outfits"><ion-icon name="albums-outline"></ion-icon><ion-label>Outfits</ion-label></ion-tab-button>
-        <ion-tab-button tab="builder" routerLink="/tabs/builder"><ion-icon name="sparkles-outline"></ion-icon><ion-label>Builder</ion-label></ion-tab-button>
-        <ion-tab-button tab="settings" routerLink="/tabs/settings"><ion-icon name="settings-outline"></ion-icon><ion-label>Settings</ion-label></ion-tab-button>
+        <ion-tab-button tab="wardrobe"><ion-icon name="shirt-outline"></ion-icon><ion-label>Wardrobe</ion-label></ion-tab-button>
+        <ion-tab-button tab="add"><ion-icon name="add-circle-outline"></ion-icon><ion-label>Add</ion-label></ion-tab-button>
+        <ion-tab-button tab="outfits"><ion-icon name="albums-outline"></ion-icon><ion-label>Outfits</ion-label></ion-tab-button>
+        <ion-tab-button tab="builder"><ion-icon name="sparkles-outline"></ion-icon><ion-label>Builder</ion-label></ion-tab-button>
+        <ion-tab-button tab="settings"><ion-icon name="settings-outline"></ion-icon><ion-label>Settings</ion-label></ion-tab-button>
       </ion-tab-bar>
     </ion-tabs>
   `
@@ -101,14 +101,95 @@ export class TabsPage {}
         </header>
         <div class="search-row">
           <ion-searchbar class="wardrobe-search" [(ngModel)]="search" placeholder="Search black jeans, blazers..." (ionInput)="load()"></ion-searchbar>
-          <button type="button" class="filter-button" aria-label="Clear wardrobe filters" (click)="clearFilters()" [disabled]="!categoryId && !search.trim()">
+          <button type="button" class="filter-button" aria-label="Clear wardrobe filters" (click)="clearFilters()" [disabled]="!hasFilters">
             <ion-icon name="options-outline"></ion-icon>
           </button>
         </div>
-        <div class="chip-row">
-          <button type="button" class="chip" [class.active]="!categoryId" (click)="setCategory(null)">All</button>
-          <button type="button" class="chip" *ngFor="let category of lookups?.categories || []" [class.active]="categoryId === category.id" (click)="setCategory(category.id)">{{ category.label }}</button>
-        </div>
+        <article class="panel filter-panel">
+          <div class="filter-group">
+            <span class="filter-label">Category</span>
+            <div class="chip-row">
+              <button type="button" class="chip" [class.active]="!categoryId" (click)="setCategory(null)">All</button>
+              <button type="button" class="chip" *ngFor="let category of lookups?.categories || []" [class.active]="categoryId === category.id" (click)="setCategory(category.id)">{{ category.label }}</button>
+            </div>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Subcategory</span>
+            <div class="chip-row">
+              <button type="button" class="chip" [class.active]="!subcategoryId" (click)="setSubcategory(null)">Any</button>
+              <button type="button" class="chip" *ngFor="let option of subcategoryOptions" [class.active]="subcategoryId === option.id" (click)="setSubcategory(option.id)">{{ option.label }}</button>
+            </div>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Colour</span>
+            <div class="chip-row">
+              <button type="button" class="chip" [class.active]="!colourId" (click)="setColour(null)">Any</button>
+              <button type="button" class="chip" *ngFor="let option of lookups?.colours || []" [class.active]="colourId === option.id" (click)="setColour(option.id)">{{ option.label }}</button>
+            </div>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Pattern</span>
+            <div class="chip-row">
+              <button type="button" class="chip" [class.active]="!patternId" (click)="setPattern(null)">Any</button>
+              <button type="button" class="chip" *ngFor="let option of lookups?.patterns || []" [class.active]="patternId === option.id" (click)="setPattern(option.id)">{{ option.label }}</button>
+            </div>
+          </div>
+          <div class="filter-select-grid">
+            <label>
+              Material
+              <ion-select class="field" [(ngModel)]="visibleMaterialId" name="visibleMaterialId" (ionChange)="load()">
+                <ion-select-option [value]="null">Any</ion-select-option>
+                <ion-select-option *ngFor="let option of lookups?.visibleMaterials || []" [value]="option.id">{{ option.label }}</ion-select-option>
+              </ion-select>
+            </label>
+            <label>
+              Neckline
+              <ion-select class="field" [(ngModel)]="necklineId" name="necklineId" (ionChange)="load()">
+                <ion-select-option [value]="null">Any</ion-select-option>
+                <ion-select-option *ngFor="let option of lookups?.necklines || []" [value]="option.id">{{ option.label }}</ion-select-option>
+              </ion-select>
+            </label>
+            <label>
+              Sleeve
+              <ion-select class="field" [(ngModel)]="sleeveLengthId" name="sleeveLengthId" (ionChange)="load()">
+                <ion-select-option [value]="null">Any</ion-select-option>
+                <ion-select-option *ngFor="let option of lookups?.sleeveLengths || []" [value]="option.id">{{ option.label }}</ion-select-option>
+              </ion-select>
+            </label>
+            <label>
+              Fit
+              <ion-select class="field" [(ngModel)]="fitId" name="fitId" (ionChange)="load()">
+                <ion-select-option [value]="null">Any</ion-select-option>
+                <ion-select-option *ngFor="let option of lookups?.fits || []" [value]="option.id">{{ option.label }}</ion-select-option>
+              </ion-select>
+            </label>
+            <label>
+              Length
+              <ion-select class="field" [(ngModel)]="lengthId" name="lengthId" (ionChange)="load()">
+                <ion-select-option [value]="null">Any</ion-select-option>
+                <ion-select-option *ngFor="let option of lookups?.garmentLengths || []" [value]="option.id">{{ option.label }}</ion-select-option>
+              </ion-select>
+            </label>
+            <label>
+              Shape
+              <ion-select class="field" [(ngModel)]="bottomShapeId" name="bottomShapeId" (ionChange)="load()">
+                <ion-select-option [value]="null">Any</ion-select-option>
+                <ion-select-option *ngFor="let option of lookups?.bottomShapes || []" [value]="option.id">{{ option.label }}</ion-select-option>
+              </ion-select>
+            </label>
+            <label>
+              Rise
+              <ion-select class="field" [(ngModel)]="riseId" name="riseId" (ionChange)="load()">
+                <ion-select-option [value]="null">Any</ion-select-option>
+                <ion-select-option *ngFor="let option of lookups?.rises || []" [value]="option.id">{{ option.label }}</ion-select-option>
+              </ion-select>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <span>Include archived</span>
+            <ion-toggle [checked]="includeArchived" (ionChange)="setIncludeArchived($event.detail.checked)"></ion-toggle>
+          </div>
+        </article>
         <article class="panel state-panel" *ngIf="isLoading">
           <ion-spinner name="crescent"></ion-spinner>
           <p class="muted">Loading wardrobe...</p>
@@ -133,8 +214,10 @@ export class TabsPage {}
         </div>
         <ng-template #emptyWardrobe>
           <article class="panel" *ngIf="!isLoading && !message">
-            <h2 class="plain-title">No items yet</h2>
-            <p class="muted">Add one item from the camera and it will appear here immediately.</p>
+            <h2 class="plain-title">{{ hasFilters ? 'No matching items found.' : 'Your wardrobe is empty.' }}</h2>
+            <p class="muted">{{ hasFilters ? 'Clear filters to see more wardrobe items.' : 'Add your first item.' }}</p>
+            <ion-button *ngIf="hasFilters" class="secondary-button" fill="outline" size="small" (click)="clearFilters()">Clear filters</ion-button>
+            <ion-button *ngIf="!hasFilters" class="primary-button" size="small" routerLink="/tabs/add">Add Item</ion-button>
           </article>
         </ng-template>
       </section>
@@ -144,16 +227,57 @@ export class TabsPage {}
     </ion-content>
   `
 })
-export class WardrobePage implements OnInit {
+export class WardrobePage {
   private readonly api = inject(WardrobeApiService);
   items: WardrobeItemDto[] = [];
   lookups: WardrobeLookupsDto | null = null;
   categoryId: string | null = null;
+  subcategoryId: string | null = null;
+  colourId: string | null = null;
+  patternId: string | null = null;
+  visibleMaterialId: string | null = null;
+  necklineId: string | null = null;
+  sleeveLengthId: string | null = null;
+  fitId: string | null = null;
+  lengthId: string | null = null;
+  bottomShapeId: string | null = null;
+  riseId: string | null = null;
+  includeArchived = false;
   search = '';
   isLoading = true;
   message = '';
 
-  async ngOnInit(): Promise<void> {
+  get hasFilters(): boolean {
+    return !!(
+      this.categoryId
+      || this.subcategoryId
+      || this.colourId
+      || this.patternId
+      || this.visibleMaterialId
+      || this.necklineId
+      || this.sleeveLengthId
+      || this.fitId
+      || this.lengthId
+      || this.bottomShapeId
+      || this.riseId
+      || this.search.trim()
+      || this.includeArchived
+    );
+  }
+
+  get subcategoryOptions(): { id: string; label: string }[] {
+    if (!this.lookups) {
+      return [];
+    }
+
+    if (!this.categoryId) {
+      return this.lookups.categories.flatMap((category) => category.subcategories);
+    }
+
+    return this.lookups.categories.find((category) => category.id === this.categoryId)?.subcategories ?? [];
+  }
+
+  async ionViewWillEnter(): Promise<void> {
     await this.load();
   }
 
@@ -162,9 +286,21 @@ export class WardrobePage implements OnInit {
     this.message = '';
     try {
       this.lookups ??= await this.api.getLookups();
-      const params: Record<string, string> = {};
-      if (this.categoryId) params['categoryId'] = this.categoryId;
-      if (this.search.trim()) params['search'] = this.search.trim();
+      const params: Record<string, string | boolean> = {
+        categoryId: this.categoryId ?? '',
+        subcategoryId: this.subcategoryId ?? '',
+        colourId: this.colourId ?? '',
+        patternId: this.patternId ?? '',
+        visibleMaterialId: this.visibleMaterialId ?? '',
+        necklineId: this.necklineId ?? '',
+        sleeveLengthId: this.sleeveLengthId ?? '',
+        fitId: this.fitId ?? '',
+        lengthId: this.lengthId ?? '',
+        bottomShapeId: this.bottomShapeId ?? '',
+        riseId: this.riseId ?? '',
+        search: this.search.trim(),
+        includeArchived: this.includeArchived
+      };
       this.items = await this.api.getItems(params);
     } catch (error) {
       this.message = readMessage(error, 'Could not load wardrobe. Pull down or try again.');
@@ -176,11 +312,43 @@ export class WardrobePage implements OnInit {
 
   async setCategory(categoryId: string | null): Promise<void> {
     this.categoryId = categoryId;
+    this.subcategoryId = null;
+    await this.load();
+  }
+
+  async setSubcategory(subcategoryId: string | null): Promise<void> {
+    this.subcategoryId = subcategoryId;
+    await this.load();
+  }
+
+  async setColour(colourId: string | null): Promise<void> {
+    this.colourId = colourId;
+    await this.load();
+  }
+
+  async setPattern(patternId: string | null): Promise<void> {
+    this.patternId = patternId;
+    await this.load();
+  }
+
+  async setIncludeArchived(includeArchived: boolean): Promise<void> {
+    this.includeArchived = includeArchived;
     await this.load();
   }
 
   async clearFilters(): Promise<void> {
     this.categoryId = null;
+    this.subcategoryId = null;
+    this.colourId = null;
+    this.patternId = null;
+    this.visibleMaterialId = null;
+    this.necklineId = null;
+    this.sleeveLengthId = null;
+    this.fitId = null;
+    this.lengthId = null;
+    this.bottomShapeId = null;
+    this.riseId = null;
+    this.includeArchived = false;
     this.search = '';
     await this.load();
   }
@@ -216,6 +384,9 @@ export class WardrobePage implements OnInit {
           <h1>Add item</h1>
           <span></span>
         </header>
+        <input #cameraInput class="file-input" type="file" accept="image/*" capture="environment" (change)="handleFileSelection($event)">
+        <input #libraryInput class="file-input" type="file" accept="image/*" (change)="handleFileSelection($event)">
+        <input #batchInput class="file-input" type="file" accept="image/*" multiple (change)="handleBatchSelection($event)">
         <div class="capture-stage">
           <img *ngIf="previewUrl" [src]="previewUrl" alt="Selected wardrobe item">
           <div class="capture-placeholder" *ngIf="!previewUrl">
@@ -225,19 +396,43 @@ export class WardrobePage implements OnInit {
         </div>
         <article class="capture-dock">
           <div class="camera-control-row">
-            <button type="button" class="round-control" disabled aria-label="Flash disabled">
-              <ion-icon name="flash-outline"></ion-icon>
-            </button>
-            <button type="button" class="shutter-button" (click)="capture(CameraSource.Camera)" [disabled]="isSaving" aria-label="Take photo"></button>
             <button type="button" class="round-control" (click)="capture(CameraSource.Photos)" [disabled]="isSaving" aria-label="Choose from library">
               <ion-icon name="images-outline"></ion-icon>
             </button>
+            <button type="button" class="shutter-button" (click)="capture(CameraSource.Camera)" [disabled]="isSaving" aria-label="Take photo"></button>
+            <button type="button" class="round-control" (click)="clearSelection()" [disabled]="isSaving || !previewUrl" aria-label="Clear selected photo">
+              <ion-icon name="close-outline"></ion-icon>
+            </button>
           </div>
-          <ion-button class="primary-button olive-button" expand="block" (click)="capture(CameraSource.Camera)" [disabled]="isSaving">{{ isSaving ? 'Saving item...' : 'Take photo' }}</ion-button>
-          <ion-button class="light-button" expand="block" (click)="capture(CameraSource.Photos)" [disabled]="isSaving">Choose from library</ion-button>
+          <ion-button class="primary-button olive-button" expand="block" (click)="imageBlob ? upload() : capture(CameraSource.Camera)" [disabled]="isSaving">{{ isSaving ? 'Processing item...' : imageBlob ? 'Submit photo' : 'Take photo' }}</ion-button>
+          <ion-button class="light-button" expand="block" (click)="capture(CameraSource.Photos)" [disabled]="isSaving">{{ imageBlob ? 'Choose different photo' : 'Choose from library' }}</ion-button>
           <ion-button class="secondary-button retry-button" fill="outline" expand="block" *ngIf="imageBlob && message && !isSaving" (click)="upload()">Try again</ion-button>
-          <p>One item, clearly visible.</p>
+          <div class="processing-line" *ngIf="isSaving">
+            <ion-spinner name="crescent"></ion-spinner>
+            <span>Uploading and categorising item...</span>
+          </div>
+          <p>{{ imageBlob ? 'Ready to submit for categorisation.' : 'One item, clearly visible.' }}</p>
           <p class="muted" *ngIf="message">{{ message }}</p>
+        </article>
+        <article class="panel form-stack batch-panel">
+          <div class="panel-heading">
+            <h2 class="section-title">Batch upload</h2>
+            <button type="button" class="icon-button" aria-label="Choose batch photos" (click)="openBatchPicker()" [disabled]="isBatchSaving">
+              <ion-icon name="images-outline"></ion-icon>
+            </button>
+          </div>
+          <div class="batch-summary" *ngIf="batchFiles.length">
+            <span>{{ batchFiles.length }} selected</span>
+            <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="clearBatchSelection()" [disabled]="isBatchSaving">Clear</ion-button>
+          </div>
+          <div class="batch-grid" *ngIf="batchFiles.length">
+            <button type="button" class="batch-item" *ngFor="let file of batchFiles; let index = index" (click)="removeBatchFile(index)" [disabled]="isBatchSaving">
+              <img [src]="batchPreviewUrls[index]" [alt]="file.name">
+              <span>{{ file.name }}</span>
+            </button>
+          </div>
+          <p class="muted" *ngIf="!batchFiles.length">Select multiple photos and upload them together.</p>
+          <ion-button class="primary-button" expand="block" (click)="uploadBatch()" [disabled]="isBatchSaving || !batchFiles.length">{{ isBatchSaving ? 'Uploading batch...' : 'Upload batch' }}</ion-button>
         </article>
       </section>
     </ion-content>
@@ -246,14 +441,26 @@ export class WardrobePage implements OnInit {
 export class AddItemPage {
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
+  @ViewChild('cameraInput') private readonly cameraInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('libraryInput') private readonly libraryInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('batchInput') private readonly batchInput?: ElementRef<HTMLInputElement>;
   readonly CameraSource = CameraSource;
   previewUrl: string | null = null;
   imageBlob: Blob | null = null;
+  imageFileName = 'wardrobe-item.jpg';
   message = '';
   isSaving = false;
+  batchFiles: File[] = [];
+  batchPreviewUrls: string[] = [];
+  isBatchSaving = false;
 
   async capture(source: CameraSource.Camera | CameraSource.Photos): Promise<void> {
     this.message = '';
+    if (!Capacitor.isNativePlatform()) {
+      this.openBrowserFilePicker(source);
+      return;
+    }
+
     try {
       const photo = await Camera.getPhoto({ source, resultType: CameraResultType.Uri, quality: 90 });
       if (!photo.webPath) {
@@ -262,24 +469,139 @@ export class AddItemPage {
 
       this.previewUrl = photo.webPath;
       this.imageBlob = await (await fetch(photo.webPath)).blob();
-      await this.upload();
+      this.imageFileName = 'wardrobe-item.jpg';
     } catch {
       this.message = source === CameraSource.Camera ? 'Camera was not available.' : 'Could not open photo library.';
     }
   }
 
-  async upload(): Promise<void> {
+  async handleFileSelection(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) {
+      return;
+    }
+
+    this.setPreviewUrl(URL.createObjectURL(file));
+    this.imageBlob = file;
+    this.imageFileName = file.name || 'wardrobe-item.jpg';
+  }
+
+  clearSelection(): void {
+    this.setPreviewUrl(null);
+    this.imageBlob = null;
+    this.imageFileName = 'wardrobe-item.jpg';
+    this.message = '';
+  }
+
+  async handleBatchSelection(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    if (!files.length) {
+      return;
+    }
+
+    this.clearBatchSelection();
+    this.batchFiles = files;
+    this.batchPreviewUrls = files.map((file) => URL.createObjectURL(file));
+  }
+
+  async upload(fileName = this.imageFileName): Promise<void> {
     if (!this.imageBlob) return;
     this.isSaving = true;
     this.message = '';
     try {
-      await this.api.createItem(this.imageBlob, 'wardrobe-item.jpg');
+      await this.api.createItem(this.imageBlob, fileName);
       await this.router.navigateByUrl('/tabs/wardrobe');
     } catch (error) {
       this.message = readMessage(error, 'Could not upload item. Try again.');
     } finally {
       this.isSaving = false;
     }
+  }
+
+  async uploadBatch(): Promise<void> {
+    if (!this.batchFiles.length) {
+      return;
+    }
+
+    this.isBatchSaving = true;
+    this.message = '';
+    try {
+      const result = await this.api.createItems(this.batchFiles);
+      const failures = result.results.filter((entry) => !entry.success);
+      this.clearBatchSelection();
+      if (!failures.length) {
+        await this.router.navigateByUrl('/tabs/wardrobe');
+        return;
+      }
+
+      const failureSummary = failures
+        .slice(0, 3)
+        .map((entry) => `${entry.fileName}: ${entry.error || 'Could not upload item. Try again.'}`)
+        .join(' ');
+      this.message = result.succeededCount > 0
+        ? `${result.succeededCount} item${result.succeededCount === 1 ? '' : 's'} added. ${result.failedCount} could not be uploaded. ${failureSummary}`
+        : failureSummary || 'Could not upload batch. Try again.';
+    } catch (error) {
+      this.message = readMessage(error, 'Could not upload batch. Try again.');
+    } finally {
+      this.isBatchSaving = false;
+    }
+  }
+
+  removeBatchFile(index: number): void {
+    if (this.isBatchSaving) {
+      return;
+    }
+
+    const nextFiles = this.batchFiles.filter((_, currentIndex) => currentIndex !== index);
+    this.clearBatchSelection();
+    this.batchFiles = nextFiles;
+    this.batchPreviewUrls = nextFiles.map((file) => URL.createObjectURL(file));
+  }
+
+  openBatchPicker(): void {
+    if (this.isBatchSaving) {
+      return;
+    }
+
+    this.batchInput?.nativeElement.click();
+  }
+
+  clearBatchSelection(): void {
+    for (const previewUrl of this.batchPreviewUrls) {
+      if (previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    }
+
+    this.batchFiles = [];
+    this.batchPreviewUrls = [];
+
+    if (this.batchInput) {
+      this.batchInput.nativeElement.value = '';
+    }
+  }
+
+  private openBrowserFilePicker(source: CameraSource.Camera | CameraSource.Photos): void {
+    const input = source === CameraSource.Camera ? this.cameraInput : this.libraryInput;
+    if (!input) {
+      this.message = source === CameraSource.Camera ? 'Camera was not available.' : 'Could not open photo library.';
+      return;
+    }
+
+    input.nativeElement.click();
+  }
+
+  private setPreviewUrl(url: string | null): void {
+    if (this.previewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(this.previewUrl);
+    }
+
+    this.previewUrl = url;
   }
 }
 
@@ -319,6 +641,7 @@ export class AddItemPage {
         <div class="product-stage">
           <img class="product-image" [src]="item.image.displayUrl" [alt]="item.name">
         </div>
+        <ion-button class="taupe-button" expand="block" (click)="markWorn()" *ngIf="!editing" [disabled]="isMarkingWorn">{{ isMarkingWorn ? 'Marking worn...' : 'Mark worn' }}</ion-button>
         <div class="detail-chips">
           <span class="detail-chip" *ngFor="let tag of visibleTags">{{ tag }}</span>
         </div>
@@ -419,7 +742,7 @@ export class AddItemPage {
     </ion-content>
   `
 })
-export class ItemDetailPage implements OnInit {
+export class ItemDetailPage {
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
@@ -429,6 +752,7 @@ export class ItemDetailPage implements OnInit {
   message = '';
   isLoading = true;
   isSaving = false;
+  isMarkingWorn = false;
   editing = false;
 
   get selectedSubcategories(): { id: string; label: string }[] {
@@ -453,7 +777,15 @@ export class ItemDetailPage implements OnInit {
     return Array.from(new Set(tags.map((id) => lookupLabel(this.lookups!, id)).filter(Boolean))).slice(0, 8);
   }
 
-  async ngOnInit(): Promise<void> {
+  async ionViewWillEnter(): Promise<void> {
+    await this.loadItem();
+  }
+
+  private async loadItem(): Promise<void> {
+    this.isLoading = true;
+    this.message = '';
+    this.item = null;
+    this.editing = false;
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
       this.message = 'Could not load item.';
@@ -468,6 +800,20 @@ export class ItemDetailPage implements OnInit {
       this.message = readMessage(error, 'Could not load item.');
     } finally {
       this.isLoading = false;
+    }
+  }
+
+  async markWorn(): Promise<void> {
+    if (!this.item) return;
+    this.isMarkingWorn = true;
+    this.message = '';
+    try {
+      await this.api.markItemWorn(this.item.id);
+      this.message = 'Marked as worn.';
+    } catch (error) {
+      this.message = readMessage(error, 'Could not mark item as worn.');
+    } finally {
+      this.isMarkingWorn = false;
     }
   }
 
@@ -545,6 +891,42 @@ export class ItemDetailPage implements OnInit {
           </div>
           <ion-button class="primary-button" expand="block" (click)="search()" [disabled]="isBusy || !query.trim()">{{ isBusy ? 'Building...' : 'Build outfits' }}</ion-button>
         </article>
+        <article class="panel form-stack manual-builder">
+          <div class="panel-heading">
+            <h2 class="section-title">Manual builder</h2>
+            <button type="button" class="icon-button" aria-label="Clear selected manual items" (click)="clearManualSelection()" [disabled]="!manualItemIds.length || isBusy">
+              <ion-icon name="close-outline"></ion-icon>
+            </button>
+          </div>
+          <label>
+            Outfit name
+            <ion-input class="field" [(ngModel)]="manualName" name="manualName"></ion-input>
+          </label>
+          <div class="manual-summary">
+            <span>{{ manualItemIds.length }} selected</span>
+            <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="selectAllItems()" [disabled]="!items.length || isBusy">Select all</ion-button>
+          </div>
+          <div class="manual-grid" *ngIf="items.length">
+            <button type="button" class="item-card manual-item" *ngFor="let item of items; trackBy: trackById" [class.selected]="isManualSelected(item.id)" (click)="toggleManualItem(item.id)">
+              <div class="item-card__image-wrap manual-item__image-wrap">
+                <img [src]="item.image.displayUrl" [alt]="item.name">
+                <span class="manual-item__check">
+                  <ion-icon [name]="isManualSelected(item.id) ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+                </span>
+              </div>
+              <div class="item-card__body">
+                <h3>{{ item.name }}</h3>
+                <div class="meta-line"><span>{{ label(item.subcategoryId) }}</span></div>
+                <div class="colour-dots" aria-label="Item colours">
+                  <span class="colour-dot" *ngFor="let colour of coloursFor(item)" [style.background]="colourSwatch(colour)"></span>
+                </div>
+              </div>
+            </button>
+          </div>
+          <p class="muted" *ngIf="!items.length">Load wardrobe items to build a manual outfit.</p>
+          <p class="muted" *ngIf="manualItemIds.length && !manualCanSave">{{ manualHint }}</p>
+          <ion-button class="primary-button" expand="block" (click)="saveManual()" [disabled]="isBusy || !manualCanSave">{{ isBusy ? 'Saving...' : 'Save manual outfit' }}</ion-button>
+        </article>
         <h2 class="section-title" *ngIf="results.length">Outfit ideas</h2>
         <article class="outfit-card idea-card" *ngFor="let outfit of results">
           <div class="outfit-images">
@@ -561,19 +943,25 @@ export class ItemDetailPage implements OnInit {
     </ion-content>
   `
 })
-export class BuilderPage implements OnInit {
+export class BuilderPage {
   private readonly api = inject(WardrobeApiService);
   query = 'Smart casual dinner using my black jeans, no heels';
   chips = ['Work', 'Dinner', 'Brunch', 'No heels', 'Smart casual'];
   items: WardrobeItemDto[] = [];
+  lookups: WardrobeLookupsDto | null = null;
   results: GeneratedOutfitDto[] = [];
   requiredItemId: string | null = null;
+  manualName = 'Manual outfit';
+  manualItemIds: string[] = [];
   message = '';
   isBusy = false;
 
-  async ngOnInit(): Promise<void> {
+  async ionViewWillEnter(): Promise<void> {
+    this.message = '';
     try {
+      this.lookups ??= await this.api.getLookups();
       this.items = await this.api.getItems();
+      this.manualItemIds = this.manualItemIds.filter((id) => this.items.some((item) => item.id === id));
     } catch (error) {
       this.message = readMessage(error, 'Could not load wardrobe items.');
     }
@@ -587,18 +975,54 @@ export class BuilderPage implements OnInit {
     this.query = '';
   }
 
+  toggleManualItem(id: string): void {
+    if (this.manualItemIds.includes(id)) {
+      this.manualItemIds = this.manualItemIds.filter((value) => value !== id);
+      return;
+    }
+
+    this.manualItemIds = [...this.manualItemIds, id];
+  }
+
+  clearManualSelection(): void {
+    this.manualItemIds = [];
+  }
+
+  selectAllItems(): void {
+    this.manualItemIds = this.items.map((item) => item.id);
+  }
+
   async search(): Promise<void> {
     this.isBusy = true;
     this.message = '';
     try {
+      this.lookups ??= await this.api.getLookups();
       this.items = await this.api.getItems();
       this.results = await this.api.searchOutfits(this.query, this.requiredItemId);
       if (!this.results.length) {
-        this.message = 'Could not build an outfit from the current wardrobe.';
+        this.message = 'No outfit matched that request. Try removing one restriction.';
       }
     } catch (error) {
       this.results = [];
       this.message = readMessage(error, 'Could not build an outfit from the current wardrobe.');
+    } finally {
+      this.isBusy = false;
+    }
+  }
+
+  async saveManual(): Promise<void> {
+    if (!this.manualCanSave) {
+      this.message = this.manualHint || 'Add more clothing items to build complete outfits.';
+      return;
+    }
+
+    this.isBusy = true;
+    this.message = '';
+    try {
+      await this.api.saveOutfit(this.manualName.trim() || 'Manual outfit', null, 'Built manually from selected wardrobe items.', this.manualItemIds);
+      this.message = 'Outfit saved.';
+    } catch (error) {
+      this.message = readMessage(error, 'Could not save outfit.');
     } finally {
       this.isBusy = false;
     }
@@ -620,6 +1044,70 @@ export class BuilderPage implements OnInit {
 
   nameFor(id: string): string {
     return this.items.find((x) => x.id === id)?.name ?? 'Wardrobe item';
+  }
+
+  label(id: string | null): string {
+    if (!id || !this.lookups) return '';
+    return lookupLabel(this.lookups, id);
+  }
+
+  coloursFor(item: WardrobeItemDto): string[] {
+    return [item.primaryColourId, ...item.secondaryColourIds].filter(Boolean).slice(0, 4);
+  }
+
+  colourSwatch(id: string): string {
+    return colourSwatch(id);
+  }
+
+  isManualSelected(id: string): boolean {
+    return this.manualItemIds.includes(id);
+  }
+
+  get manualCanSave(): boolean {
+    return this.isValidManualOutfit(this.selectedManualItems());
+  }
+
+  get manualHint(): string {
+    const selected = this.selectedManualItems();
+    if (!selected.length) {
+      return '';
+    }
+
+    if (!selected.some((item) => item.categoryId === 'footwear')) {
+      return 'Add shoes to complete the outfit.';
+    }
+
+    return 'Select a top and bottom, a dress, or one piece with shoes.';
+  }
+
+  private selectedManualItems(): WardrobeItemDto[] {
+    return this.manualItemIds
+      .map((id) => this.items.find((item) => item.id === id))
+      .filter((item): item is WardrobeItemDto => !!item);
+  }
+
+  private isValidManualOutfit(items: WardrobeItemDto[]): boolean {
+    const count = (predicate: (item: WardrobeItemDto) => boolean): number => items.filter(predicate).length;
+    const tops = count((item) => item.categoryId === 'tops' || item.categoryId === 'knitwear');
+    const bottoms = count((item) => item.categoryId === 'bottoms');
+    const dresses = count((item) => item.categoryId === 'dresses');
+    const onePieces = count((item) => item.categoryId === 'one_pieces');
+    const footwear = count((item) => item.categoryId === 'footwear');
+    const outerwear = count((item) => item.categoryId === 'outerwear');
+    const bags = count((item) => item.categoryId === 'bags');
+    const supportedItems = tops + bottoms + dresses + onePieces + footwear + outerwear + bags + count((item) => item.categoryId === 'accessories');
+
+    if (supportedItems !== items.length || footwear !== 1 || outerwear > 1 || bags > 1) {
+      return false;
+    }
+
+    return (tops === 1 && bottoms === 1 && dresses === 0 && onePieces === 0)
+      || (dresses === 1 && tops === 0 && bottoms === 0 && onePieces === 0)
+      || (onePieces === 1 && tops === 0 && bottoms === 0 && dresses === 0);
+  }
+
+  trackById(_: number, item: WardrobeItemDto): string {
+    return item.id;
   }
 }
 
@@ -663,13 +1151,13 @@ export class BuilderPage implements OnInit {
     </ion-content>
   `
 })
-export class OutfitsPage implements OnInit {
+export class OutfitsPage {
   private readonly api = inject(WardrobeApiService);
   outfits: OutfitDto[] = [];
   isLoading = true;
   message = '';
 
-  async ngOnInit(): Promise<void> {
+  async ionViewWillEnter(): Promise<void> {
     await this.load();
   }
 

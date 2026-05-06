@@ -2,11 +2,21 @@ export interface AuthUserDto {
   id: string;
   email: string;
   displayName: string;
+  provider?: string;
 }
 
 export interface AuthResponse {
   accessToken: string;
+  refreshToken: string;
+  tokenType: string;
+  expiresAt: string;
   user: AuthUserDto;
+}
+
+export interface AuthProviderDto {
+  provider: string;
+  enabled: boolean;
+  clientId: string;
 }
 
 export interface LookupOptionDto {
@@ -55,9 +65,25 @@ export interface WardrobeItemDto {
   lengthId: string | null;
   bottomShapeId: string | null;
   riseId: string | null;
+  isArchived: boolean;
+  wearCount: number;
+  lastWornAt: string | null;
   image: WardrobeItemImageDto;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface WardrobeItemUploadResultDto {
+  fileName: string;
+  success: boolean;
+  item: WardrobeItemDto | null;
+  error: string | null;
+}
+
+export interface BatchWardrobeItemsResponse {
+  results: WardrobeItemUploadResultDto[];
+  succeededCount: number;
+  failedCount: number;
 }
 
 export interface UpdateWardrobeItemRequest {
@@ -88,6 +114,8 @@ export interface OutfitDto {
   prompt: string | null;
   explanation: string | null;
   items: WardrobeItemDto[];
+  wearCount: number;
+  lastWornAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

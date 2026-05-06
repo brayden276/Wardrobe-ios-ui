@@ -20,6 +20,22 @@ The lane builds the Angular app, runs `npx cap sync ios`, then produces a manual
 
 Use `bundle exec fastlane ios sync` when you only need to refresh the native iOS project after web changes.
 
+## Production IPA
+
+The production IPA must point to the hosted `Wardrobe-ios-api` Railway URL. Do not use the API under `api/WardrobeAi.Api` for production; it remains in this repository only as legacy/non-production source.
+
+From a macOS machine with the production signing assets installed:
+
+```sh
+APP_IDENTIFIER=com.yourcompany.wardrobeai \
+APPLE_TEAM_ID=YOURTEAMID \
+PROVISIONING_PROFILE_SPECIFIER="Wardrobe AI App Store" \
+UI_API_BASE_URL=https://your-api.up.railway.app \
+bundle exec fastlane ios build_release
+```
+
+`build_release` fails if `UI_API_BASE_URL` is missing or points to localhost.
+
 ## API URL
 
 The Ionic app uses `UI_API_BASE_URL` from `.env` or the process environment when `npm run build` runs. Use the API origin only, without a trailing `/api`.

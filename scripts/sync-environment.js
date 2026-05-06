@@ -25,11 +25,23 @@ const appEnvPath = path.join(root, 'src', 'environments', 'environment.ts');
 const prodEnvPath = path.join(root, 'src', 'environments', 'environment.prod.ts');
 
 const defaults = {
-  UI_API_BASE_URL: 'https://localhost:7152'
+  UI_API_BASE_URL: 'http://localhost:5055'
 };
 
 const envFile = fs.existsSync(envPath) ? parseDotEnv(fs.readFileSync(envPath, 'utf8')) : {};
-const apiBaseUrl = normaliseApiBaseUrl(process.env.UI_API_BASE_URL || envFile.UI_API_BASE_URL || defaults.UI_API_BASE_URL);
+const requireProductionApi = process.env.UI_REQUIRE_PRODUCTION_API === 'true';
+const allowLocalhostApi = process.env.UI_ALLOW_LOCALHOST_API === 'true';
+const enforceProductionApi = requireProductionApi || (process.env.npm_lifecycle_event === 'prebuild' && !allowLocalhostApi);
+const configuredApiBaseUrl = process.env.UI_API_BASE_URL || envFile.UI_API_BASE_URL || defaults.UI_API_BASE_URL;
+const apiBaseUrl = normaliseApiBaseUrl(configuredApiBaseUrl);
+
+if (enforceProductionApi && !process.env.UI_API_BASE_URL) {
+  throw new Error('UI_API_BASE_URL must be supplied by the environment for release builds.');
+}
+
+if (enforceProductionApi && isLocalhost(apiBaseUrl)) {
+  throw new Error('Release builds must not use localhost for UI_API_BASE_URL.');
+}
 const output = `// This file is generated from .env by scripts/sync-environment.js.
 // Update UI_API_BASE_URL in .env or the process environment, then run npm start or npm run build.
 
@@ -57,4 +69,13 @@ function normaliseApiBaseUrl(value) {
     .trim()
     .replace(/\/+$/, '')
     .replace(/\/api$/i, '');
+}
+
+function isLocalhost(value) {
+  try {
+    const parsed = new URL(value);
+    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1';
+  } catch {
+    return true;
+  }
 }
