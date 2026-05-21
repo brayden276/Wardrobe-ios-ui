@@ -4,6 +4,8 @@
 
 Fastlane is configured against the checked-in Capacitor iOS target at `ios/App/App.xcodeproj`.
 
+This repository's iOS project is a Capacitor 8 Swift Package Manager project. It does not check in a `Podfile` or an `ios/App/App.xcworkspace`.
+
 - Bundle ID: `ai.wardrobe.app`
 - Display name: `Wardrobe AI`
 - Scheme: `App`
@@ -26,6 +28,15 @@ UI_API_BASE_URL=https://your-api-host.example.com bundle exec fastlane ios build
 The lane builds the Angular app, runs `npx cap sync ios`, then produces a manually signed development IPA under `build/ios`.
 
 Use `bundle exec fastlane ios sync` when you only need to refresh the native iOS project after web changes.
+
+## Appflow
+
+Appflow must be told to package this app as an SPM-based Capacitor iOS project.
+
+- Set `ENABLE_SPM_SUPPORT=true` in the Appflow environment for iOS package builds.
+- Do not add CocoaPods files just to satisfy Appflow. The checked-in native project is `ios/App/App.xcodeproj`, and there is intentionally no `ios/App/App.xcworkspace`.
+
+Without `ENABLE_SPM_SUPPORT=true`, Appflow treats the project as CocoaPods-based, looks for `ios/App/App.xcworkspace`, and fails during the native packaging step after the web build succeeds.
 
 ## Production IPA
 
