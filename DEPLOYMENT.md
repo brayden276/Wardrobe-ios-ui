@@ -34,7 +34,10 @@ Use `bundle exec fastlane ios sync` when you only need to refresh the native iOS
 Appflow must be told to package this app as an SPM-based Capacitor iOS project.
 
 - Set `ENABLE_SPM_SUPPORT=true` in the Appflow environment for iOS package builds.
+- Upload an App Store provisioning profile whose bundle identifier is exactly `ai.wardrobe.app`.
 - Do not add CocoaPods files just to satisfy Appflow. The checked-in native project is `ios/App/App.xcodeproj`, and there is intentionally no `ios/App/App.xcworkspace`.
+
+If Appflow detects an older profile such as `Memory App Provisioning` for `com.braydendekoning.bidwinner.dev`, the archive step will fail even when `APP_IDENTIFIER`, `APPLE_TEAM_ID`, and `PROVISIONING_PROFILE_SPECIFIER` are set correctly.
 
 Without `ENABLE_SPM_SUPPORT=true`, Appflow treats the project as CocoaPods-based, looks for `ios/App/App.xcworkspace`, and fails during the native packaging step after the web build succeeds.
 
@@ -45,7 +48,7 @@ The production IPA must point to the hosted `Wardrobe-ios-api` Railway URL. Do n
 From a macOS machine with the production signing assets installed:
 
 ```sh
-APP_IDENTIFIER=com.yourcompany.wardrobeai \
+APP_IDENTIFIER=ai.wardrobe.app \
 APPLE_TEAM_ID=YOURTEAMID \
 PROVISIONING_PROFILE_SPECIFIER="Wardrobe AI App Store" \
 UI_API_BASE_URL=https://your-api.up.railway.app \
