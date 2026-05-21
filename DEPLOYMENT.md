@@ -1,16 +1,57 @@
 # Deployment
 
-## iOS Fastlane
+## GitHub Actions iOS Release
 
-Fastlane is configured against the checked-in Capacitor iOS target at `ios/App/App.xcodeproj`.
+The release path is now `/.github/workflows/ios-release.yml`.
+
+It keeps the existing Capacitor + Fastlane + Xcode build path, but moves signing, IPA packaging, artifact upload, and optional TestFlight upload into GitHub Actions instead of Appflow.
 
 This repository's iOS project is a Capacitor 8 Swift Package Manager project. It does not check in a `Podfile` or an `ios/App/App.xcworkspace`.
+
+Current release values:
 
 - Bundle ID: `ai.wardrobe.app`
 - Display name: `Wardrobe AI`
 - Scheme: `App`
+- Apple team ID: `454Z8R39M9`
+- Provisioning profile specifier: `Wardrobe AI App Store`
 - Privacy manifest: `ios/App/App/PrivacyInfo.xcprivacy`
 - iOS permission strings: `ios/App/App/Info.plist`
+
+Repository variables required by the workflow:
+
+- `UI_API_BASE_URL`
+- `APPSTORE_API_KEY_ID`
+- `APPSTORE_ISSUER_ID`
+
+Repository secrets required by the workflow:
+
+- `BUILD_CERTIFICATE_BASE64`
+- `P12_PASSWORD`
+- `BUILD_PROVISION_PROFILE_BASE64`
+- `KEYCHAIN_PASSWORD`
+- `APPSTORE_API_PRIVATE_KEY`
+
+`BUILD_CERTIFICATE_BASE64` should be the Base64-encoded `.p12` Apple signing certificate. `BUILD_PROVISION_PROFILE_BASE64` should be the Base64-encoded `.mobileprovision` file for `ai.wardrobe.app`.
+
+From a macOS machine, you can generate the GitHub secret values with:
+
+```sh
+base64 -i path/to/wardrobeai_distribution.p12 | pbcopy
+base64 -i path/to/WardrobeAI.mobileprovision | pbcopy
+```
+
+After the variables and secrets are configured:
+
+1. Open the `iOS Release` workflow in GitHub Actions.
+2. Run it with `upload_to_testflight=true` for a full signed release upload, or `false` to build only and keep the IPA as a workflow artifact.
+3. Download the `wardrobe-ai-ios-release` artifact if you need the signed IPA outside TestFlight.
+
+The workflow builds the Angular app, runs `npx cap sync ios` through Fastlane, signs the checked-in Xcode project on a macOS runner, uploads `build/ios/WardrobeAI.ipa` as an artifact, and can then upload that IPA to TestFlight using the App Store Connect API key.
+
+## Local Fastlane
+
+Fastlane is configured against the checked-in Capacitor iOS target at `ios/App/App.xcodeproj`.
 
 Manual signing values still come from Fastlane environment variables:
 
@@ -29,18 +70,6 @@ The lane builds the Angular app, runs `npx cap sync ios`, then produces a manual
 
 Use `bundle exec fastlane ios sync` when you only need to refresh the native iOS project after web changes.
 
-## Appflow
-
-Appflow must be told to package this app as an SPM-based Capacitor iOS project.
-
-- Set `ENABLE_SPM_SUPPORT=true` in the Appflow environment for iOS package builds.
-- Upload an App Store provisioning profile whose bundle identifier is exactly `ai.wardrobe.app`.
-- Do not add CocoaPods files just to satisfy Appflow. The checked-in native project is `ios/App/App.xcodeproj`, and there is intentionally no `ios/App/App.xcworkspace`.
-
-If Appflow detects an older profile such as `Memory App Provisioning` for `com.braydendekoning.bidwinner.dev`, the archive step will fail even when `APP_IDENTIFIER`, `APPLE_TEAM_ID`, and `PROVISIONING_PROFILE_SPECIFIER` are set correctly.
-
-Without `ENABLE_SPM_SUPPORT=true`, Appflow treats the project as CocoaPods-based, looks for `ios/App/App.xcworkspace`, and fails during the native packaging step after the web build succeeds.
-
 ## Production IPA
 
 The production IPA must point to the hosted `Wardrobe-ios-api` Railway URL. Do not use the API under `api/WardrobeAi.Api` for production; it remains in this repository only as legacy/non-production source.
@@ -49,7 +78,7 @@ From a macOS machine with the production signing assets installed:
 
 ```sh
 APP_IDENTIFIER=ai.wardrobe.app \
-APPLE_TEAM_ID=YOURTEAMID \
+APPLE_TEAM_ID=454Z8R39M9 \
 PROVISIONING_PROFILE_SPECIFIER="Wardrobe AI App Store" \
 UI_API_BASE_URL=https://your-api.up.railway.app \
 bundle exec fastlane ios build_release
