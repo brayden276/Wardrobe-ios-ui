@@ -2,6 +2,7 @@ import { Component, ElementRef, ViewChild, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Preferences } from '@capacitor/preferences';
 import { AuthService } from './auth.service';
 import { ApiMessage, GeneratedOutfitDto, OutfitDto, UpdateWardrobeItemRequest, WardrobeItemDto, WardrobeLookupsDto } from './models';
 import { WardrobeApiService } from './wardrobe-api.service';
@@ -420,6 +421,8 @@ export class WardrobePage {
             <span>Uploading and categorising item...</span>
           </div>
           <p>{{ imageBlob ? 'Ready to submit for categorisation.' : 'One item, clearly visible.' }}</p>
+          <p class="muted consent-note">Wardrobe AI sends uploaded wardrobe photos to OpenAI to classify items and generate cleaned display images.</p>
+          <p class="muted consent-note">Only upload clothing photos you are comfortable sharing with that provider.</p>
           <p class="muted" *ngIf="message">{{ message }}</p>
         </article>
         <article class="panel form-stack batch-panel">
@@ -440,6 +443,7 @@ export class WardrobePage {
             </button>
           </div>
           <p class="muted" *ngIf="!batchFiles.length">Select multiple photos and upload them together.</p>
+          <p class="muted consent-note">Batch uploads use the same OpenAI-powered classification flow as single-item uploads.</p>
           <ion-button class="primary-button" expand="block" (click)="uploadBatch()" [disabled]="isBatchSaving || !batchFiles.length">{{ isBatchSaving ? 'Uploading batch...' : 'Upload batch' }}</ion-button>
         </article>
       </section>
@@ -518,6 +522,14 @@ export class AddItemPage {
 
   async upload(fileName = this.imageFileName): Promise<void> {
     if (!this.imageBlob) return;
+
+    if (!await ensureAiConsent(
+      'Wardrobe AI uses OpenAI to classify wardrobe photos and generate cleaned display images. Do you want to continue with AI processing for this device?'))
+    {
+      this.message = 'OpenAI consent is required before you can upload wardrobe photos.';
+      return;
+    }
+
     this.isSaving = true;
     this.message = '';
     try {
@@ -532,6 +544,13 @@ export class AddItemPage {
 
   async uploadBatch(): Promise<void> {
     if (!this.batchFiles.length) {
+      return;
+    }
+
+    if (!await ensureAiConsent(
+      'Wardrobe AI uses OpenAI to classify wardrobe photos and generate cleaned display images. Do you want to continue with AI processing for this device?'))
+    {
+      this.message = 'OpenAI consent is required before you can upload wardrobe photos.';
       return;
     }
 
@@ -898,6 +917,7 @@ export class ItemDetailPage {
             <button type="button" class="chip" *ngFor="let chip of chips" (click)="append(chip)">{{ chip }}</button>
           </div>
           <ion-button class="primary-button" expand="block" (click)="search()" [disabled]="isBusy || !query.trim()">{{ isBusy ? 'Building...' : 'Build outfits' }}</ion-button>
+          <p class="muted consent-note">Wardrobe AI sends your outfit request and wardrobe item details to OpenAI to generate outfit suggestions.</p>
         </article>
         <article class="panel form-stack manual-builder">
           <div class="panel-heading">
@@ -1005,6 +1025,13 @@ export class BuilderPage {
   }
 
   async search(): Promise<void> {
+    if (!await ensureAiConsent(
+      'Wardrobe AI uses OpenAI to interpret your outfit request and generate outfit suggestions from your wardrobe. Do you want to continue with AI processing for this device?'))
+    {
+      this.message = 'OpenAI consent is required before Wardrobe AI can build outfit suggestions.';
+      return;
+    }
+
     this.isBusy = true;
     this.message = '';
     try {
@@ -1254,7 +1281,30 @@ export class OutfitsPage {
         <article class="panel settings-card">
           <h1 class="plain-title">{{ auth.session?.user?.displayName || 'Wardrobe AI' }}</h1>
           <p class="muted">{{ auth.session?.user?.email }}</p>
-          <ion-button class="secondary-button" fill="outline" (click)="logout()">Sign out</ion-button>
+        </article>
+        <article class="panel settings-card">
+          <h2 class="section-title">Device session</h2>
+          <p class="muted">This device stores your Wardrobe AI session in local app preferences until you sign out or delete your account.</p>
+          <p class="muted" *ngIf="sessionExpiresAtLabel">Current session expires {{ sessionExpiresAtLabel }}.</p>
+          <ion-button class="secondary-button" fill="outline" (click)="logout()" [disabled]="isBusy">{{ isBusy ? 'Working...' : 'Sign out' }}</ion-button>
+        </article>
+        <article class="panel settings-card">
+          <h2 class="section-title">AI processing</h2>
+          <p class="muted">{{ aiConsentAccepted ? 'This device is allowed to send wardrobe photos and outfit requests to OpenAI.' : 'This device has not granted OpenAI processing consent yet.' }}</p>
+          <p class="muted">{{ aiDisclosure }}</p>
+          <ion-button class="secondary-button" fill="outline" (click)="resetAiConsent()" [disabled]="isBusy || !aiConsentAccepted">Require consent again</ion-button>
+        </article>
+        <article class="panel settings-card">
+          <h2 class="section-title">Legal and support</h2>
+          <a class="text-link" [href]="privacyPolicyUrl" target="_blank" rel="noreferrer">Privacy policy</a>
+          <a class="text-link" [href]="termsUrl" target="_blank" rel="noreferrer">Terms of use</a>
+          <a class="text-link" [href]="supportUrl" target="_blank" rel="noreferrer">Support</a>
+        </article>
+        <article class="panel settings-card danger-panel">
+          <h2 class="section-title">Delete account</h2>
+          <p class="muted">Deleting your account permanently removes your sign-in, wardrobe items, saved outfits, uploaded images, and related cloud data.</p>
+          <ion-button class="secondary-button destructive-button" fill="outline" (click)="deleteAccount()" [disabled]="isBusy">{{ isBusy ? 'Deleting...' : 'Delete account' }}</ion-button>
+          <p class="muted" *ngIf="message">{{ message }}</p>
         </article>
       </section>
     </ion-content>
@@ -1263,10 +1313,67 @@ export class OutfitsPage {
 export class SettingsPage {
   readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  readonly privacyPolicyUrl = PRIVACY_POLICY_URL;
+  readonly termsUrl = TERMS_OF_USE_URL;
+  readonly supportUrl = SUPPORT_URL;
+  readonly aiDisclosure = AI_DISCLOSURE_TEXT;
+  aiConsentAccepted = false;
+  isBusy = false;
+  message = '';
+
+  async ionViewWillEnter(): Promise<void> {
+    this.aiConsentAccepted = await hasAiConsent();
+    this.message = '';
+  }
+
+  get sessionExpiresAtLabel(): string {
+    const expiresAt = this.auth.session?.expiresAt;
+    if (!expiresAt) {
+      return '';
+    }
+
+    const parsed = Date.parse(expiresAt);
+    if (Number.isNaN(parsed)) {
+      return '';
+    }
+
+    return `on ${new Date(parsed).toLocaleString()}`;
+  }
 
   async logout(): Promise<void> {
+    this.isBusy = true;
     await this.auth.logout();
+    this.isBusy = false;
     await this.router.navigateByUrl('/login');
+  }
+
+  async resetAiConsent(): Promise<void> {
+    if (!this.aiConsentAccepted || !window.confirm('Require consent again for OpenAI wardrobe processing on this device?')) {
+      return;
+    }
+
+    await clearAiConsent();
+    this.aiConsentAccepted = false;
+    this.message = 'OpenAI consent was cleared for this device.';
+  }
+
+  async deleteAccount(): Promise<void> {
+    const confirmed = window.confirm('Delete your Wardrobe AI account? This permanently removes your account, wardrobe items, saved outfits, uploaded images, and related cloud data.');
+    if (!confirmed) {
+      return;
+    }
+
+    this.isBusy = true;
+    this.message = '';
+    try {
+      await this.auth.deleteAccount();
+      await clearAiConsent();
+      await this.router.navigateByUrl('/login');
+    } catch (error) {
+      this.message = readMessage(error, 'Could not delete your account. Try again.');
+    } finally {
+      this.isBusy = false;
+    }
   }
 }
 
@@ -1329,7 +1436,40 @@ function colourSwatch(id: string): string {
   return colours[id] ?? '#c4b8a8';
 }
 
+const AI_CONSENT_KEY = 'wardrobe-ai-openai-consent';
+const PRIVACY_POLICY_URL = 'https://wardrobe.ai/privacy';
+const TERMS_OF_USE_URL = 'https://wardrobe.ai/terms';
+const SUPPORT_URL = 'mailto:support@wardrobe.ai';
+const AI_DISCLOSURE_TEXT = 'Wardrobe AI uses OpenAI to classify wardrobe photos, generate cleaned display images, and suggest outfits from your saved wardrobe. Avoid uploading photos or prompts that you do not want processed by that provider.';
+
+async function hasAiConsent(): Promise<boolean> {
+  const stored = await Preferences.get({ key: AI_CONSENT_KEY });
+  return stored.value === 'accepted';
+}
+
+async function ensureAiConsent(prompt: string): Promise<boolean> {
+  if (await hasAiConsent()) {
+    return true;
+  }
+
+  const confirmed = window.confirm(prompt);
+  if (!confirmed) {
+    return false;
+  }
+
+  await Preferences.set({ key: AI_CONSENT_KEY, value: 'accepted' });
+  return true;
+}
+
+async function clearAiConsent(): Promise<void> {
+  await Preferences.remove({ key: AI_CONSENT_KEY });
+}
+
 function readMessage(error: unknown, fallback: string): string {
-  const candidate = error as { error?: ApiMessage };
-  return candidate.error?.message ?? fallback;
+  const candidate = error as { error?: ApiMessage; status?: number; message?: string };
+  if (candidate.status === 0) {
+    return 'Could not reach Wardrobe AI. Check your connection and try again.';
+  }
+
+  return candidate.error?.message ?? candidate.message ?? fallback;
 }

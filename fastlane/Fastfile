@@ -1,9 +1,9 @@
 default_platform(:ios)
 
 REPO_ROOT = File.expand_path("..", __dir__)
-APP_IDENTIFIER = ENV.fetch("APP_IDENTIFIER", "com.braydendekoning.bidwinner.dev")
-APPLE_TEAM_ID = ENV.fetch("APPLE_TEAM_ID", "454Z8R39M9")
-PROFILE_NAME = ENV.fetch("PROVISIONING_PROFILE_SPECIFIER", "Memory App Dev")
+APP_IDENTIFIER = ENV.fetch("APP_IDENTIFIER", "ai.wardrobe.app")
+APPLE_TEAM_ID = ENV.fetch("APPLE_TEAM_ID", "YOURTEAMID")
+PROFILE_NAME = ENV.fetch("PROVISIONING_PROFILE_SPECIFIER", "Wardrobe AI Development")
 IOS_PROJECT = File.join(REPO_ROOT, "ios", "App", "App.xcodeproj")
 IOS_SCHEME = ENV.fetch("IOS_SCHEME", "App")
 IOS_CONFIGURATION = ENV.fetch("IOS_CONFIGURATION", "Release")
@@ -22,6 +22,7 @@ platform :ios do
 
   desc "Build a manually signed development IPA for Wardrobe AI"
   lane :build_dev do
+    ensure_signing_inputs!
     ENV["UI_ALLOW_LOCALHOST_API"] = "true"
     sync
 
@@ -86,6 +87,11 @@ platform :ios do
         sh("npm ci")
       end
     end
+  end
+
+  private_lane :ensure_signing_inputs! do
+    UI.user_error!("APPLE_TEAM_ID is required for iOS builds") if APPLE_TEAM_ID.to_s.strip.empty? || APPLE_TEAM_ID == "YOURTEAMID"
+    UI.user_error!("APP_IDENTIFIER is required for iOS builds") if APP_IDENTIFIER.to_s.strip.empty?
   end
 end
 

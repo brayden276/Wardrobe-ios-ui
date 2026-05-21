@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.braydendekoning.bidwinner.dev',
+  appId: 'ai.wardrobe.app',
   appName: 'Wardrobe AI',
   webDir: 'www'
 };

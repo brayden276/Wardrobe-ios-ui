@@ -1,0 +1,40 @@
+name: UI CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify release environment injection
+        env:
+          UI_API_BASE_URL: https://api.example.com
+        run: |
+          node scripts/sync-environment.js
+          grep -q 'https://api.example.com' src/environments/environment.prod.ts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run unit tests
+        env:
+          CI: true
+        run: npm test -- --configuration=ci --watch=false --browsers=ChromeHeadlessNoSandbox

@@ -32,13 +32,19 @@ module.exports = function (config) {
         { type: 'text-summary' }
       ]
     },
+    customLaunchers: {
+      ChromeHeadlessNoSandbox: {
+        base: 'ChromeHeadless',
+        flags: ['--no-sandbox', '--disable-dev-shm-usage']
+      }
+    },
     reporters: ['progress', 'kjhtml'],
     port: 9876,
     colors: true,
     logLevel: config.LOG_INFO,
-    autoWatch: true,
-    browsers: ['Chrome'],
-    singleRun: false,
+    autoWatch: !process.env.CI,
+    browsers: [process.env.CI ? 'ChromeHeadlessNoSandbox' : 'Chrome'],
+    singleRun: !!process.env.CI,
     restartOnFileChange: true
   });
 };

@@ -490,6 +490,12 @@ ion-searchbar.wardrobe-search {
   text-align: center;
 }
 
+.capture-dock .consent-note {
+  color: rgba(255, 250, 243, 0.72);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .camera-control-row {
   display: grid;
   grid-template-columns: 1fr 80px 1fr;
@@ -861,6 +867,21 @@ ion-select.field {
 .settings-card {
   display: grid;
   gap: 8px;
+}
+
+.settings-card .text-link {
+  text-align: left;
+  font-weight: 600;
+}
+
+.danger-panel {
+  border-color: rgba(138, 48, 42, 0.22);
+  background: rgba(255, 247, 245, 0.94);
+}
+
+.destructive-button {
+  --border-color: rgba(138, 48, 42, 0.28);
+  --color: #8a302a;
 }
 
 .advanced-editor {

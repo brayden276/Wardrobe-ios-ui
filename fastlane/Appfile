@@ -1,2 +1,2 @@
-app_identifier(ENV.fetch("APP_IDENTIFIER", "com.braydendekoning.bidwinner.dev"))
-apple_team_id(ENV.fetch("APPLE_TEAM_ID", "454Z8R39M9"))
+app_identifier(ENV.fetch("APP_IDENTIFIER", "ai.wardrobe.app"))
+apple_team_id(ENV.fetch("APPLE_TEAM_ID", "YOURTEAMID"))

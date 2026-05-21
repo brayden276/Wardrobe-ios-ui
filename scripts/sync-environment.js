@@ -34,6 +34,7 @@ const allowLocalhostApi = process.env.UI_ALLOW_LOCALHOST_API === 'true';
 const enforceProductionApi = requireProductionApi || (process.env.npm_lifecycle_event === 'prebuild' && !allowLocalhostApi);
 const configuredApiBaseUrl = process.env.UI_API_BASE_URL || envFile.UI_API_BASE_URL || defaults.UI_API_BASE_URL;
 const apiBaseUrl = normaliseApiBaseUrl(configuredApiBaseUrl);
+const productionApiBaseUrl = process.env.UI_API_BASE_URL ? apiBaseUrl : '';
 
 if (enforceProductionApi && !process.env.UI_API_BASE_URL) {
   throw new Error('UI_API_BASE_URL must be supplied by the environment for release builds.');
@@ -56,7 +57,7 @@ const productionOutput = `// This file is generated from .env by scripts/sync-en
 
 export const environment = {
   production: true,
-  apiBaseUrl: "${apiBaseUrl}"
+  apiBaseUrl: "${productionApiBaseUrl}"
 };
 `;
 

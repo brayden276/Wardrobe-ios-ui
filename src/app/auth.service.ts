@@ -85,6 +85,19 @@ export class AuthService {
     await this.clearSession();
   }
 
+  async deleteAccount(): Promise<void> {
+    const token = this.token;
+    if (!token) {
+      await this.clearSession();
+      return;
+    }
+
+    await firstValueFrom(this.http.delete(`${environment.apiBaseUrl}/api/auth/account`, {
+      headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
+    }));
+    await this.clearSession();
+  }
+
   async handleUnauthorized(error: unknown): Promise<void> {
     if ((error as { status?: number }).status === 401) {
       await this.clearSession();
