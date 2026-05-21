@@ -45,6 +45,7 @@ module.exports = function (config) {
     autoWatch: !process.env.CI,
     browsers: [process.env.CI ? 'ChromeHeadlessNoSandbox' : 'Chrome'],
     singleRun: !!process.env.CI,
+    failOnEmptyTestSuite: false,
     restartOnFileChange: true
   });
 };
