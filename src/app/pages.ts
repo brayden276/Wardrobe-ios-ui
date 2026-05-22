@@ -474,14 +474,14 @@ export class AddItemPage {
     }
 
     try {
-      const photo = await Camera.getPhoto({ source, resultType: CameraResultType.Uri, quality: 90 });
-      if (!photo.webPath) {
+      const photo = await Camera.getPhoto({ source, resultType: CameraResultType.DataUrl, quality: 90 });
+      if (!photo.dataUrl) {
         return;
       }
 
-      this.previewUrl = photo.webPath;
-      this.imageBlob = await (await fetch(photo.webPath)).blob();
-      this.imageFileName = 'wardrobe-item.jpg';
+      this.setPreviewUrl(photo.dataUrl);
+      this.imageBlob = this.dataUrlToBlob(photo.dataUrl);
+      this.imageFileName = `wardrobe-item.${photo.format || 'jpg'}`;
     } catch {
       this.message = source === CameraSource.Camera ? 'Camera was not available.' : 'Could not open photo library.';
     }
@@ -629,6 +629,19 @@ export class AddItemPage {
     }
 
     this.previewUrl = url;
+  }
+
+  private dataUrlToBlob(dataUrl: string): Blob {
+    const [header, data] = dataUrl.split(',', 2);
+    const mimeType = /^data:(.*);base64$/.exec(header)?.[1] ?? 'image/jpeg';
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let index = 0; index < binary.length; index++) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+
+    return new Blob([bytes], { type: mimeType });
   }
 }
 

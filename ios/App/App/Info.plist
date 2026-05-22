@@ -28,6 +28,8 @@
 	<string>Wardrobe AI needs camera access so you can photograph clothing items for wardrobe capture.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Wardrobe AI needs photo library access so you can import clothing photos into your wardrobe.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Wardrobe AI needs photo library access so you can save wardrobe photos when requested.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
