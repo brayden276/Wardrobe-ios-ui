@@ -111,7 +111,7 @@ def signing_xcargs
 end
 
 def release_signing_xcargs(app_identifier, apple_team_id, profile_name, export_method)
-  identity = export_method == "development" ? "iPhone Developer" : "iPhone Distribution"
+  identity = export_method == "development" ? "iPhone Developer" : "Apple Distribution"
   [
     "CODE_SIGN_STYLE=Manual",
     "CODE_SIGN_IDENTITY=\"#{identity}\"",
