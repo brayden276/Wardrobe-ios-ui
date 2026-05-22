@@ -122,6 +122,14 @@ export interface OutfitDto {
   updatedAt: string;
 }
 
+export interface AiUsageCostSummaryDto {
+  totalCostUsd: number;
+  wardrobeItemClassifications: number;
+  outfitSearches: number;
+  displayImages: number;
+  outfitImages: number;
+}
+
 export interface ApiMessage {
   message?: string;
 }

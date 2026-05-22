@@ -913,6 +913,21 @@ ion-select.field {
   font-weight: 600;
 }
 
+.usage-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: #4b4036;
+  font-size: 14px;
+}
+
+.usage-total strong {
+  color: #1f1a16;
+  font-size: 20px;
+  font-weight: 700;
+}
+
 .danger-panel {
   border-color: rgba(138, 48, 42, 0.22);
   background: rgba(255, 247, 245, 0.94);

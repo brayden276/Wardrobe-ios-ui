@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../environments/environment';
 import { AuthService } from './auth.service';
 import {
+  AiUsageCostSummaryDto,
   BatchWardrobeItemsResponse,
   GeneratedOutfitDto,
   OutfitDto,
@@ -97,6 +98,10 @@ export class WardrobeApiService {
 
   async markItemWorn(id: string): Promise<void> {
     await this.authorized(() => firstValueFrom(this.http.post(this.url(`/api/wardrobe/items/${id}/wear-logs`), {}, this.authOptions())));
+  }
+
+  async getAiUsageCostSummary(): Promise<AiUsageCostSummaryDto> {
+    return this.authorized(() => firstValueFrom(this.http.get<AiUsageCostSummaryDto>(this.url('/api/usage/ai'), this.authOptions())));
   }
 
   private url(path: string): string {

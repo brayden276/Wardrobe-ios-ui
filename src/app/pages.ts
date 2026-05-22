@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Preferences } from '@capacitor/preferences';
 import { AuthService } from './auth.service';
-import { ApiMessage, GeneratedOutfitDto, OutfitDto, UpdateWardrobeItemRequest, WardrobeItemDto, WardrobeLookupsDto } from './models';
+import { AiUsageCostSummaryDto, ApiMessage, GeneratedOutfitDto, OutfitDto, UpdateWardrobeItemRequest, WardrobeItemDto, WardrobeLookupsDto } from './models';
 import { WardrobeApiService } from './wardrobe-api.service';
 
 @Component({
@@ -1483,6 +1483,11 @@ export class OutfitsPage {
         </article>
         <article class="panel settings-card">
           <h2 class="section-title">AI processing</h2>
+          <div class="usage-total">
+            <span>Total estimated AI cost</span>
+            <strong>{{ aiUsageTotalLabel }}</strong>
+          </div>
+          <p class="muted" *ngIf="aiUsage">Based on {{ aiUsage.wardrobeItemClassifications }} item scans, {{ aiUsage.outfitSearches }} saved AI outfit searches, and {{ aiUsage.displayImages + aiUsage.outfitImages }} generated images.</p>
           <p class="muted">{{ aiConsentAccepted ? 'This device is allowed to send wardrobe photos and outfit requests to OpenAI.' : 'This device has not granted OpenAI processing consent yet.' }}</p>
           <p class="muted">{{ aiDisclosure }}</p>
           <ion-button class="secondary-button" fill="outline" (click)="resetAiConsent()" [disabled]="isBusy || !aiConsentAccepted">Require consent again</ion-button>
@@ -1505,18 +1510,25 @@ export class OutfitsPage {
 })
 export class SettingsPage {
   readonly auth = inject(AuthService);
+  private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
   readonly privacyPolicyUrl = PRIVACY_POLICY_URL;
   readonly termsUrl = TERMS_OF_USE_URL;
   readonly supportUrl = SUPPORT_URL;
   readonly aiDisclosure = AI_DISCLOSURE_TEXT;
   aiConsentAccepted = false;
+  aiUsage: AiUsageCostSummaryDto | null = null;
   isBusy = false;
   message = '';
 
   async ionViewWillEnter(): Promise<void> {
     this.aiConsentAccepted = await hasAiConsent();
     this.message = '';
+    try {
+      this.aiUsage = await this.api.getAiUsageCostSummary();
+    } catch {
+      this.aiUsage = null;
+    }
   }
 
   get sessionExpiresAtLabel(): string {
@@ -1531,6 +1543,11 @@ export class SettingsPage {
     }
 
     return `on ${new Date(parsed).toLocaleString()}`;
+  }
+
+  get aiUsageTotalLabel(): string {
+    const value = this.aiUsage?.totalCostUsd ?? 0;
+    return value.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 });
   }
 
   async logout(): Promise<void> {
