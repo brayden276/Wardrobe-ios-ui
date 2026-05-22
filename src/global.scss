@@ -507,6 +507,56 @@ ion-searchbar.wardrobe-search {
   line-height: 1.4;
 }
 
+.intent-switch,
+.upload-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.intent-tab,
+.mode-tab {
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: rgba(255, 250, 243, 0.9);
+  color: #4f4439;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.intent-tab.active,
+.mode-tab.active {
+  border-color: var(--app-olive);
+  background: var(--app-olive);
+  color: #fffaf3;
+}
+
+.intent-tab:disabled,
+.mode-tab:disabled {
+  opacity: 0.4;
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.status-line ion-spinner {
+  width: 17px;
+  height: 17px;
+  --color: var(--app-olive);
+}
+
+.filter-summary {
+  display: grid;
+  gap: 6px;
+}
+
 .camera-control-row {
   display: grid;
   grid-template-columns: 1fr 80px 1fr;

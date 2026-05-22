@@ -7,38 +7,60 @@ import { AuthService } from './auth.service';
 import { AiUsageCostSummaryDto, ApiMessage, GeneratedOutfitDto, OutfitDto, UpdateWardrobeItemRequest, WardrobeItemDto, WardrobeLookupsDto } from './models';
 import { WardrobeApiService } from './wardrobe-api.service';
 
+type UploadMode = 'single' | 'batch';
+type WardrobeMode = 'browse' | 'filters';
+type BuilderMode = 'smart' | 'manual';
+type ItemDetailMode = 'view' | 'edit';
+type OutfitsMode = 'saved' | 'detail';
+type SettingsMode = 'account' | 'ai' | 'legal' | 'danger';
+
+type PreparedUploadFile = {
+  file: File;
+  name: string;
+  originalBytes: number;
+  preparedBytes: number;
+};
+
 @Component({
   selector: 'app-login',
   standalone: false,
   template: `
-    <ion-content class="app-content">
-      <section class="screen login-screen">
+  <ion-content class="app-content">
+    <section class="screen login-screen">
         <div>
           <h1 class="plain-title">Wardrobe AI</h1>
           <p class="muted">Your private wardrobe catalogue and outfit builder.</p>
+          <p class="muted">{{ authModeHint }}</p>
         </div>
-        <form class="panel form-stack" (ngSubmit)="submit()">
-          <label>
-            Email
-            <ion-input class="field" type="email" [(ngModel)]="email" name="email"></ion-input>
-          </label>
+      <div class="intent-switch" role="tablist" aria-label="Authentication intent">
+        <button type="button" class="intent-tab" [class.active]="mode === 'login'" (click)="setAuthMode('login')" role="tab">Sign in</button>
+        <button type="button" class="intent-tab" [class.active]="mode === 'register'" (click)="setAuthMode('register')" role="tab">Create account</button>
+      </div>
+      <form class="panel form-stack" (ngSubmit)="submit()">
+        <label>
+          Email
+          <ion-input class="field" type="email" [(ngModel)]="email" name="email"></ion-input>
+        </label>
           <p class="muted field-error" *ngIf="emailValidationMessage">{{ emailValidationMessage }}</p>
           <label>
             Password
             <ion-input class="field" type="password" [(ngModel)]="password" name="password"></ion-input>
           </label>
           <p class="muted field-error" *ngIf="passwordValidationMessage">{{ passwordValidationMessage }}</p>
-          <label *ngIf="mode === 'register'">
-            Name
-            <ion-input class="field" [(ngModel)]="displayName" name="displayName"></ion-input>
-          </label>
-          <p class="muted field-error" *ngIf="mode === 'register' && displayNameValidationMessage">{{ displayNameValidationMessage }}</p>
-          <ion-button class="primary-button" expand="block" type="submit" [disabled]="isBusy || !canSubmit">{{ mode === 'login' ? 'Sign in' : 'Create account' }}</ion-button>
-          <ion-button class="secondary-button" fill="outline" expand="block" type="button" (click)="toggleMode()">{{ mode === 'login' ? 'Create account' : 'I already have an account' }}</ion-button>
-          <p class="muted" *ngIf="message">{{ message }}</p>
-        </form>
-      </section>
-    </ion-content>
+        <label *ngIf="mode === 'register'">
+          Name
+          <ion-input class="field" [(ngModel)]="displayName" name="displayName"></ion-input>
+        </label>
+        <p class="muted field-error" *ngIf="mode === 'register' && displayNameValidationMessage">{{ displayNameValidationMessage }}</p>
+        <ion-button class="primary-button" expand="block" type="submit" [disabled]="isBusy || !canSubmit">{{ authSubmitLabel }}</ion-button>
+        <div class="status-line" *ngIf="isBusy">
+          <ion-spinner name="crescent"></ion-spinner>
+          <span>{{ authStatusMessage }}</span>
+        </div>
+        <p class="muted" *ngIf="message">{{ message }}</p>
+      </form>
+    </section>
+  </ion-content>
   `
 })
 export class LoginPage {
@@ -92,9 +114,29 @@ export class LoginPage {
     );
   }
 
-  toggleMode(): void {
-    this.mode = this.mode === 'login' ? 'register' : 'login';
+  setAuthMode(mode: 'login' | 'register'): void {
+    if (this.mode === mode) {
+      return;
+    }
+
+    this.mode = mode;
     this.message = '';
+  }
+
+  toggleMode(): void {
+    this.setAuthMode(this.mode === 'login' ? 'register' : 'login');
+  }
+
+  get authSubmitLabel(): string {
+    return this.mode === 'login' ? 'Sign in' : 'Create account';
+  }
+
+  get authStatusMessage(): string {
+    return this.mode === 'login' ? 'Signing in...' : 'Creating your account...';
+  }
+
+  get authModeHint(): string {
+    return this.mode === 'login' ? 'Sign in to review your wardrobe.' : 'Create your account to get started.';
   }
 
   async submit(): Promise<void> {
@@ -157,7 +199,22 @@ export class TabsPage {}
             <ion-icon name="options-outline"></ion-icon>
           </button>
         </div>
-        <article class="panel filter-panel">
+        <div class="intent-switch" role="tablist" aria-label="Wardrobe mode">
+          <button type="button" class="intent-tab" [class.active]="wardrobeMode === 'browse'" (click)="setWardrobeMode('browse')" role="tab">Browse</button>
+          <button type="button" class="intent-tab" [class.active]="wardrobeMode === 'filters'" (click)="setWardrobeMode('filters')" role="tab">Filters</button>
+        </div>
+        <article class="panel filter-summary" *ngIf="wardrobeMode === 'browse' && hasFilters">
+          <div class="filter-group">
+            <span class="filter-label">Active filters</span>
+            <p class="muted">{{ activeFilterSummary }}</p>
+            <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="setWardrobeMode('filters')">Edit filters</ion-button>
+          </div>
+        </article>
+        <article class="panel filter-summary" *ngIf="wardrobeMode === 'browse' && !hasFilters">
+          <span class="muted">No filters selected.</span>
+          <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="setWardrobeMode('filters')">Add filters</ion-button>
+        </article>
+        <article class="panel filter-panel" *ngIf="wardrobeMode === 'filters'">
           <div class="filter-group">
             <span class="filter-label">Category</span>
             <div class="chip-row">
@@ -301,11 +358,55 @@ export class WardrobePage {
   bottomShapeId: string | null = null;
   riseId: string | null = null;
   includeArchived = false;
+  wardrobeMode: WardrobeMode = 'browse';
   search = '';
   isLoading = true;
   message = '';
   private loadDebounceHandle: ReturnType<typeof setTimeout> | null = null;
   private readonly loadDebounceMs = 250;
+
+  get activeFilterSummary(): string {
+    const filters: string[] = [];
+
+    if (this.categoryId) {
+      const category = this.lookups?.categories.find((option) => option.id === this.categoryId)?.label ?? this.categoryId;
+      filters.push(`Category: ${category}`);
+    }
+
+    if (this.subcategoryId) {
+      const current = this.subcategoryOptions.find((option) => option.id === this.subcategoryId);
+      filters.push(`Subcategory: ${current?.label ?? this.subcategoryId}`);
+    }
+
+    if (this.colourId) {
+      const colour = this.lookups?.colours.find((option) => option.id === this.colourId)?.label ?? this.colourId;
+      filters.push(`Colour: ${colour}`);
+    }
+
+    if (this.patternId) {
+      const pattern = this.lookups?.patterns.find((option) => option.id === this.patternId)?.label ?? this.patternId;
+      filters.push(`Pattern: ${pattern}`);
+    }
+
+    if (this.includeArchived) {
+      filters.push('Include archived');
+    }
+
+    const search = this.search.trim();
+    if (search) {
+      filters.push(`Search: ${search}`);
+    }
+
+    if (!filters.length) {
+      return 'No filters selected.';
+    }
+
+    return filters.join(' · ');
+  }
+
+  setWardrobeMode(mode: WardrobeMode): void {
+    this.wardrobeMode = mode;
+  }
 
   get hasFilters(): boolean {
     return !!(
@@ -460,59 +561,74 @@ export class WardrobePage {
         <input #cameraInput class="file-input" type="file" accept="image/*" capture="environment" (change)="handleFileSelection($event)">
         <input #libraryInput class="file-input" type="file" accept="image/*" (change)="handleFileSelection($event)">
         <input #batchInput class="file-input" type="file" accept="image/*" multiple (change)="handleBatchSelection($event)">
-        <div class="capture-stage">
-          <img *ngIf="previewUrl" [src]="previewUrl" alt="Selected wardrobe item">
-          <div class="capture-placeholder" *ngIf="!previewUrl">
-            <ion-icon name="scan-outline"></ion-icon>
-            <p>Place one item flat on a plain surface.</p>
-          </div>
+        <div class="upload-mode-switch" role="tablist" aria-label="Upload mode">
+          <button type="button" class="mode-tab" [class.active]="uploadMode === 'single'" (click)="setUploadMode('single')" role="tab">Single upload</button>
+          <button type="button" class="mode-tab" [class.active]="uploadMode === 'batch'" (click)="setUploadMode('batch')" role="tab">Batch upload</button>
         </div>
-        <article class="capture-dock">
-          <div class="camera-control-row">
-            <button type="button" class="round-control" (click)="capture(CameraSource.Photos)" [disabled]="isSaving" aria-label="Choose from library">
-              <ion-icon name="images-outline"></ion-icon>
-            </button>
-            <button type="button" class="shutter-button" (click)="capture(CameraSource.Camera)" [disabled]="isSaving" aria-label="Take photo"></button>
-            <button type="button" class="round-control" (click)="clearSelection()" [disabled]="isSaving || !previewUrl" aria-label="Clear selected photo">
-              <ion-icon name="close-outline"></ion-icon>
-            </button>
-          </div>
-          <ion-button class="primary-button olive-button" expand="block" (click)="imageBlob ? upload() : capture(CameraSource.Camera)" [disabled]="isSaving">{{ isSaving ? 'Processing item...' : imageBlob ? 'Submit photo' : 'Take photo' }}</ion-button>
-          <ion-button class="light-button" expand="block" (click)="capture(CameraSource.Photos)" [disabled]="isSaving">{{ imageBlob ? 'Choose different photo' : 'Choose from library' }}</ion-button>
-          <ion-button class="secondary-button retry-button" fill="outline" expand="block" *ngIf="imageBlob && message && !isSaving" (click)="upload()">Try again</ion-button>
-          <div class="processing-line" *ngIf="isSaving">
-            <ion-spinner name="crescent"></ion-spinner>
-            <span>Uploading and categorising item...</span>
-          </div>
-          <p>{{ imageBlob ? 'Ready to submit for categorisation.' : 'One item, clearly visible.' }}</p>
-          <p class="muted consent-note">Wardrobe AI sends uploaded wardrobe photos to OpenAI to classify items and generate cleaned display images.</p>
-          <p class="muted consent-note">Only upload clothing photos you are comfortable sharing with that provider.</p>
-          <p class="muted" *ngIf="message">{{ message }}</p>
-        </article>
-        <article class="panel form-stack batch-panel">
-          <div class="panel-heading">
-            <h2 class="section-title">Batch upload</h2>
-            <button type="button" class="icon-button" aria-label="Choose batch photos" (click)="openBatchPicker()" [disabled]="isBatchSaving">
-              <ion-icon name="images-outline"></ion-icon>
-            </button>
-          </div>
-          <div class="batch-summary" *ngIf="batchFiles.length">
-            <span>{{ batchFiles.length }} selected</span>
-            <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="clearBatchSelection()" [disabled]="isBatchSaving">Clear</ion-button>
-          </div>
-          <div class="batch-grid" *ngIf="batchFiles.length">
-            <div class="batch-item" *ngFor="let file of batchFiles; let index = index">
-              <button type="button" class="icon-button batch-item__remove" aria-label="Remove batch photo" (click)="removeBatchFile(index)" [disabled]="isBatchSaving">
-                <ion-icon name="close-outline"></ion-icon>
-              </button>
-              <img [src]="batchPreviewUrls[index]" [alt]="file.name">
-              <span>{{ file.name }}</span>
+        <ng-container *ngIf="uploadMode === 'single'">
+          <div class="capture-stage">
+            <img *ngIf="previewUrl" [src]="previewUrl" alt="Selected wardrobe item">
+            <div class="capture-placeholder" *ngIf="!previewUrl">
+              <ion-icon name="scan-outline"></ion-icon>
+              <p>Place one item flat on a plain surface.</p>
             </div>
           </div>
-          <p class="muted" *ngIf="!batchFiles.length">Select multiple photos and upload them together.</p>
-          <p class="muted consent-note">Batch uploads use the same OpenAI-powered classification flow as single-item uploads.</p>
-          <ion-button class="primary-button" expand="block" (click)="uploadBatch()" [disabled]="isBatchSaving || !batchFiles.length">{{ isBatchSaving ? 'Uploading batch...' : 'Upload batch' }}</ion-button>
-        </article>
+          <article class="capture-dock">
+            <div class="camera-control-row">
+              <button type="button" class="round-control" (click)="capture(CameraSource.Photos)" [disabled]="isSaving || isPreparing" aria-label="Choose from library">
+                <ion-icon name="images-outline"></ion-icon>
+              </button>
+              <button type="button" class="shutter-button" (click)="capture(CameraSource.Camera)" [disabled]="isSaving || isPreparing" aria-label="Take photo"></button>
+              <button type="button" class="round-control" (click)="clearSelection()" [disabled]="isSaving || isPreparing || !previewUrl" aria-label="Clear selected photo">
+                <ion-icon name="close-outline"></ion-icon>
+              </button>
+            </div>
+            <ion-button class="primary-button olive-button" expand="block" (click)="imageBlob ? upload() : capture(CameraSource.Camera)" [disabled]="isSaving || isPreparing">{{ isSaving ? 'Uploading item...' : imageBlob ? 'Submit photo' : 'Take photo' }}</ion-button>
+            <ion-button class="light-button" expand="block" (click)="capture(CameraSource.Photos)" [disabled]="isSaving || isPreparing">{{ imageBlob ? 'Choose different photo' : 'Choose from library' }}</ion-button>
+            <ion-button class="secondary-button retry-button" fill="outline" expand="block" *ngIf="imageBlob && uploadError && !isSaving && !isPreparing" (click)="upload()">Try again</ion-button>
+            <div class="processing-line" *ngIf="isPreparing || isSaving">
+              <ion-spinner name="crescent"></ion-spinner>
+              <span>{{ isPreparing ? 'Preparing image...' : 'Uploading and categorising item...' }}</span>
+            </div>
+            <p>{{ imageBlob ? singleReadyLabel : 'One item, clearly visible.' }}</p>
+            <p class="muted consent-note">Wardrobe AI sends uploaded wardrobe photos to OpenAI to classify items and generate cleaned display images.</p>
+            <p class="muted consent-note">Only upload clothing photos you are comfortable sharing with that provider.</p>
+            <p class="muted" *ngIf="statusMessage">{{ statusMessage }}</p>
+            <p class="muted" *ngIf="message">{{ message }}</p>
+          </article>
+        </ng-container>
+        <ng-container *ngIf="uploadMode === 'batch'">
+          <article class="panel form-stack batch-panel">
+            <div class="panel-heading">
+              <h2 class="section-title">Batch upload</h2>
+              <button type="button" class="icon-button" aria-label="Choose batch photos" (click)="openBatchPicker()" [disabled]="isBatchSaving || isPreparing">
+                <ion-icon name="images-outline"></ion-icon>
+              </button>
+            </div>
+            <div class="batch-summary" *ngIf="batchFiles.length">
+              <span>{{ batchSummary }}</span>
+              <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="clearBatchSelection()" [disabled]="isBatchSaving || isPreparing">Clear</ion-button>
+            </div>
+            <div class="batch-grid" *ngIf="batchFiles.length">
+              <div class="batch-item" *ngFor="let file of batchFiles; let index = index">
+                <button type="button" class="icon-button batch-item__remove" aria-label="Remove batch photo" (click)="removeBatchFile(index)" [disabled]="isBatchSaving || isPreparing">
+                  <ion-icon name="close-outline"></ion-icon>
+                </button>
+                <img [src]="batchPreviewUrls[index]" [alt]="file.name">
+                <span>{{ file.name }}</span>
+              </div>
+            </div>
+            <p class="muted" *ngIf="!batchFiles.length">Select up to {{ maxBatchUploadCount }} photos and upload them together.</p>
+            <p class="muted consent-note">Batch uploads use the same OpenAI-powered classification flow as single-item uploads.</p>
+            <div class="processing-line" *ngIf="isBatchSaving">
+              <ion-spinner name="crescent"></ion-spinner>
+              <span>Uploading batch...</span>
+            </div>
+            <p class="muted" *ngIf="statusMessage && !isBatchSaving">{{ statusMessage }}</p>
+            <p class="muted" *ngIf="message">{{ message }}</p>
+            <ion-button class="primary-button" expand="block" (click)="uploadBatch()" [disabled]="isBatchSaving || !batchFiles.length || isPreparing">{{ isBatchSaving ? 'Uploading batch...' : 'Upload batch' }}</ion-button>
+          </article>
+        </ng-container>
       </section>
     </ion-content>
   `
@@ -524,17 +640,64 @@ export class AddItemPage {
   @ViewChild('libraryInput') private readonly libraryInput?: ElementRef<HTMLInputElement>;
   @ViewChild('batchInput') private readonly batchInput?: ElementRef<HTMLInputElement>;
   readonly CameraSource = CameraSource;
+  uploadMode: UploadMode = 'single';
   previewUrl: string | null = null;
-  imageBlob: Blob | null = null;
+  imageBlob: File | null = null;
   imageFileName = 'wardrobe-item.jpg';
+  readonly maxBatchUploadCount = MAX_BATCH_UPLOAD_COUNT;
+  private selectedImageOriginalBytes = 0;
+  private selectedImagePreparedBytes = 0;
   message = '';
+  statusMessage = '';
   isSaving = false;
-  batchFiles: File[] = [];
+  isPreparing = false;
+  uploadError = false;
+  batchFiles: PreparedUploadFile[] = [];
   batchPreviewUrls: string[] = [];
   isBatchSaving = false;
 
+  get singleReadyLabel(): string {
+    if (!this.imageBlob) {
+      return '';
+    }
+
+    if (this.selectedImageOriginalBytes === this.selectedImagePreparedBytes) {
+      return `Ready to submit (${this.formatBytes(this.selectedImagePreparedBytes)}).`;
+    }
+
+    return `Ready to submit (${this.formatBytes(this.selectedImagePreparedBytes)}, reduced from ${this.formatBytes(this.selectedImageOriginalBytes)}).`;
+  }
+
+  get batchSummary(): string {
+    if (!this.batchFiles.length) {
+      return '';
+    }
+
+    const originalBytes = this.batchFiles.reduce((sum, file) => sum + file.originalBytes, 0);
+    const preparedBytes = this.batchFiles.reduce((sum, file) => sum + file.preparedBytes, 0);
+
+    if (originalBytes === preparedBytes) {
+      return `${this.batchFiles.length} photo${this.batchFiles.length === 1 ? '' : 's'} (${this.formatBytes(preparedBytes)} total).`;
+    }
+
+    return `${this.batchFiles.length} photo${this.batchFiles.length === 1 ? '' : 's'} (${this.formatBytes(preparedBytes)} total, reduced from ${this.formatBytes(originalBytes)}).`;
+  }
+
+  setUploadMode(uploadMode: UploadMode): void {
+    if (this.uploadMode === uploadMode) {
+      return;
+    }
+
+    this.uploadMode = uploadMode;
+    this.message = '';
+    this.statusMessage = '';
+    this.uploadError = false;
+  }
+
   async capture(source: CameraSource.Camera | CameraSource.Photos): Promise<void> {
     this.message = '';
+    this.statusMessage = '';
+    this.uploadError = false;
     if (!Capacitor.isNativePlatform()) {
       this.openBrowserFilePicker(source);
       return;
@@ -546,11 +709,13 @@ export class AddItemPage {
         return;
       }
 
-      this.setPreviewUrl(photo.dataUrl);
-      this.imageBlob = this.dataUrlToBlob(photo.dataUrl);
-      this.imageFileName = `wardrobe-item.${photo.format || 'jpg'}`;
+      const sourceBlob = this.dataUrlToBlob(photo.dataUrl);
+      const fileName = `wardrobe-item.${photo.format || 'jpg'}`;
+      const sourceImage = new File([sourceBlob], fileName, { type: sourceBlob.type || 'image/jpeg' });
+      await this.applySingleSelection(sourceImage);
     } catch {
       this.message = source === CameraSource.Camera ? 'Camera was not available.' : 'Could not open photo library.';
+      this.uploadError = true;
     }
   }
 
@@ -562,16 +727,18 @@ export class AddItemPage {
       return;
     }
 
-    this.setPreviewUrl(URL.createObjectURL(file));
-    this.imageBlob = file;
-    this.imageFileName = file.name || 'wardrobe-item.jpg';
+    await this.applySingleSelection(file);
   }
 
   clearSelection(): void {
     this.setPreviewUrl(null);
     this.imageBlob = null;
     this.imageFileName = 'wardrobe-item.jpg';
+    this.selectedImageOriginalBytes = 0;
+    this.selectedImagePreparedBytes = 0;
     this.message = '';
+    this.statusMessage = '';
+    this.uploadError = false;
   }
 
   async handleBatchSelection(event: Event): Promise<void> {
@@ -583,8 +750,40 @@ export class AddItemPage {
     }
 
     this.clearBatchSelection();
-    this.batchFiles = files;
-    this.batchPreviewUrls = files.map((file) => URL.createObjectURL(file));
+    this.message = '';
+    this.statusMessage = '';
+    this.uploadError = false;
+    this.isPreparing = true;
+
+    try {
+      if (files.length > this.maxBatchUploadCount) {
+        this.message = `You selected ${files.length} photos. Only the first ${this.maxBatchUploadCount} were kept.`;
+      }
+
+      const preparedFiles = await this.prepareBatchImages(files.slice(0, this.maxBatchUploadCount));
+      if (!preparedFiles.length) {
+        if (!this.message) {
+          this.message = 'No valid images in selection.';
+        }
+        this.uploadError = true;
+        return;
+      }
+
+      this.batchFiles = preparedFiles;
+      this.batchPreviewUrls = preparedFiles.map((entry) => URL.createObjectURL(entry.file));
+      if (this.batchFiles.length !== files.length) {
+        this.statusMessage = 'Some selected files were skipped during validation.';
+      } else {
+        this.statusMessage = 'All selected photos are ready for upload.';
+      }
+    } catch (error) {
+      this.message = error instanceof Error ? error.message : 'Could not prepare batch images. Try again.';
+      this.uploadError = true;
+      this.batchFiles = [];
+      this.batchPreviewUrls = [];
+    } finally {
+      this.isPreparing = false;
+    }
   }
 
   async upload(fileName = this.imageFileName): Promise<void> {
@@ -594,18 +793,23 @@ export class AddItemPage {
       'Wardrobe AI uses OpenAI to classify wardrobe photos and generate cleaned display images. Do you want to continue with AI processing for this device?'))
     {
       this.message = 'OpenAI consent is required before you can upload wardrobe photos.';
+      this.uploadError = true;
       return;
     }
 
     this.isSaving = true;
     this.message = '';
+    this.statusMessage = '';
+    this.uploadError = false;
     try {
       await this.api.createItem(this.imageBlob, fileName);
       await this.router.navigateByUrl('/tabs/wardrobe');
     } catch (error) {
       this.message = readMessage(error, 'Could not upload item. Try again.');
+      this.uploadError = true;
     } finally {
       this.isSaving = false;
+      this.statusMessage = '';
     }
   }
 
@@ -618,13 +822,16 @@ export class AddItemPage {
       'Wardrobe AI uses OpenAI to classify wardrobe photos and generate cleaned display images. Do you want to continue with AI processing for this device?'))
     {
       this.message = 'OpenAI consent is required before you can upload wardrobe photos.';
+      this.uploadError = true;
       return;
     }
 
     this.isBatchSaving = true;
     this.message = '';
+    this.statusMessage = `Uploading ${this.batchFiles.length} photo${this.batchFiles.length === 1 ? '' : 's'}...`;
+    this.uploadError = false;
     try {
-      const result = await this.api.createItems(this.batchFiles);
+      const result = await this.api.createItems(this.batchFiles.map((entry) => entry.file));
       const failures = result.results.filter((entry) => !entry.success);
       this.clearBatchSelection();
       if (!failures.length) {
@@ -641,13 +848,15 @@ export class AddItemPage {
         : failureSummary || 'Could not upload batch. Try again.';
     } catch (error) {
       this.message = readMessage(error, 'Could not upload batch. Try again.');
+      this.uploadError = true;
     } finally {
       this.isBatchSaving = false;
+      this.statusMessage = '';
     }
   }
 
   removeBatchFile(index: number): void {
-    if (this.isBatchSaving) {
+    if (this.isBatchSaving || this.isPreparing) {
       return;
     }
 
@@ -661,7 +870,7 @@ export class AddItemPage {
   }
 
   openBatchPicker(): void {
-    if (this.isBatchSaving) {
+    if (this.isBatchSaving || this.isPreparing) {
       return;
     }
 
@@ -669,6 +878,9 @@ export class AddItemPage {
   }
 
   clearBatchSelection(): void {
+    this.message = '';
+    this.statusMessage = '';
+    this.uploadError = false;
     for (const previewUrl of this.batchPreviewUrls) {
       if (previewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(previewUrl);
@@ -693,6 +905,60 @@ export class AddItemPage {
     input.nativeElement.click();
   }
 
+  private async applySingleSelection(file: File): Promise<void> {
+    this.isPreparing = true;
+    this.statusMessage = 'Preparing image...';
+    this.uploadError = false;
+    this.message = '';
+
+    try {
+      const prepared = await this.prepareImageForUpload(file);
+      this.setPreviewUrl(URL.createObjectURL(prepared.file));
+      this.imageBlob = prepared.file;
+      this.imageFileName = prepared.name;
+      this.selectedImageOriginalBytes = prepared.originalBytes;
+      this.selectedImagePreparedBytes = prepared.preparedBytes;
+      this.statusMessage = prepared.originalBytes === prepared.preparedBytes
+        ? 'No compression was needed.'
+        : `Compressed from ${this.formatBytes(prepared.originalBytes)} to ${this.formatBytes(prepared.preparedBytes)}.`;
+    } catch (error) {
+      this.clearSelection();
+      this.message = error instanceof Error ? error.message : 'Could not prepare image. Try again.';
+      this.uploadError = true;
+    } finally {
+      this.isPreparing = false;
+    }
+  }
+
+  private async prepareBatchImages(files: File[]): Promise<PreparedUploadFile[]> {
+    const prepared: PreparedUploadFile[] = [];
+    const skippedMessages: string[] = [];
+
+    for (const file of files) {
+      const validationMessage = this.validateImageFile(file);
+      if (validationMessage) {
+        skippedMessages.push(`${file.name}: ${validationMessage}`);
+        continue;
+      }
+
+      try {
+        const entry = await this.prepareImageForUpload(file);
+        prepared.push(entry);
+      } catch (error) {
+        skippedMessages.push(`${file.name}: ${error instanceof Error ? error.message : 'Could not prepare image.'}`);
+      }
+    }
+
+    if (skippedMessages.length) {
+      this.message = skippedMessages.join('\n');
+      this.uploadError = true;
+    } else {
+      this.uploadError = false;
+    }
+
+    return prepared;
+  }
+
   private setPreviewUrl(url: string | null): void {
     if (this.previewUrl?.startsWith('blob:')) {
       URL.revokeObjectURL(this.previewUrl);
@@ -712,6 +978,117 @@ export class AddItemPage {
     }
 
     return new Blob([bytes], { type: mimeType });
+  }
+
+  private validateImageFile(file: File): string | null {
+    if (!file.type.startsWith('image/')) {
+      return 'Please upload an image file.';
+    }
+
+    if (!file.size) {
+      return 'The selected file is empty.';
+    }
+
+    if (file.size > MAX_UPLOAD_FILE_BYTES) {
+      return `Image file is too large. Maximum size is ${this.formatBytes(MAX_UPLOAD_FILE_BYTES)}.`;
+    }
+
+    return null;
+  }
+
+  private async prepareImageForUpload(file: File): Promise<PreparedUploadFile> {
+    const validation = this.validateImageFile(file);
+    if (validation) {
+      throw new Error(validation);
+    }
+
+    const originalBytes = file.size;
+    const fileName = file.name || 'wardrobe-item.jpg';
+    if (originalBytes <= IMAGE_COMPRESSION_TRIGGER_BYTES) {
+      return {
+        file,
+        name: fileName,
+        originalBytes,
+        preparedBytes: originalBytes
+      };
+    }
+
+    const sourceUrl = URL.createObjectURL(file);
+    try {
+      const image = await this.decodeImage(sourceUrl);
+      const maxSide = Math.max(image.naturalWidth, image.naturalHeight);
+      const scale = Math.min(1, IMAGE_MAX_SIDE / maxSide);
+      const targetWidth = Math.max(1, Math.round(image.naturalWidth * scale));
+      const targetHeight = Math.max(1, Math.round(image.naturalHeight * scale));
+      if (image.naturalWidth < IMAGE_MIN_SIDE || image.naturalHeight < IMAGE_MIN_SIDE) {
+        throw new Error('Images must be at least 600x600 for reliable classification.');
+      }
+
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if (!context) {
+        throw new Error('Could not prepare image canvas.');
+      }
+
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      context.drawImage(image, 0, 0, targetWidth, targetHeight);
+      const compressedBlob = await this.toBlob(canvas, `image/${MIME_IMAGE_OUTPUT_EXTENSION}`, IMAGE_COMPRESSION_QUALITY);
+      if (!compressedBlob.size || compressedBlob.size >= originalBytes) {
+        return {
+          file,
+          name: fileName,
+          originalBytes,
+          preparedBytes: originalBytes
+        };
+      }
+
+      const preparedName = this.normaliseUploadFileName(fileName, MIME_IMAGE_OUTPUT_EXTENSION);
+      const preparedFile = new File([compressedBlob], preparedName, { type: `image/${MIME_IMAGE_OUTPUT_EXTENSION}` });
+      return {
+        file: preparedFile,
+        name: preparedFile.name,
+        originalBytes,
+        preparedBytes: preparedFile.size
+      };
+    } finally {
+      URL.revokeObjectURL(sourceUrl);
+    }
+  }
+
+  private decodeImage(url: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error('Could not read image file.'));
+      image.src = url;
+    });
+  }
+
+  private toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((value) => {
+        if (!value) {
+          reject(new Error('Could not compress image.'));
+          return;
+        }
+
+        resolve(value);
+      }, type, quality);
+    });
+  }
+
+  private normaliseUploadFileName(fileName: string, extension: string): string {
+    const baseName = fileName.trim() || 'wardrobe-item';
+    return `${baseName.replace(/\.[^/.]+$/, '')}.${extension}`;
+  }
+
+  private formatBytes(value: number): string {
+    if (value >= 1024 * 1024) {
+      return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    return `${(value / 1024).toFixed(0)} KB`;
   }
 }
 
@@ -738,25 +1115,28 @@ export class AddItemPage {
           <p class="muted">{{ message || 'Could not load item.' }}</p>
         </article>
       </section>
-      <section class="screen" *ngIf="!isLoading && item">
+        <section class="screen" *ngIf="!isLoading && item">
         <header class="nav-header">
           <button type="button" class="nav-button" routerLink="/tabs/wardrobe" aria-label="Back to wardrobe">
             <ion-icon name="chevron-back-outline"></ion-icon>
           </button>
           <h1>{{ item.name }}</h1>
-          <button type="button" class="nav-button" aria-label="Edit item" (click)="editing = true">
+          <button type="button" class="nav-button" aria-label="Edit item" (click)="setItemMode('edit')" *ngIf="!editing">
             <ion-icon name="create-outline"></ion-icon>
           </button>
         </header>
-        <div class="product-stage">
-          <img class="product-image" [src]="item.image.displayUrl" [alt]="item.name">
+          <div class="intent-switch" role="tablist" aria-label="Item mode">
+            <button type="button" class="intent-tab" [class.active]="itemMode === 'view'" (click)="setItemMode('view')" role="tab">View item</button>
+            <button type="button" class="intent-tab" [class.active]="itemMode === 'edit'" (click)="setItemMode('edit')" role="tab">Edit details</button>
+          </div>
+          <div class="product-stage">
+            <img class="product-image" [src]="item.image.displayUrl" [alt]="item.name">
+          </div>
+          <ion-button class="taupe-button" expand="block" (click)="markWorn()" *ngIf="!editing" [disabled]="isMarkingWorn">{{ isMarkingWorn ? 'Marking worn...' : 'Mark worn' }}</ion-button>
+          <div class="detail-chips">
+            <span class="detail-chip" *ngFor="let tag of visibleTags">{{ tag }}</span>
         </div>
-        <ion-button class="taupe-button" expand="block" (click)="markWorn()" *ngIf="!editing" [disabled]="isMarkingWorn">{{ isMarkingWorn ? 'Marking worn...' : 'Mark worn' }}</ion-button>
-        <div class="detail-chips">
-          <span class="detail-chip" *ngFor="let tag of visibleTags">{{ tag }}</span>
-        </div>
-        <ion-button class="taupe-button" expand="block" (click)="editing = true" *ngIf="!editing">Edit details</ion-button>
-        <a class="text-link" *ngIf="item.image.originalUrl" [href]="item.image.originalUrl" target="_blank">View original</a>
+          <a class="text-link" *ngIf="item.image.originalUrl" [href]="item.image.originalUrl" target="_blank">View original</a>
         <p class="muted center-message" *ngIf="message && !editing">{{ message }}</p>
         <form class="panel form-stack editor-panel" *ngIf="editing" (ngSubmit)="save()">
           <label>Name<ion-input class="field" [(ngModel)]="form.name" name="name"></ion-input></label>
@@ -866,7 +1246,7 @@ export class ItemDetailPage {
   isSaving = false;
   isMarkingWorn = false;
   isArchiving = false;
-  editing = false;
+  itemMode: ItemDetailMode = 'view';
 
   get selectedSubcategories(): { id: string; label: string }[] {
     return this.lookups?.categories.find((category) => category.id === this.form.categoryId)?.subcategories ?? [];
@@ -898,7 +1278,7 @@ export class ItemDetailPage {
     this.isLoading = true;
     this.message = '';
     this.item = null;
-    this.editing = false;
+    this.setItemMode('view');
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
       this.message = 'Could not load item.';
@@ -923,7 +1303,7 @@ export class ItemDetailPage {
     }
 
     this.isMarkingWorn = true;
-    this.message = '';
+    this.message = 'Marking item as worn...';
     try {
       await this.api.markItemWorn(this.item.id);
       this.message = 'Marked as worn.';
@@ -948,7 +1328,7 @@ export class ItemDetailPage {
       this.item = await this.api.updateItem(this.item.id, this.form);
       this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
       this.message = 'Details saved.';
-      this.editing = false;
+      this.setItemMode('view');
     } catch (error) {
       this.message = readMessage(error, 'Could not save details.');
     } finally {
@@ -976,11 +1356,23 @@ export class ItemDetailPage {
   }
 
   cancelEdit(): void {
-    if (this.item) {
+    this.setItemMode('view');
+  }
+
+  get editing(): boolean {
+    return this.itemMode === 'edit';
+  }
+
+  setItemMode(mode: ItemDetailMode): void {
+    if (this.itemMode === mode) {
+      return;
+    }
+
+    this.itemMode = mode;
+    this.message = '';
+    if (mode === 'view' && this.item) {
       this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
     }
-    this.message = '';
-    this.editing = false;
   }
 }
 
@@ -997,7 +1389,11 @@ export class ItemDetailPage {
           <h1>Build an outfit</h1>
           <span></span>
         </header>
-        <article class="query-card form-stack">
+        <div class="intent-switch" role="tablist" aria-label="Builder mode">
+          <button type="button" class="intent-tab" [class.active]="builderMode === 'smart'" (click)="setBuilderMode('smart')" role="tab">Smart build</button>
+          <button type="button" class="intent-tab" [class.active]="builderMode === 'manual'" (click)="setBuilderMode('manual')" role="tab">Manual build</button>
+        </div>
+        <article class="query-card form-stack" *ngIf="builderMode === 'smart'">
           <div class="textarea-wrap">
             <ion-textarea class="field outfit-query" rows="5" maxlength="120" [(ngModel)]="query" placeholder="Smart casual dinner using my black jeans, no heels"></ion-textarea>
             <button type="button" class="clear-button" aria-label="Clear outfit request" (click)="clearQuery()" *ngIf="query">
@@ -1017,8 +1413,9 @@ export class ItemDetailPage {
           </div>
           <ion-button class="primary-button" expand="block" (click)="search()" [disabled]="isBusy || !query.trim()">{{ isBusy ? 'Building...' : 'Build outfits' }}</ion-button>
           <p class="muted consent-note">Wardrobe AI sends your outfit request and wardrobe item details to OpenAI to generate outfit suggestions.</p>
+          <div class="status-line" *ngIf="isBusy"><ion-spinner name="crescent"></ion-spinner><span>Building outfit suggestions...</span></div>
         </article>
-        <article class="panel form-stack manual-builder">
+        <article class="panel form-stack manual-builder" *ngIf="builderMode === 'manual'">
           <div class="panel-heading">
             <h2 class="section-title">Manual builder</h2>
             <button type="button" class="icon-button" aria-label="Clear selected manual items" (click)="clearManualSelection()" [disabled]="!manualItemIds.length || isBusy">
@@ -1087,6 +1484,7 @@ export class BuilderPage {
   manualName = 'Manual outfit';
   manualItemIds: string[] = [];
   message = '';
+  builderMode: BuilderMode = 'smart';
   isBusy = false;
   private readonly savingGeneratedOutfitKeys = new Set<string>();
 
@@ -1098,6 +1496,16 @@ export class BuilderPage {
       this.manualItemIds = this.manualItemIds.filter((id) => this.items.some((item) => item.id === id));
     } catch (error) {
       this.message = readMessage(error, 'Could not load wardrobe items.');
+    }
+  }
+
+  setBuilderMode(mode: BuilderMode): void {
+    this.builderMode = mode;
+    if (mode === 'manual' && !this.items.length) {
+      this.message = 'Load your wardrobe first to select items manually.';
+      void this.ionViewWillEnter();
+    } else if (mode === 'smart') {
+      this.message = '';
     }
   }
 
@@ -1325,33 +1733,39 @@ export class BuilderPage {
         <article class="panel state-panel" *ngIf="!isLoading && message">
           <p class="muted">{{ message }}</p>
         </article>
-        <article class="outfit-card" *ngFor="let outfit of outfits">
-          <button type="button" class="outfit-open" (click)="open(outfit)">
-            <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [src]="outfit.imageUrl" [alt]="outfit.name">
-          </button>
-          <div class="outfit-images" *ngIf="!outfit.imageUrl">
-            <img *ngFor="let item of outfit.items" [src]="item.image.displayUrl" [alt]="item.name">
-          </div>
-          <div class="outfit-copy">
-            <h3>{{ outfit.name }}</h3>
-            <p class="muted">{{ outfit.explanation || 'Saved from your wardrobe.' }}</p>
-            <div class="outfit-item-list">
-              <span *ngFor="let item of outfit.items">{{ item.name }}</span>
+        <div class="intent-switch" role="tablist" aria-label="Outfits mode">
+          <button type="button" class="intent-tab" [class.active]="outfitsMode === 'saved'" (click)="setOutfitsMode('saved')" role="tab">Saved outfits</button>
+          <button type="button" class="intent-tab" [class.active]="outfitsMode === 'detail'" (click)="setOutfitsMode('detail')" [disabled]="!selectedOutfit" role="tab">Outfit detail</button>
+        </div>
+        <ng-container *ngIf="outfitsMode === 'saved'">
+          <article class="outfit-card" *ngFor="let outfit of outfits">
+            <button type="button" class="outfit-open" (click)="open(outfit)">
+              <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [src]="outfit.imageUrl" [alt]="outfit.name">
+            </button>
+            <div class="outfit-images" *ngIf="!outfit.imageUrl">
+              <img *ngFor="let item of outfit.items" [src]="item.image.displayUrl" [alt]="item.name">
             </div>
-          </div>
-          <div class="outfit-actions">
-            <ion-button class="secondary-button compact-button" fill="outline" (click)="open(outfit)">Open</ion-button>
-            <ion-button class="secondary-button compact-button" fill="outline" (click)="markWorn(outfit)"
-              [disabled]="isMarkingOutfit(outfit.id) || isRemovingOutfit(outfit.id)">
-              {{ isMarkingOutfit(outfit.id) ? 'Marking...' : 'Mark worn' }}
-            </ion-button>
-            <ion-button class="quiet-button compact-button" fill="clear" (click)="remove(outfit)"
-              [disabled]="isRemovingOutfit(outfit.id) || isMarkingOutfit(outfit.id)">
-              {{ isRemovingOutfit(outfit.id) ? 'Deleting...' : 'Delete' }}
-            </ion-button>
-          </div>
-        </article>
-        <article class="panel outfit-detail-panel" *ngIf="selectedOutfit">
+            <div class="outfit-copy">
+              <h3>{{ outfit.name }}</h3>
+              <p class="muted">{{ outfit.explanation || 'Saved from your wardrobe.' }}</p>
+              <div class="outfit-item-list">
+                <span *ngFor="let item of outfit.items">{{ item.name }}</span>
+              </div>
+            </div>
+            <div class="outfit-actions">
+              <ion-button class="secondary-button compact-button" fill="outline" (click)="open(outfit)">Open</ion-button>
+              <ion-button class="secondary-button compact-button" fill="outline" (click)="markWorn(outfit)"
+                [disabled]="isMarkingOutfit(outfit.id) || isRemovingOutfit(outfit.id)">
+                {{ isMarkingOutfit(outfit.id) ? 'Marking...' : 'Mark worn' }}
+              </ion-button>
+              <ion-button class="quiet-button compact-button" fill="clear" (click)="remove(outfit)"
+                [disabled]="isRemovingOutfit(outfit.id) || isMarkingOutfit(outfit.id)">
+                {{ isRemovingOutfit(outfit.id) ? 'Deleting...' : 'Delete' }}
+              </ion-button>
+            </div>
+          </article>
+        </ng-container>
+        <article class="panel outfit-detail-panel" *ngIf="outfitsMode === 'detail' && selectedOutfit">
           <div class="panel-heading">
             <h2 class="section-title">{{ selectedOutfit.name }}</h2>
             <button type="button" class="icon-button" aria-label="Close outfit details" (click)="close()">
@@ -1369,7 +1783,12 @@ export class BuilderPage {
             </div>
           </div>
         </article>
-        <article class="panel" *ngIf="!isLoading && !message && !outfits.length">
+        <article class="panel" *ngIf="outfitsMode === 'detail' && !selectedOutfit">
+          <h2 class="plain-title">Select an outfit</h2>
+          <p class="muted">Open an outfit from Saved outfits to review item details and actions.</p>
+          <ion-button class="secondary-button" fill="outline" size="small" (click)="setOutfitsMode('saved')">View saved outfits</ion-button>
+        </article>
+        <article class="panel" *ngIf="outfitsMode === 'saved' && !isLoading && !message && !outfits.length">
           <h2 class="plain-title">No saved outfits</h2>
           <p class="muted">Build an outfit and save the ones worth repeating.</p>
         </article>
@@ -1381,6 +1800,7 @@ export class OutfitsPage {
   private readonly api = inject(WardrobeApiService);
   outfits: OutfitDto[] = [];
   selectedOutfit: OutfitDto | null = null;
+  outfitsMode: OutfitsMode = 'saved';
   isLoading = true;
   message = '';
   private readonly markingOutfitIds = new Set<string>();
@@ -1398,6 +1818,9 @@ export class OutfitsPage {
       if (this.selectedOutfit) {
         this.selectedOutfit = this.outfits.find((outfit) => outfit.id === this.selectedOutfit?.id) ?? null;
       }
+      if (!this.selectedOutfit) {
+        this.outfitsMode = 'saved';
+      }
     } catch (error) {
       this.message = readMessage(error, 'Could not load outfits.');
       this.outfits = [];
@@ -1408,10 +1831,23 @@ export class OutfitsPage {
 
   open(outfit: OutfitDto): void {
     this.selectedOutfit = outfit;
+    this.outfitsMode = 'detail';
   }
 
   close(): void {
     this.selectedOutfit = null;
+    this.outfitsMode = 'saved';
+  }
+
+  setOutfitsMode(mode: OutfitsMode): void {
+    if (this.outfitsMode === mode) {
+      return;
+    }
+
+    this.outfitsMode = mode;
+    if (mode === 'saved') {
+      this.message = '';
+    }
   }
 
   async markWorn(outfit: OutfitDto): Promise<void> {
@@ -1471,17 +1907,23 @@ export class OutfitsPage {
         <header class="page-header">
           <h1>Settings</h1>
         </header>
-        <article class="panel settings-card">
+        <div class="intent-switch" role="tablist" aria-label="Settings section">
+          <button type="button" class="intent-tab" [class.active]="settingsMode === 'account'" (click)="setSettingsMode('account')" role="tab">Account</button>
+          <button type="button" class="intent-tab" [class.active]="settingsMode === 'ai'" (click)="setSettingsMode('ai')" role="tab">AI</button>
+          <button type="button" class="intent-tab" [class.active]="settingsMode === 'legal'" (click)="setSettingsMode('legal')" role="tab">Legal</button>
+          <button type="button" class="intent-tab" [class.active]="settingsMode === 'danger'" (click)="setSettingsMode('danger')" role="tab">Danger</button>
+        </div>
+        <article class="panel settings-card" *ngIf="settingsMode === 'account'">
           <h1 class="plain-title">{{ auth.session?.user?.displayName || 'Wardrobe AI' }}</h1>
           <p class="muted">{{ auth.session?.user?.email }}</p>
         </article>
-        <article class="panel settings-card">
+        <article class="panel settings-card" *ngIf="settingsMode === 'account'">
           <h2 class="section-title">Device session</h2>
           <p class="muted">This device stores your Wardrobe AI session in local app preferences until you sign out or delete your account.</p>
           <p class="muted" *ngIf="sessionExpiresAtLabel">Current session expires {{ sessionExpiresAtLabel }}.</p>
           <ion-button class="secondary-button" fill="outline" (click)="logout()" [disabled]="isBusy">{{ isBusy ? 'Working...' : 'Sign out' }}</ion-button>
         </article>
-        <article class="panel settings-card">
+        <article class="panel settings-card" *ngIf="settingsMode === 'ai'">
           <h2 class="section-title">AI processing</h2>
           <div class="usage-total">
             <span>Total estimated AI cost</span>
@@ -1491,14 +1933,15 @@ export class OutfitsPage {
           <p class="muted">{{ aiConsentAccepted ? 'This device is allowed to send wardrobe photos and outfit requests to OpenAI.' : 'This device has not granted OpenAI processing consent yet.' }}</p>
           <p class="muted">{{ aiDisclosure }}</p>
           <ion-button class="secondary-button" fill="outline" (click)="resetAiConsent()" [disabled]="isBusy || !aiConsentAccepted">Require consent again</ion-button>
+          <p class="muted" *ngIf="message">{{ message }}</p>
         </article>
-        <article class="panel settings-card">
+        <article class="panel settings-card" *ngIf="settingsMode === 'legal'">
           <h2 class="section-title">Legal and support</h2>
           <a class="text-link" [href]="privacyPolicyUrl" target="_blank" rel="noreferrer">Privacy policy</a>
           <a class="text-link" [href]="termsUrl" target="_blank" rel="noreferrer">Terms of use</a>
           <a class="text-link" [href]="supportUrl" target="_blank" rel="noreferrer">Support</a>
         </article>
-        <article class="panel settings-card danger-panel">
+        <article class="panel settings-card danger-panel" *ngIf="settingsMode === 'danger'">
           <h2 class="section-title">Delete account</h2>
           <p class="muted">Deleting your account permanently removes your sign-in, wardrobe items, saved outfits, uploaded images, and related cloud data.</p>
           <ion-button class="secondary-button destructive-button" fill="outline" (click)="deleteAccount()" [disabled]="isBusy">{{ isBusy ? 'Deleting...' : 'Delete account' }}</ion-button>
@@ -1520,6 +1963,7 @@ export class SettingsPage {
   aiUsage: AiUsageCostSummaryDto | null = null;
   isBusy = false;
   message = '';
+  settingsMode: SettingsMode = 'account';
 
   async ionViewWillEnter(): Promise<void> {
     this.aiConsentAccepted = await hasAiConsent();
@@ -1548,6 +1992,17 @@ export class SettingsPage {
   get aiUsageTotalLabel(): string {
     const value = this.aiUsage?.totalCostUsd ?? 0;
     return value.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  }
+
+  setSettingsMode(mode: SettingsMode): void {
+    if (this.settingsMode === mode) {
+      return;
+    }
+
+    this.settingsMode = mode;
+    if (mode !== 'danger') {
+      this.message = '';
+    }
   }
 
   async logout(): Promise<void> {
@@ -1707,6 +2162,13 @@ const PRIVACY_POLICY_URL = 'https://wardrobe.ai/privacy';
 const TERMS_OF_USE_URL = 'https://wardrobe.ai/terms';
 const SUPPORT_URL = 'mailto:support@wardrobe.ai';
 const AI_DISCLOSURE_TEXT = 'Wardrobe AI uses OpenAI to classify wardrobe photos, generate cleaned display images, and suggest outfits from your saved wardrobe. Avoid uploading photos or prompts that you do not want processed by that provider.';
+const MAX_BATCH_UPLOAD_COUNT = 10;
+const MAX_UPLOAD_FILE_BYTES = 30 * 1024 * 1024;
+const IMAGE_COMPRESSION_TRIGGER_BYTES = 1.5 * 1024 * 1024;
+const IMAGE_MAX_SIDE = 2200;
+const IMAGE_MIN_SIDE = 600;
+const IMAGE_COMPRESSION_QUALITY = 0.82;
+const MIME_IMAGE_OUTPUT_EXTENSION = 'jpeg';
 
 async function hasAiConsent(): Promise<boolean> {
   const stored = await Preferences.get({ key: AI_CONSENT_KEY });
