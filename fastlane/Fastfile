@@ -86,6 +86,7 @@ platform :ios do
       output_name: "WardrobeAI.ipa",
       include_symbols: true,
       include_bitcode: false,
+      xcargs: release_xcargs,
       export_options: {
         method: export_method,
         signingStyle: "manual",
@@ -177,4 +178,11 @@ def signing_xcargs
     "DEVELOPMENT_TEAM=#{APPLE_TEAM_ID}",
     "PRODUCT_BUNDLE_IDENTIFIER=#{APP_IDENTIFIER}"
   ].join(" ")
+end
+
+def release_xcargs
+  build_number = ENV["IOS_BUILD_NUMBER"].to_s.strip
+  return nil if build_number.empty?
+
+  "CURRENT_PROJECT_VERSION=#{build_number}"
 end

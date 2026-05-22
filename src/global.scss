@@ -24,6 +24,12 @@ body {
   background: var(--app-bg);
 }
 
+ion-app,
+ion-router-outlet,
+.ion-page {
+  background: var(--app-bg);
+}
+
 body {
   font-size: 15px;
 }

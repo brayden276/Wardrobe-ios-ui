@@ -13,6 +13,11 @@ on:
         type: string
         required: false
         default: ""
+      build_number:
+        description: Optional CFBundleVersion override. Defaults to the GitHub workflow run number.
+        type: string
+        required: false
+        default: ""
       repair_signing_assets:
         description: Allow fastlane match to create or repair signing assets
         type: boolean
@@ -38,6 +43,7 @@ jobs:
       MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
       KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
       MATCH_READONLY: ${{ inputs.repair_signing_assets && 'false' || 'true' }}
+      IOS_BUILD_NUMBER: ${{ inputs.build_number != '' && inputs.build_number || github.run_number }}
 
     steps:
       - name: Checkout repository
