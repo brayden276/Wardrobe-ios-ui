@@ -1,17 +1,14 @@
-import { Component, ElementRef, ViewChild, inject } from '@angular/core';
+import { Component, ElementRef, OnDestroy, ViewChild, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Preferences } from '@capacitor/preferences';
 import { AuthService } from './auth.service';
-import { AiUsageCostSummaryDto, ApiMessage, GeneratedOutfitDto, OutfitDto, UpdateWardrobeItemRequest, WardrobeItemDto, WardrobeLookupsDto } from './models';
-import { WardrobeApiService } from './wardrobe-api.service';
+import { AiUsageCostSummaryDto, ApiMessage, GeneratedOutfitDto, ImageGenerationStreamUpdate, OutfitDto, UpdateWardrobeItemRequest, WardrobeItemDto, WardrobeLookupsDto } from './models';
+import { ImageGenerationStatusStream, WardrobeApiService } from './wardrobe-api.service';
 
 type UploadMode = 'single' | 'batch';
-type WardrobeMode = 'browse' | 'filters';
-type BuilderMode = 'smart' | 'manual';
 type ItemDetailMode = 'view' | 'edit';
-type OutfitsMode = 'saved' | 'detail';
 type SettingsMode = 'account' | 'ai' | 'legal' | 'danger';
 
 type PreparedUploadFile = {
@@ -195,26 +192,24 @@ export class TabsPage {}
         </header>
         <div class="search-row">
           <ion-searchbar class="wardrobe-search" [(ngModel)]="search" placeholder="Search black jeans, blazers..." (ionInput)="scheduleLoad()"></ion-searchbar>
-          <button type="button" class="filter-button" aria-label="Clear wardrobe filters" (click)="clearFilters()" [disabled]="!hasFilters">
-            <ion-icon name="options-outline"></ion-icon>
+          <button type="button" class="filter-button" [class.active]="filtersExpanded || hasFilters" [attr.aria-label]="filtersExpanded ? 'Hide wardrobe filters' : 'Show wardrobe filters'" (click)="toggleFilters()">
+            <ion-icon [name]="filtersExpanded ? 'close-outline' : 'options-outline'"></ion-icon>
           </button>
         </div>
-        <div class="intent-switch" role="tablist" aria-label="Wardrobe mode">
-          <button type="button" class="intent-tab" [class.active]="wardrobeMode === 'browse'" (click)="setWardrobeMode('browse')" role="tab">Browse</button>
-          <button type="button" class="intent-tab" [class.active]="wardrobeMode === 'filters'" (click)="setWardrobeMode('filters')" role="tab">Filters</button>
-        </div>
-        <article class="panel filter-summary" *ngIf="wardrobeMode === 'browse' && hasFilters">
+        <article class="panel filter-summary" *ngIf="!filtersExpanded && hasFilters">
           <div class="filter-group">
             <span class="filter-label">Active filters</span>
             <p class="muted">{{ activeFilterSummary }}</p>
-            <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="setWardrobeMode('filters')">Edit filters</ion-button>
+            <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="toggleFilters()">Edit filters</ion-button>
           </div>
         </article>
-        <article class="panel filter-summary" *ngIf="wardrobeMode === 'browse' && !hasFilters">
-          <span class="muted">No filters selected.</span>
-          <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="setWardrobeMode('filters')">Add filters</ion-button>
-        </article>
-        <article class="panel filter-panel" *ngIf="wardrobeMode === 'filters'">
+        <article class="panel filter-panel" *ngIf="filtersExpanded">
+          <div class="panel-heading">
+            <h2 class="section-title">Filters</h2>
+            <button type="button" class="icon-button" aria-label="Close filters" (click)="toggleFilters()">
+              <ion-icon name="close-outline"></ion-icon>
+            </button>
+          </div>
           <div class="filter-group">
             <span class="filter-label">Category</span>
             <div class="chip-row">
@@ -304,6 +299,7 @@ export class TabsPage {}
               <ion-toggle [checked]="includeArchived" (ionChange)="setIncludeArchived($event.detail.checked)"></ion-toggle>
             </div>
           </details>
+          <ion-button class="secondary-button" fill="outline" expand="block" (click)="clearFilters()" [disabled]="!hasFilters">Clear filters</ion-button>
         </article>
         <article class="panel state-panel" *ngIf="isLoading">
           <ion-spinner name="crescent"></ion-spinner>
@@ -324,6 +320,10 @@ export class TabsPage {}
               <div class="colour-dots" aria-label="Item colours">
                 <span class="colour-dot" *ngFor="let colour of coloursFor(item)" [style.background]="colourSwatch(colour)"></span>
               </div>
+              <div class="item-generation-state" *ngIf="imageGenerationMessage(item) as status">
+                <ion-spinner *ngIf="isImageGenerationInProgress(item.imageGenerationStatus)" name="crescent"></ion-spinner>
+                <span>{{ status }}</span>
+              </div>
             </div>
           </a>
         </div>
@@ -342,7 +342,7 @@ export class TabsPage {}
       </ion-content>
   `
 })
-export class WardrobePage {
+export class WardrobePage implements OnDestroy {
   private readonly api = inject(WardrobeApiService);
   items: WardrobeItemDto[] = [];
   lookups: WardrobeLookupsDto | null = null;
@@ -358,12 +358,16 @@ export class WardrobePage {
   bottomShapeId: string | null = null;
   riseId: string | null = null;
   includeArchived = false;
-  wardrobeMode: WardrobeMode = 'browse';
+  filtersExpanded = false;
   search = '';
   isLoading = true;
   message = '';
   private loadDebounceHandle: ReturnType<typeof setTimeout> | null = null;
   private readonly loadDebounceMs = 250;
+  private imageGenerationStatusStream: ImageGenerationStatusStream | null = null;
+  private readonly itemImageGenerationPollingIntervalMs = 1800;
+  private itemImageGenerationPollTimeout: ReturnType<typeof setTimeout> | null = null;
+  private isRefreshingImageGeneration = false;
 
   get activeFilterSummary(): string {
     const filters: string[] = [];
@@ -404,8 +408,8 @@ export class WardrobePage {
     return filters.join(' · ');
   }
 
-  setWardrobeMode(mode: WardrobeMode): void {
-    this.wardrobeMode = mode;
+  toggleFilters(): void {
+    this.filtersExpanded = !this.filtersExpanded;
   }
 
   get hasFilters(): boolean {
@@ -444,12 +448,30 @@ export class WardrobePage {
     await this.load();
   }
 
+  ngOnDestroy(): void {
+    this.stopItemImageGenerationStreaming();
+    this.stopItemImageGenerationPolling();
+  }
+
   async load(): Promise<void> {
+    this.stopItemImageGenerationStreaming();
+    this.stopItemImageGenerationPolling();
     this.isLoading = true;
     this.message = '';
     try {
       this.lookups ??= await this.api.getLookups();
-      const params: Record<string, string | boolean> = {
+      this.items = await this.api.getItems(this.buildItemFilterParams());
+      this.startImageGenerationStreaming();
+    } catch (error) {
+      this.message = readMessage(error, 'Could not load wardrobe. Please try again.');
+      this.items = [];
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  private buildItemFilterParams(): Record<string, string | boolean> {
+    return {
         categoryId: this.categoryId ?? '',
         subcategoryId: this.subcategoryId ?? '',
         colourId: this.colourId ?? '',
@@ -464,13 +486,114 @@ export class WardrobePage {
         search: this.search.trim(),
         includeArchived: this.includeArchived
       };
-      this.items = await this.api.getItems(params);
-    } catch (error) {
-      this.message = readMessage(error, 'Could not load wardrobe. Please try again.');
-      this.items = [];
-    } finally {
-      this.isLoading = false;
+  }
+
+  private startImageGenerationStreaming(): void {
+    this.stopItemImageGenerationStreaming();
+    this.stopItemImageGenerationPolling();
+
+    if (!this.hasItemImageGenerationInProgress()) {
+      return;
     }
+
+    const trackingItemIds = this.items
+      .filter((item) => this.isImageGenerationInProgress(item.imageGenerationStatus))
+      .map((item) => item.id);
+
+    const stream = this.api.streamImageGenerationStatuses(
+      trackingItemIds,
+      [],
+      (updates) => this.applyImageGenerationStreamUpdates(updates),
+      () => {
+        this.imageGenerationStatusStream = null;
+        this.startItemImageGenerationPolling();
+      });
+
+    if (stream === null) {
+      this.startItemImageGenerationPolling();
+      return;
+    }
+
+    this.imageGenerationStatusStream = stream;
+  }
+
+  private applyImageGenerationStreamUpdates(updates: ImageGenerationStreamUpdate[]): void {
+    if (!updates.length || this.items.length === 0) {
+      return;
+    }
+
+    const updateById = new Map<string, ImageGenerationStreamUpdate>(updates.filter((update) => update.kind === 'item').map((update) => [update.id, update]));
+    this.items = this.items.map((item) => {
+      const update = updateById.get(item.id);
+      if (!update || update.status === item.imageGenerationStatus) {
+        return item;
+      }
+
+      return { ...item, imageGenerationStatus: update.status };
+    });
+
+    if (!this.hasItemImageGenerationInProgress()) {
+      this.stopItemImageGenerationStreaming();
+      void this.refreshWardrobeItemsAfterImageGeneration();
+    }
+  }
+
+  private async refreshWardrobeItemsAfterImageGeneration(): Promise<void> {
+    try {
+      this.items = await this.api.getItems(this.buildItemFilterParams());
+    } catch {
+      // Ignore temporary network issues after image generation completes.
+    }
+  }
+
+  private stopItemImageGenerationStreaming(): void {
+    if (this.imageGenerationStatusStream) {
+      this.imageGenerationStatusStream.close();
+    }
+    this.imageGenerationStatusStream = null;
+  }
+
+  private startItemImageGenerationPolling(): void {
+    if (!this.hasItemImageGenerationInProgress()) {
+      return;
+    }
+
+    this.itemImageGenerationPollTimeout = setTimeout(() => {
+      void this.refreshItemImageGenerationStatuses();
+    }, this.itemImageGenerationPollingIntervalMs);
+  }
+
+  private async refreshItemImageGenerationStatuses(): Promise<void> {
+    if (this.isRefreshingImageGeneration) {
+      this.startItemImageGenerationPolling();
+      return;
+    }
+
+    if (!this.hasItemImageGenerationInProgress()) {
+      return;
+    }
+
+    this.isRefreshingImageGeneration = true;
+    try {
+      this.items = await this.api.getItems(this.buildItemFilterParams());
+    } catch {
+      // Ignore temporary network issues while polling for image-generation states.
+    } finally {
+      this.isRefreshingImageGeneration = false;
+      this.startItemImageGenerationPolling();
+    }
+  }
+
+  private stopItemImageGenerationPolling(): void {
+    if (this.itemImageGenerationPollTimeout) {
+      clearTimeout(this.itemImageGenerationPollTimeout);
+    }
+    this.itemImageGenerationPollTimeout = null;
+    this.isRefreshingImageGeneration = false;
+  }
+
+  private hasItemImageGenerationInProgress(): boolean {
+    return this.items.some((item) => this.isImageGenerationInProgress(item.imageGenerationStatus));
   }
 
   setCategory(categoryId: string | null): void {
@@ -513,6 +636,7 @@ export class WardrobePage {
     this.riseId = null;
     this.includeArchived = false;
     this.search = '';
+    this.filtersExpanded = false;
     this.scheduleLoad();
   }
 
@@ -531,6 +655,23 @@ export class WardrobePage {
 
   trackById(_: number, item: WardrobeItemDto): string {
     return item.id;
+  }
+
+  imageGenerationMessage(item: WardrobeItemDto): string | null {
+    switch (item.imageGenerationStatus) {
+      case 'queued':
+        return 'Image generation queued...';
+      case 'generating':
+        return 'Generating polished image...';
+      case 'failed':
+        return 'Image generation failed.';
+      default:
+        return null;
+    }
+  }
+
+  isImageGenerationInProgress(status: string | null): boolean {
+    return status === 'queued' || status === 'generating';
   }
 
   scheduleLoad(): void {
@@ -561,10 +702,6 @@ export class WardrobePage {
         <input #cameraInput class="file-input" type="file" accept="image/*" capture="environment" (change)="handleFileSelection($event)">
         <input #libraryInput class="file-input" type="file" accept="image/*" (change)="handleFileSelection($event)">
         <input #batchInput class="file-input" type="file" accept="image/*" multiple (change)="handleBatchSelection($event)">
-        <div class="upload-mode-switch" role="tablist" aria-label="Upload mode">
-          <button type="button" class="mode-tab" [class.active]="uploadMode === 'single'" (click)="setUploadMode('single')" role="tab">Single upload</button>
-          <button type="button" class="mode-tab" [class.active]="uploadMode === 'batch'" (click)="setUploadMode('batch')" role="tab">Batch upload</button>
-        </div>
         <ng-container *ngIf="uploadMode === 'single'">
           <div class="capture-stage">
             <img *ngIf="previewUrl" [src]="previewUrl" alt="Selected wardrobe item">
@@ -585,12 +722,13 @@ export class WardrobePage {
             </div>
             <ion-button class="primary-button olive-button" expand="block" (click)="imageBlob ? upload() : capture(CameraSource.Camera)" [disabled]="isSaving || isPreparing">{{ isSaving ? 'Uploading item...' : imageBlob ? 'Submit photo' : 'Take photo' }}</ion-button>
             <ion-button class="light-button" expand="block" (click)="capture(CameraSource.Photos)" [disabled]="isSaving || isPreparing">{{ imageBlob ? 'Choose different photo' : 'Choose from library' }}</ion-button>
+            <ion-button class="light-button" expand="block" (click)="openBatchPicker()" [disabled]="isSaving || isBatchSaving || isPreparing">{{ batchFiles.length ? 'Add photos to batch' : 'Upload multiple photos' }}</ion-button>
             <ion-button class="secondary-button retry-button" fill="outline" expand="block" *ngIf="imageBlob && uploadError && !isSaving && !isPreparing" (click)="upload()">Try again</ion-button>
             <div class="processing-line" *ngIf="isPreparing || isSaving">
               <ion-spinner name="crescent"></ion-spinner>
               <span>{{ isPreparing ? 'Preparing image...' : 'Uploading and categorising item...' }}</span>
             </div>
-            <p>{{ imageBlob ? singleReadyLabel : 'One item, clearly visible.' }}</p>
+            <p>{{ imageBlob ? singleReadyLabel : 'Upload one item here, or tap Upload multiple photos for a batch.' }}</p>
             <p class="muted consent-note">Wardrobe AI sends uploaded wardrobe photos to OpenAI to classify items and generate cleaned display images.</p>
             <p class="muted consent-note">Only upload clothing photos you are comfortable sharing with that provider.</p>
             <p class="muted" *ngIf="statusMessage">{{ statusMessage }}</p>
@@ -749,6 +887,14 @@ export class AddItemPage {
       return;
     }
 
+    if (files.length === 1) {
+      this.setUploadMode('single');
+      this.clearBatchSelection();
+      await this.applySingleSelection(files[0]);
+      return;
+    }
+
+    this.setUploadMode('batch');
     this.clearBatchSelection();
     this.message = '';
     this.statusMessage = '';
@@ -1125,12 +1271,12 @@ export class AddItemPage {
             <ion-icon name="create-outline"></ion-icon>
           </button>
         </header>
-          <div class="intent-switch" role="tablist" aria-label="Item mode">
-            <button type="button" class="intent-tab" [class.active]="itemMode === 'view'" (click)="setItemMode('view')" role="tab">View item</button>
-            <button type="button" class="intent-tab" [class.active]="itemMode === 'edit'" (click)="setItemMode('edit')" role="tab">Edit details</button>
-          </div>
           <div class="product-stage">
             <img class="product-image" [src]="item.image.displayUrl" [alt]="item.name">
+            <p class="muted center-message image-status-line" *ngIf="imageGenerationMessage(item.imageGenerationStatus)">
+              <ion-spinner *ngIf="isImageGenerationInProgress(item.imageGenerationStatus)" name="crescent"></ion-spinner>
+              <span>{{ imageGenerationMessage(item.imageGenerationStatus) }}</span>
+            </p>
           </div>
           <ion-button class="taupe-button" expand="block" (click)="markWorn()" *ngIf="!editing" [disabled]="isMarkingWorn">{{ isMarkingWorn ? 'Marking worn...' : 'Mark worn' }}</ion-button>
           <div class="detail-chips">
@@ -1234,7 +1380,7 @@ export class AddItemPage {
     </ion-content>
   `
 })
-export class ItemDetailPage {
+export class ItemDetailPage implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
@@ -1247,6 +1393,10 @@ export class ItemDetailPage {
   isMarkingWorn = false;
   isArchiving = false;
   itemMode: ItemDetailMode = 'view';
+  private imageGenerationStatusStream: ImageGenerationStatusStream | null = null;
+  private readonly imageGenerationPollingIntervalMs = 1800;
+  private imageGenerationPollTimeout: ReturnType<typeof setTimeout> | null = null;
+  private isRefreshingImageGeneration = false;
 
   get selectedSubcategories(): { id: string; label: string }[] {
     return this.lookups?.categories.find((category) => category.id === this.form.categoryId)?.subcategories ?? [];
@@ -1274,7 +1424,14 @@ export class ItemDetailPage {
     await this.loadItem();
   }
 
+  ngOnDestroy(): void {
+    this.stopImageGenerationStreaming();
+    this.stopImageGenerationPolling();
+  }
+
   private async loadItem(): Promise<void> {
+    this.stopImageGenerationStreaming();
+    this.stopImageGenerationPolling();
     this.isLoading = true;
     this.message = '';
     this.item = null;
@@ -1289,11 +1446,158 @@ export class ItemDetailPage {
       this.lookups = await this.api.getLookups();
       this.item = await this.api.getItem(id);
       this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
+      this.startImageGenerationStreaming();
     } catch (error) {
       this.message = readMessage(error, 'Could not load item.');
     } finally {
       this.isLoading = false;
     }
+  }
+
+  private startImageGenerationStreaming(): void {
+    if (!this.item) {
+      return;
+    }
+
+    this.stopImageGenerationStreaming();
+    this.stopImageGenerationPolling();
+
+    if (!this.shouldPollImageGeneration()) {
+      return;
+    }
+
+    const stream = this.api.streamImageGenerationStatuses(
+      [this.item.id],
+      [],
+      (updates) => this.applyImageGenerationStreamUpdates(updates),
+      () => {
+        this.imageGenerationStatusStream = null;
+        this.startImageGenerationPolling();
+      });
+
+    if (stream === null) {
+      this.startImageGenerationPolling();
+      return;
+    }
+
+    this.imageGenerationStatusStream = stream;
+  }
+
+  private applyImageGenerationStreamUpdates(updates: ImageGenerationStreamUpdate[]): void {
+    if (!this.item) {
+      return;
+    }
+
+    const itemId = this.item.id;
+    const update = updates.find((entry) => entry.kind === 'item' && entry.id === itemId);
+    if (!update) {
+      return;
+    }
+
+    const currentMode = this.itemMode;
+    this.item = {
+      ...this.item,
+      imageGenerationStatus: update.status
+    };
+    if (currentMode !== 'edit') {
+      this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
+    }
+
+    if (!this.shouldPollImageGeneration()) {
+      this.stopImageGenerationStreaming();
+      void this.refreshItemAfterImageGeneration();
+    }
+  }
+
+  private async refreshItemAfterImageGeneration(): Promise<void> {
+    if (!this.item) {
+      return;
+    }
+
+    try {
+      const latestItem = await this.api.getItem(this.item.id);
+      const mode = this.itemMode;
+      this.item = latestItem;
+      if (mode !== 'edit') {
+        this.form = { ...latestItem, secondaryColourIds: latestItem.secondaryColourIds.slice() };
+      }
+    } catch {
+      // Ignore temporary network issues after image generation completes.
+    }
+  }
+
+  private stopImageGenerationStreaming(): void {
+    if (this.imageGenerationStatusStream) {
+      this.imageGenerationStatusStream.close();
+    }
+    this.imageGenerationStatusStream = null;
+  }
+
+  private startImageGenerationPolling(): void {
+    this.stopImageGenerationPolling();
+    if (!this.shouldPollImageGeneration()) {
+      return;
+    }
+
+    this.imageGenerationPollTimeout = setTimeout(() => {
+      this.imageGenerationPollTimeout = null;
+      void this.pollImageGeneration();
+    }, this.imageGenerationPollingIntervalMs);
+  }
+
+  private async pollImageGeneration(): Promise<void> {
+    if (!this.item || this.isRefreshingImageGeneration) {
+      this.startImageGenerationPolling();
+      return;
+    }
+
+    if (!this.shouldPollImageGeneration()) {
+      return;
+    }
+
+    this.isRefreshingImageGeneration = true;
+    try {
+      const latestItem = await this.api.getItem(this.item.id);
+      const mode = this.itemMode;
+      this.item = latestItem;
+      if (mode !== 'edit') {
+        this.form = { ...latestItem, secondaryColourIds: latestItem.secondaryColourIds.slice() };
+      }
+    } catch {
+      // Ignore temporary network issues while polling for image-generation state.
+    } finally {
+      this.isRefreshingImageGeneration = false;
+      this.startImageGenerationPolling();
+    }
+  }
+
+  private stopImageGenerationPolling(): void {
+    if (this.imageGenerationPollTimeout) {
+      clearTimeout(this.imageGenerationPollTimeout);
+    }
+    this.imageGenerationPollTimeout = null;
+    this.isRefreshingImageGeneration = false;
+  }
+
+  private shouldPollImageGeneration(): boolean {
+    return this.isImageGenerationInProgress(this.item?.imageGenerationStatus ?? null);
+  }
+
+  imageGenerationMessage(status: string | null): string | null {
+    switch (status) {
+      case 'queued':
+        return 'Image generation queued...';
+      case 'generating':
+        return 'Generating polished image...';
+      case 'failed':
+        return 'Image generation failed.';
+      default:
+        return null;
+    }
+  }
+
+  isImageGenerationInProgress(status: string | null): boolean {
+    return status === 'queued' || status === 'generating';
   }
 
   async markWorn(): Promise<void> {
@@ -1389,11 +1693,7 @@ export class ItemDetailPage {
           <h1>Build an outfit</h1>
           <span></span>
         </header>
-        <div class="intent-switch" role="tablist" aria-label="Builder mode">
-          <button type="button" class="intent-tab" [class.active]="builderMode === 'smart'" (click)="setBuilderMode('smart')" role="tab">Smart build</button>
-          <button type="button" class="intent-tab" [class.active]="builderMode === 'manual'" (click)="setBuilderMode('manual')" role="tab">Manual build</button>
-        </div>
-        <article class="query-card form-stack" *ngIf="builderMode === 'smart'">
+        <article class="query-card form-stack">
           <div class="textarea-wrap">
             <ion-textarea class="field outfit-query" rows="5" maxlength="120" [(ngModel)]="query" placeholder="Smart casual dinner using my black jeans, no heels"></ion-textarea>
             <button type="button" class="clear-button" aria-label="Clear outfit request" (click)="clearQuery()" *ngIf="query">
@@ -1411,18 +1711,18 @@ export class ItemDetailPage {
           <div class="chip-row">
             <button type="button" class="chip" *ngFor="let chip of chips" (click)="append(chip)">{{ chip }}</button>
           </div>
-          <ion-button class="primary-button" expand="block" (click)="search()" [disabled]="isBusy || !query.trim()">{{ isBusy ? 'Building...' : 'Build outfits' }}</ion-button>
+          <ion-button class="primary-button" expand="block" (click)="search()" [disabled]="isBusy || !query.trim()">{{ isBuildingOutfits ? 'Building...' : 'Build outfits' }}</ion-button>
           <p class="muted consent-note">Wardrobe AI sends your outfit request and wardrobe item details to OpenAI to generate outfit suggestions.</p>
-          <div class="status-line" *ngIf="isBusy"><ion-spinner name="crescent"></ion-spinner><span>Building outfit suggestions...</span></div>
+          <div class="status-line" *ngIf="isBuildingOutfits"><ion-spinner name="crescent"></ion-spinner><span>Building outfit suggestions...</span></div>
         </article>
-        <article class="panel form-stack manual-builder" *ngIf="builderMode === 'manual'">
+        <article class="panel form-stack manual-builder">
           <div class="panel-heading">
-            <h2 class="section-title">Manual builder</h2>
+            <h2 class="section-title">{{ manualItemIds.length ? 'Selected outfit' : 'Pick items' }}</h2>
             <button type="button" class="icon-button" aria-label="Clear selected manual items" (click)="clearManualSelection()" [disabled]="!manualItemIds.length || isBusy">
               <ion-icon name="close-outline"></ion-icon>
             </button>
           </div>
-          <label>
+          <label *ngIf="manualItemIds.length">
             Outfit name
             <ion-input class="field" [(ngModel)]="manualName" name="manualName"></ion-input>
           </label>
@@ -1449,7 +1749,7 @@ export class ItemDetailPage {
           </div>
           <p class="muted" *ngIf="!items.length">Load wardrobe items to build a manual outfit.</p>
           <p class="muted" *ngIf="manualItemIds.length && !manualCanSave">{{ manualHint }}</p>
-          <ion-button class="primary-button" expand="block" (click)="saveManual()" [disabled]="isBusy || !manualCanSave">{{ isBusy ? 'Saving...' : 'Save manual outfit' }}</ion-button>
+          <ion-button class="primary-button" expand="block" *ngIf="manualItemIds.length" (click)="saveManual()" [disabled]="isBusy || !manualCanSave">{{ isSavingManualOutfit ? 'Saving...' : 'Save outfit' }}</ion-button>
         </article>
         <h2 class="section-title" *ngIf="results.length">Outfit ideas</h2>
         <article class="outfit-card idea-card" *ngFor="let outfit of results">
@@ -1484,9 +1784,13 @@ export class BuilderPage {
   manualName = 'Manual outfit';
   manualItemIds: string[] = [];
   message = '';
-  builderMode: BuilderMode = 'smart';
-  isBusy = false;
+  isBuildingOutfits = false;
+  isSavingManualOutfit = false;
   private readonly savingGeneratedOutfitKeys = new Set<string>();
+
+  get isBusy(): boolean {
+    return this.isBuildingOutfits || this.isSavingManualOutfit;
+  }
 
   async ionViewWillEnter(): Promise<void> {
     this.message = '';
@@ -1496,16 +1800,6 @@ export class BuilderPage {
       this.manualItemIds = this.manualItemIds.filter((id) => this.items.some((item) => item.id === id));
     } catch (error) {
       this.message = readMessage(error, 'Could not load wardrobe items.');
-    }
-  }
-
-  setBuilderMode(mode: BuilderMode): void {
-    this.builderMode = mode;
-    if (mode === 'manual' && !this.items.length) {
-      this.message = 'Load your wardrobe first to select items manually.';
-      void this.ionViewWillEnter();
-    } else if (mode === 'smart') {
-      this.message = '';
     }
   }
 
@@ -1542,7 +1836,7 @@ export class BuilderPage {
       return;
     }
 
-    this.isBusy = true;
+    this.isBuildingOutfits = true;
     this.message = '';
     try {
       this.lookups ??= await this.api.getLookups();
@@ -1555,7 +1849,7 @@ export class BuilderPage {
       this.results = [];
       this.message = readMessage(error, 'Could not build an outfit from the current wardrobe.');
     } finally {
-      this.isBusy = false;
+      this.isBuildingOutfits = false;
     }
   }
 
@@ -1565,7 +1859,7 @@ export class BuilderPage {
       return;
     }
 
-    this.isBusy = true;
+    this.isSavingManualOutfit = true;
     this.message = '';
     try {
       await this.api.saveOutfit(this.manualName.trim() || 'Manual outfit', null, 'Built manually from selected wardrobe items.', this.manualItemIds);
@@ -1573,7 +1867,7 @@ export class BuilderPage {
     } catch (error) {
       this.message = readMessage(error, 'Could not save outfit.');
     } finally {
-      this.isBusy = false;
+      this.isSavingManualOutfit = false;
     }
   }
 
@@ -1733,11 +2027,7 @@ export class BuilderPage {
         <article class="panel state-panel" *ngIf="!isLoading && message">
           <p class="muted">{{ message }}</p>
         </article>
-        <div class="intent-switch" role="tablist" aria-label="Outfits mode">
-          <button type="button" class="intent-tab" [class.active]="outfitsMode === 'saved'" (click)="setOutfitsMode('saved')" role="tab">Saved outfits</button>
-          <button type="button" class="intent-tab" [class.active]="outfitsMode === 'detail'" (click)="setOutfitsMode('detail')" [disabled]="!selectedOutfit" role="tab">Outfit detail</button>
-        </div>
-        <ng-container *ngIf="outfitsMode === 'saved'">
+        <ng-container *ngIf="!selectedOutfit">
           <article class="outfit-card" *ngFor="let outfit of outfits">
             <button type="button" class="outfit-open" (click)="open(outfit)">
               <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [src]="outfit.imageUrl" [alt]="outfit.name">
@@ -1748,6 +2038,9 @@ export class BuilderPage {
             <div class="outfit-copy">
               <h3>{{ outfit.name }}</h3>
               <p class="muted">{{ outfit.explanation || 'Saved from your wardrobe.' }}</p>
+              <div class="muted" *ngIf="outfitGenerationMessage(outfit.imageGenerationStatus) as status">
+                <span>{{ status }}</span>
+              </div>
               <div class="outfit-item-list">
                 <span *ngFor="let item of outfit.items">{{ item.name }}</span>
               </div>
@@ -1765,7 +2058,7 @@ export class BuilderPage {
             </div>
           </article>
         </ng-container>
-        <article class="panel outfit-detail-panel" *ngIf="outfitsMode === 'detail' && selectedOutfit">
+        <article class="panel outfit-detail-panel" *ngIf="selectedOutfit">
           <div class="panel-heading">
             <h2 class="section-title">{{ selectedOutfit.name }}</h2>
             <button type="button" class="icon-button" aria-label="Close outfit details" (click)="close()">
@@ -1773,6 +2066,10 @@ export class BuilderPage {
             </button>
           </div>
           <img class="outfit-detail-image" *ngIf="selectedOutfit.imageUrl" [src]="selectedOutfit.imageUrl" [alt]="selectedOutfit.name">
+          <p class="muted center-message image-status-line" *ngIf="outfitGenerationMessage(selectedOutfit.imageGenerationStatus)">
+            <ion-spinner *ngIf="isOutfitImageGenerationInProgress(selectedOutfit.imageGenerationStatus)" name="crescent"></ion-spinner>
+            <span>{{ outfitGenerationMessage(selectedOutfit.imageGenerationStatus) }}</span>
+          </p>
           <div class="outfit-detail-items">
             <div class="outfit-detail-item" *ngFor="let item of selectedOutfit.items">
               <img [src]="item.image.displayUrl" [alt]="item.name">
@@ -1783,12 +2080,7 @@ export class BuilderPage {
             </div>
           </div>
         </article>
-        <article class="panel" *ngIf="outfitsMode === 'detail' && !selectedOutfit">
-          <h2 class="plain-title">Select an outfit</h2>
-          <p class="muted">Open an outfit from Saved outfits to review item details and actions.</p>
-          <ion-button class="secondary-button" fill="outline" size="small" (click)="setOutfitsMode('saved')">View saved outfits</ion-button>
-        </article>
-        <article class="panel" *ngIf="outfitsMode === 'saved' && !isLoading && !message && !outfits.length">
+        <article class="panel" *ngIf="!selectedOutfit && !isLoading && !message && !outfits.length">
           <h2 class="plain-title">No saved outfits</h2>
           <p class="muted">Build an outfit and save the ones worth repeating.</p>
         </article>
@@ -1796,21 +2088,31 @@ export class BuilderPage {
     </ion-content>
   `
 })
-export class OutfitsPage {
+export class OutfitsPage implements OnDestroy {
   private readonly api = inject(WardrobeApiService);
   outfits: OutfitDto[] = [];
   selectedOutfit: OutfitDto | null = null;
-  outfitsMode: OutfitsMode = 'saved';
   isLoading = true;
   message = '';
+  private imageGenerationStatusStream: ImageGenerationStatusStream | null = null;
   private readonly markingOutfitIds = new Set<string>();
   private readonly deletingOutfitIds = new Set<string>();
+  private readonly outfitGenerationPollingIntervalMs = 1800;
+  private outfitGenerationPollTimeout: ReturnType<typeof setTimeout> | null = null;
+  private isRefreshingOutfits = false;
 
   async ionViewWillEnter(): Promise<void> {
     await this.load();
   }
 
+  ngOnDestroy(): void {
+    this.stopOutfitGenerationStreaming();
+    this.stopOutfitGenerationPolling();
+  }
+
   async load(): Promise<void> {
+    this.stopOutfitGenerationStreaming();
+    this.stopOutfitGenerationPolling();
     this.isLoading = true;
     this.message = '';
     try {
@@ -1818,9 +2120,7 @@ export class OutfitsPage {
       if (this.selectedOutfit) {
         this.selectedOutfit = this.outfits.find((outfit) => outfit.id === this.selectedOutfit?.id) ?? null;
       }
-      if (!this.selectedOutfit) {
-        this.outfitsMode = 'saved';
-      }
+      this.startOutfitGenerationStreaming();
     } catch (error) {
       this.message = readMessage(error, 'Could not load outfits.');
       this.outfits = [];
@@ -1831,23 +2131,153 @@ export class OutfitsPage {
 
   open(outfit: OutfitDto): void {
     this.selectedOutfit = outfit;
-    this.outfitsMode = 'detail';
+    this.startOutfitGenerationStreaming();
   }
 
   close(): void {
     this.selectedOutfit = null;
-    this.outfitsMode = 'saved';
+    this.message = '';
   }
 
-  setOutfitsMode(mode: OutfitsMode): void {
-    if (this.outfitsMode === mode) {
+  private startOutfitGenerationStreaming(): void {
+    this.stopOutfitGenerationStreaming();
+    this.stopOutfitGenerationPolling();
+
+    if (!this.hasOutfitImageGenerationInProgress()) {
       return;
     }
 
-    this.outfitsMode = mode;
-    if (mode === 'saved') {
-      this.message = '';
+    const trackingOutfitIds = new Set<string>();
+    for (const outfit of this.outfits) {
+      if (this.isOutfitImageGenerationInProgress(outfit.imageGenerationStatus)) {
+        trackingOutfitIds.add(outfit.id);
+      }
     }
+
+    const stream = this.api.streamImageGenerationStatuses(
+      [],
+      Array.from(trackingOutfitIds),
+      (updates) => this.applyOutfitGenerationStreamUpdates(updates),
+      () => {
+        this.imageGenerationStatusStream = null;
+        this.startOutfitGenerationPolling();
+      });
+
+    if (stream === null) {
+      this.startOutfitGenerationPolling();
+      return;
+    }
+
+    this.imageGenerationStatusStream = stream;
+  }
+
+  private applyOutfitGenerationStreamUpdates(updates: ImageGenerationStreamUpdate[]): void {
+    if (!updates.length) {
+      return;
+    }
+
+    const updateById = new Map<string, ImageGenerationStreamUpdate>(
+      updates.filter((update) => update.kind === 'outfit').map((update) => [update.id, update]));
+    this.outfits = this.outfits.map((outfit) => {
+      const update = updateById.get(outfit.id);
+      if (!update || update.status === outfit.imageGenerationStatus) {
+        return outfit;
+      }
+
+      return { ...outfit, imageGenerationStatus: update.status };
+    });
+
+    if (this.selectedOutfit) {
+      this.selectedOutfit = this.outfits.find((outfit) => outfit.id === this.selectedOutfit?.id) ?? null;
+    }
+
+    if (!this.hasOutfitImageGenerationInProgress()) {
+      this.stopOutfitGenerationStreaming();
+      void this.refreshOutfitsAfterImageGeneration();
+    }
+  }
+
+  private async refreshOutfitsAfterImageGeneration(): Promise<void> {
+    try {
+      const outfits = await this.api.getOutfits();
+      const selectedOutfitId = this.selectedOutfit?.id ?? null;
+      this.outfits = outfits;
+      this.selectedOutfit = selectedOutfitId ? outfits.find((outfit) => outfit.id === selectedOutfitId) ?? null : null;
+    } catch {
+      // Ignore temporary network issues after outfit image generation completes.
+    }
+  }
+
+  private stopOutfitGenerationStreaming(): void {
+    if (this.imageGenerationStatusStream) {
+      this.imageGenerationStatusStream.close();
+    }
+    this.imageGenerationStatusStream = null;
+  }
+
+  private startOutfitGenerationPolling(): void {
+    this.stopOutfitGenerationPolling();
+    if (!this.hasOutfitImageGenerationInProgress()) {
+      return;
+    }
+
+    this.outfitGenerationPollTimeout = setTimeout(() => {
+      this.outfitGenerationPollTimeout = null;
+      void this.pollOutfitImageGeneration();
+    }, this.outfitGenerationPollingIntervalMs);
+  }
+
+  private async pollOutfitImageGeneration(): Promise<void> {
+    if (this.isRefreshingOutfits) {
+      this.startOutfitGenerationPolling();
+      return;
+    }
+
+    if (!this.hasOutfitImageGenerationInProgress()) {
+      return;
+    }
+
+    this.isRefreshingOutfits = true;
+    try {
+      const outfits = await this.api.getOutfits();
+      const selectedOutfitId = this.selectedOutfit?.id ?? null;
+      this.outfits = outfits;
+      this.selectedOutfit = selectedOutfitId ? outfits.find((outfit) => outfit.id === selectedOutfitId) ?? null : null;
+    } catch {
+      // Ignore temporary network issues while polling for outfit image status.
+    } finally {
+      this.isRefreshingOutfits = false;
+      this.startOutfitGenerationPolling();
+    }
+  }
+
+  private stopOutfitGenerationPolling(): void {
+    if (this.outfitGenerationPollTimeout) {
+      clearTimeout(this.outfitGenerationPollTimeout);
+    }
+    this.outfitGenerationPollTimeout = null;
+    this.isRefreshingOutfits = false;
+  }
+
+  private hasOutfitImageGenerationInProgress(): boolean {
+    return this.outfits.some((outfit) => this.isOutfitImageGenerationInProgress(outfit.imageGenerationStatus));
+  }
+
+  outfitGenerationMessage(status: string | null): string | null {
+    switch (status) {
+      case 'queued':
+        return 'Image generation queued...';
+      case 'generating':
+        return 'Generating outfit image...';
+      case 'failed':
+        return 'Image generation failed.';
+      default:
+        return null;
+    }
+  }
+
+  isOutfitImageGenerationInProgress(status: string | null): boolean {
+    return status === 'queued' || status === 'generating';
   }
 
   async markWorn(outfit: OutfitDto): Promise<void> {
@@ -2163,7 +2593,7 @@ const TERMS_OF_USE_URL = 'https://wardrobe.ai/terms';
 const SUPPORT_URL = 'mailto:support@wardrobe.ai';
 const AI_DISCLOSURE_TEXT = 'Wardrobe AI uses OpenAI to classify wardrobe photos, generate cleaned display images, and suggest outfits from your saved wardrobe. Avoid uploading photos or prompts that you do not want processed by that provider.';
 const MAX_BATCH_UPLOAD_COUNT = 10;
-const MAX_UPLOAD_FILE_BYTES = 30 * 1024 * 1024;
+const MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
 const IMAGE_COMPRESSION_TRIGGER_BYTES = 1.5 * 1024 * 1024;
 const IMAGE_MAX_SIDE = 2200;
 const IMAGE_MIN_SIDE = 600;

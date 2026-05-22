@@ -69,8 +69,15 @@ export interface WardrobeItemDto {
   wearCount: number;
   lastWornAt: string | null;
   image: WardrobeItemImageDto;
+  imageGenerationStatus: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ImageGenerationStreamUpdate {
+  kind: 'item' | 'outfit';
+  id: string;
+  status: string | null;
 }
 
 export interface WardrobeItemUploadResultDto {
@@ -115,6 +122,7 @@ export interface OutfitDto {
   prompt: string | null;
   explanation: string | null;
   imageUrl: string | null;
+  imageGenerationStatus: string | null;
   items: WardrobeItemDto[];
   wearCount: number;
   lastWornAt: string | null;

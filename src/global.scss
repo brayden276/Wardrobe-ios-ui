@@ -63,11 +63,24 @@ ion-tab-bar {
 ion-tab-button {
   --color: #766b5f;
   --color-selected: var(--app-olive);
+  border-radius: 10px;
   font-size: 11px;
 }
 
 ion-tab-button ion-icon {
   font-size: 22px;
+}
+
+ion-tab-button.tab-selected,
+ion-tab-button[aria-selected="true"] {
+  background: rgba(91, 96, 64, 0.1);
+  color: var(--app-olive);
+  font-weight: 600;
+}
+
+ion-tab-button.tab-selected ion-icon,
+ion-tab-button[aria-selected="true"] ion-icon {
+  color: var(--app-olive);
 }
 
 .screen {
@@ -154,6 +167,12 @@ ion-tab-button ion-icon {
   border-color: transparent;
   background: transparent;
   font-size: 21px;
+}
+
+.filter-button.active {
+  border-color: rgba(91, 96, 64, 0.34);
+  background: rgba(91, 96, 64, 0.1);
+  color: var(--app-olive);
 }
 
 .search-row {
@@ -550,6 +569,37 @@ ion-searchbar.wardrobe-search {
   width: 17px;
   height: 17px;
   --color: var(--app-olive);
+}
+
+.item-generation-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #665a4f;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.item-generation-state ion-spinner {
+  width: 14px;
+  height: 14px;
+  --color: #6d7352;
+}
+
+.image-status-line {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #665a4f;
+  font-size: 13px;
+}
+
+.image-status-line ion-spinner {
+  width: 16px;
+  height: 16px;
+  --color: #6d7352;
 }
 
 .filter-summary {

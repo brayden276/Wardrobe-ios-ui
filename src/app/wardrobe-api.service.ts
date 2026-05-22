@@ -7,11 +7,16 @@ import {
   AiUsageCostSummaryDto,
   BatchWardrobeItemsResponse,
   GeneratedOutfitDto,
+  ImageGenerationStreamUpdate,
   OutfitDto,
   UpdateWardrobeItemRequest,
   WardrobeItemDto,
   WardrobeLookupsDto
 } from './models';
+
+export interface ImageGenerationStatusStream {
+  close(): void;
+}
 
 @Injectable({ providedIn: 'root' })
 export class WardrobeApiService {
@@ -88,6 +93,56 @@ export class WardrobeApiService {
     return response.outfits.map((outfit) => this.normaliseOutfit(outfit));
   }
 
+  streamImageGenerationStatuses(
+    itemIds: string[],
+    outfitIds: string[],
+    onUpdate: (updates: ImageGenerationStreamUpdate[]) => void,
+    onError?: () => void
+  ): ImageGenerationStatusStream | null {
+    if (itemIds.length === 0 && outfitIds.length === 0) {
+      return null;
+    }
+
+    const accessToken = this.auth.token;
+    if (!accessToken) {
+      return null;
+    }
+
+    if (typeof fetch === 'undefined' || typeof AbortController === 'undefined') {
+      return null;
+    }
+
+    const query = new URLSearchParams();
+    if (itemIds.length > 0) {
+      query.set('itemIds', itemIds.join(','));
+    }
+
+    if (outfitIds.length > 0) {
+      query.set('outfitIds', outfitIds.join(','));
+    }
+
+    const controller = new AbortController();
+    let closed = false;
+
+    void this.readImageGenerationStatusStream(
+      `${this.url('/api/wardrobe/image-generation/stream')}?${query.toString()}`,
+      accessToken,
+      controller.signal,
+      onUpdate)
+      .catch(() => {
+        if (!closed) {
+          onError?.();
+        }
+      });
+
+    return {
+      close: () => {
+        closed = true;
+        controller.abort();
+      }
+    };
+  }
+
   async deleteOutfit(id: string): Promise<void> {
     await this.authorized(() => firstValueFrom(this.http.delete<void>(this.url(`/api/outfits/${id}`), this.authOptions())));
   }
@@ -131,6 +186,68 @@ export class WardrobeApiService {
     } catch (error) {
       await this.auth.handleUnauthorized(error);
       throw error;
+    }
+  }
+
+  private async readImageGenerationStatusStream(
+    url: string,
+    accessToken: string,
+    signal: AbortSignal,
+    onUpdate: (updates: ImageGenerationStreamUpdate[]) => void
+  ): Promise<void> {
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error(`Image generation stream failed with status ${response.status}.`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split('\n\n');
+      buffer = events.pop() ?? '';
+
+      for (const event of events) {
+        this.applyImageGenerationStatusStreamEvent(event, onUpdate);
+      }
+    }
+
+    buffer += decoder.decode();
+    if (buffer.trim()) {
+      this.applyImageGenerationStatusStreamEvent(buffer, onUpdate);
+    }
+  }
+
+  private applyImageGenerationStatusStreamEvent(
+    event: string,
+    onUpdate: (updates: ImageGenerationStreamUpdate[]) => void
+  ): void {
+    const data = event
+      .split('\n')
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice('data:'.length).replace(/^\s+/, ''))
+      .join('\n');
+
+    if (!data) {
+      return;
+    }
+
+    try {
+      const updates = JSON.parse(data) as ImageGenerationStreamUpdate[];
+      onUpdate(updates);
+    } catch {
+      // Ignore malformed stream payloads.
     }
   }
 
