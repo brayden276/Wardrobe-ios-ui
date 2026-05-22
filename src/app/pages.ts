@@ -22,15 +22,18 @@ import { WardrobeApiService } from './wardrobe-api.service';
             Email
             <ion-input class="field" type="email" [(ngModel)]="email" name="email"></ion-input>
           </label>
+          <p class="muted field-error" *ngIf="emailValidationMessage">{{ emailValidationMessage }}</p>
           <label>
             Password
             <ion-input class="field" type="password" [(ngModel)]="password" name="password"></ion-input>
           </label>
+          <p class="muted field-error" *ngIf="passwordValidationMessage">{{ passwordValidationMessage }}</p>
           <label *ngIf="mode === 'register'">
             Name
             <ion-input class="field" [(ngModel)]="displayName" name="displayName"></ion-input>
           </label>
-          <ion-button class="primary-button" expand="block" type="submit" [disabled]="isBusy">{{ mode === 'login' ? 'Sign in' : 'Create account' }}</ion-button>
+          <p class="muted field-error" *ngIf="mode === 'register' && displayNameValidationMessage">{{ displayNameValidationMessage }}</p>
+          <ion-button class="primary-button" expand="block" type="submit" [disabled]="isBusy || !canSubmit">{{ mode === 'login' ? 'Sign in' : 'Create account' }}</ion-button>
           <ion-button class="secondary-button" fill="outline" expand="block" type="button" (click)="toggleMode()">{{ mode === 'login' ? 'Create account' : 'I already have an account' }}</ion-button>
           <p class="muted" *ngIf="message">{{ message }}</p>
         </form>
@@ -48,19 +51,67 @@ export class LoginPage {
   message = '';
   isBusy = false;
 
+  get emailValidationMessage(): string {
+    if (!this.email.trim()) {
+      return 'Email is required.';
+    }
+
+    if (!EMAIL_PATTERN.test(this.email.trim())) {
+      return 'Enter a valid email address.';
+    }
+
+    return '';
+  }
+
+  get passwordValidationMessage(): string {
+    if (!this.password) {
+      return 'Password is required.';
+    }
+
+    return '';
+  }
+
+  get displayNameValidationMessage(): string {
+    if (this.mode !== 'register') {
+      return '';
+    }
+
+    if (!this.displayName.trim()) {
+      return 'Name is required to create an account.';
+    }
+
+    return '';
+  }
+
+  get canSubmit(): boolean {
+    return (
+      !this.isBusy
+      && !this.emailValidationMessage
+      && !this.passwordValidationMessage
+      && !this.displayNameValidationMessage
+    );
+  }
+
   toggleMode(): void {
     this.mode = this.mode === 'login' ? 'register' : 'login';
     this.message = '';
   }
 
   async submit(): Promise<void> {
+    if (!this.canSubmit) {
+      this.message = this.emailValidationMessage || this.passwordValidationMessage || this.displayNameValidationMessage || 'Please complete all required fields.';
+      return;
+    }
+
+    const email = this.email.trim();
+
     this.isBusy = true;
     this.message = '';
     try {
       if (this.mode === 'login') {
-        await this.auth.login(this.email, this.password);
+        await this.auth.login(email, this.password);
       } else {
-        await this.auth.register(this.email, this.password, this.displayName);
+        await this.auth.register(email, this.password, this.displayName.trim());
       }
       await this.router.navigateByUrl('/tabs/wardrobe');
     } catch (error) {
@@ -101,7 +152,7 @@ export class TabsPage {}
           </button>
         </header>
         <div class="search-row">
-          <ion-searchbar class="wardrobe-search" [(ngModel)]="search" placeholder="Search black jeans, blazers..." (ionInput)="load()"></ion-searchbar>
+          <ion-searchbar class="wardrobe-search" [(ngModel)]="search" placeholder="Search black jeans, blazers..." (ionInput)="scheduleLoad()"></ion-searchbar>
           <button type="button" class="filter-button" aria-label="Clear wardrobe filters" (click)="clearFilters()" [disabled]="!hasFilters">
             <ion-icon name="options-outline"></ion-icon>
           </button>
@@ -143,49 +194,49 @@ export class TabsPage {}
             <div class="filter-select-grid">
               <label>
                 Material
-                <ion-select class="field" [(ngModel)]="visibleMaterialId" name="visibleMaterialId" (ionChange)="load()">
+                <ion-select class="field" [(ngModel)]="visibleMaterialId" name="visibleMaterialId" (ionChange)="scheduleLoad()">
                   <ion-select-option [value]="null">Any</ion-select-option>
                   <ion-select-option *ngFor="let option of lookups?.visibleMaterials || []" [value]="option.id">{{ option.label }}</ion-select-option>
                 </ion-select>
               </label>
               <label>
                 Neckline
-                <ion-select class="field" [(ngModel)]="necklineId" name="necklineId" (ionChange)="load()">
+                <ion-select class="field" [(ngModel)]="necklineId" name="necklineId" (ionChange)="scheduleLoad()">
                   <ion-select-option [value]="null">Any</ion-select-option>
                   <ion-select-option *ngFor="let option of lookups?.necklines || []" [value]="option.id">{{ option.label }}</ion-select-option>
                 </ion-select>
               </label>
               <label>
                 Sleeve
-                <ion-select class="field" [(ngModel)]="sleeveLengthId" name="sleeveLengthId" (ionChange)="load()">
+                <ion-select class="field" [(ngModel)]="sleeveLengthId" name="sleeveLengthId" (ionChange)="scheduleLoad()">
                   <ion-select-option [value]="null">Any</ion-select-option>
                   <ion-select-option *ngFor="let option of lookups?.sleeveLengths || []" [value]="option.id">{{ option.label }}</ion-select-option>
                 </ion-select>
               </label>
               <label>
                 Fit
-                <ion-select class="field" [(ngModel)]="fitId" name="fitId" (ionChange)="load()">
+                <ion-select class="field" [(ngModel)]="fitId" name="fitId" (ionChange)="scheduleLoad()">
                   <ion-select-option [value]="null">Any</ion-select-option>
                   <ion-select-option *ngFor="let option of lookups?.fits || []" [value]="option.id">{{ option.label }}</ion-select-option>
                 </ion-select>
               </label>
               <label>
                 Length
-                <ion-select class="field" [(ngModel)]="lengthId" name="lengthId" (ionChange)="load()">
+                <ion-select class="field" [(ngModel)]="lengthId" name="lengthId" (ionChange)="scheduleLoad()">
                   <ion-select-option [value]="null">Any</ion-select-option>
                   <ion-select-option *ngFor="let option of lookups?.garmentLengths || []" [value]="option.id">{{ option.label }}</ion-select-option>
                 </ion-select>
               </label>
               <label>
                 Shape
-                <ion-select class="field" [(ngModel)]="bottomShapeId" name="bottomShapeId" (ionChange)="load()">
+                <ion-select class="field" [(ngModel)]="bottomShapeId" name="bottomShapeId" (ionChange)="scheduleLoad()">
                   <ion-select-option [value]="null">Any</ion-select-option>
                   <ion-select-option *ngFor="let option of lookups?.bottomShapes || []" [value]="option.id">{{ option.label }}</ion-select-option>
                 </ion-select>
               </label>
               <label>
                 Rise
-                <ion-select class="field" [(ngModel)]="riseId" name="riseId" (ionChange)="load()">
+                <ion-select class="field" [(ngModel)]="riseId" name="riseId" (ionChange)="scheduleLoad()">
                   <ion-select-option [value]="null">Any</ion-select-option>
                   <ion-select-option *ngFor="let option of lookups?.rises || []" [value]="option.id">{{ option.label }}</ion-select-option>
                 </ion-select>
@@ -228,10 +279,10 @@ export class TabsPage {}
           </article>
         </ng-template>
       </section>
-      <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-        <ion-fab-button class="fab-camera" routerLink="/tabs/add"><ion-icon name="camera-outline"></ion-icon></ion-fab-button>
-      </ion-fab>
-    </ion-content>
+        <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+          <ion-fab-button class="fab-camera" routerLink="/tabs/add" aria-label="Add item"><ion-icon name="camera-outline"></ion-icon></ion-fab-button>
+        </ion-fab>
+      </ion-content>
   `
 })
 export class WardrobePage {
@@ -253,6 +304,8 @@ export class WardrobePage {
   search = '';
   isLoading = true;
   message = '';
+  private loadDebounceHandle: ReturnType<typeof setTimeout> | null = null;
+  private readonly loadDebounceMs = 250;
 
   get hasFilters(): boolean {
     return !!(
@@ -312,40 +365,40 @@ export class WardrobePage {
       };
       this.items = await this.api.getItems(params);
     } catch (error) {
-      this.message = readMessage(error, 'Could not load wardrobe. Pull down or try again.');
+      this.message = readMessage(error, 'Could not load wardrobe. Please try again.');
       this.items = [];
     } finally {
       this.isLoading = false;
     }
   }
 
-  async setCategory(categoryId: string | null): Promise<void> {
+  setCategory(categoryId: string | null): void {
     this.categoryId = categoryId;
     this.subcategoryId = null;
-    await this.load();
+    this.scheduleLoad();
   }
 
-  async setSubcategory(subcategoryId: string | null): Promise<void> {
+  setSubcategory(subcategoryId: string | null): void {
     this.subcategoryId = subcategoryId;
-    await this.load();
+    this.scheduleLoad();
   }
 
-  async setColour(colourId: string | null): Promise<void> {
+  setColour(colourId: string | null): void {
     this.colourId = colourId;
-    await this.load();
+    this.scheduleLoad();
   }
 
-  async setPattern(patternId: string | null): Promise<void> {
+  setPattern(patternId: string | null): void {
     this.patternId = patternId;
-    await this.load();
+    this.scheduleLoad();
   }
 
-  async setIncludeArchived(includeArchived: boolean): Promise<void> {
+  setIncludeArchived(includeArchived: boolean): void {
     this.includeArchived = includeArchived;
-    await this.load();
+    this.scheduleLoad();
   }
 
-  async clearFilters(): Promise<void> {
+  clearFilters(): void {
     this.categoryId = null;
     this.subcategoryId = null;
     this.colourId = null;
@@ -359,7 +412,7 @@ export class WardrobePage {
     this.riseId = null;
     this.includeArchived = false;
     this.search = '';
-    await this.load();
+    this.scheduleLoad();
   }
 
   label(id: string | null): string {
@@ -377,6 +430,17 @@ export class WardrobePage {
 
   trackById(_: number, item: WardrobeItemDto): string {
     return item.id;
+  }
+
+  scheduleLoad(): void {
+    if (this.loadDebounceHandle) {
+      clearTimeout(this.loadDebounceHandle);
+    }
+
+    this.loadDebounceHandle = setTimeout(() => {
+      this.loadDebounceHandle = null;
+      void this.load();
+    }, this.loadDebounceMs);
   }
 }
 
@@ -437,10 +501,13 @@ export class WardrobePage {
             <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="clearBatchSelection()" [disabled]="isBatchSaving">Clear</ion-button>
           </div>
           <div class="batch-grid" *ngIf="batchFiles.length">
-            <button type="button" class="batch-item" *ngFor="let file of batchFiles; let index = index" (click)="removeBatchFile(index)" [disabled]="isBatchSaving">
+            <div class="batch-item" *ngFor="let file of batchFiles; let index = index">
+              <button type="button" class="icon-button batch-item__remove" aria-label="Remove batch photo" (click)="removeBatchFile(index)" [disabled]="isBatchSaving">
+                <ion-icon name="close-outline"></ion-icon>
+              </button>
               <img [src]="batchPreviewUrls[index]" [alt]="file.name">
               <span>{{ file.name }}</span>
-            </button>
+            </div>
           </div>
           <p class="muted" *ngIf="!batchFiles.length">Select multiple photos and upload them together.</p>
           <p class="muted consent-note">Batch uploads use the same OpenAI-powered classification flow as single-item uploads.</p>
@@ -584,10 +651,13 @@ export class AddItemPage {
       return;
     }
 
-    const nextFiles = this.batchFiles.filter((_, currentIndex) => currentIndex !== index);
-    this.clearBatchSelection();
-    this.batchFiles = nextFiles;
-    this.batchPreviewUrls = nextFiles.map((file) => URL.createObjectURL(file));
+    const previewUrl = this.batchPreviewUrls[index];
+    if (previewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    this.batchFiles = this.batchFiles.filter((_, currentIndex) => currentIndex !== index);
+    this.batchPreviewUrls = this.batchPreviewUrls.filter((_, currentIndex) => currentIndex !== index);
   }
 
   openBatchPicker(): void {
@@ -773,8 +843,10 @@ export class AddItemPage {
               </ion-select>
             </label>
           </details>
-          <ion-button class="primary-button" expand="block" type="submit" [disabled]="isSaving">{{ isSaving ? 'Saving...' : 'Save details' }}</ion-button>
-          <ion-button class="secondary-button" fill="outline" expand="block" type="button" (click)="deleteItem()">Archive item</ion-button>
+          <ion-button class="primary-button" expand="block" type="submit" [disabled]="isSaving || isArchiving">{{ isSaving ? 'Saving...' : 'Save details' }}</ion-button>
+          <ion-button class="secondary-button" fill="outline" expand="block" type="button" (click)="deleteItem()" [disabled]="isArchiving || isSaving || isMarkingWorn">
+            {{ isArchiving ? 'Archiving...' : 'Archive item' }}
+          </ion-button>
           <ion-button class="secondary-button" fill="clear" expand="block" type="button" (click)="cancelEdit()">Cancel</ion-button>
           <p class="muted" *ngIf="message">{{ message }}</p>
         </form>
@@ -793,6 +865,7 @@ export class ItemDetailPage {
   isLoading = true;
   isSaving = false;
   isMarkingWorn = false;
+  isArchiving = false;
   editing = false;
 
   get selectedSubcategories(): { id: string; label: string }[] {
@@ -845,6 +918,10 @@ export class ItemDetailPage {
 
   async markWorn(): Promise<void> {
     if (!this.item) return;
+    if (this.isMarkingWorn) {
+      return;
+    }
+
     this.isMarkingWorn = true;
     this.message = '';
     try {
@@ -880,12 +957,21 @@ export class ItemDetailPage {
   }
 
   async deleteItem(): Promise<void> {
-    if (!this.item) return;
+    if (!this.item || this.isArchiving) return;
+    const confirmed = window.confirm(`Archive "${this.item.name}"? This removes it from your wardrobe.`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.isArchiving = true;
+    this.message = '';
     try {
       await this.api.deleteItem(this.item.id);
       await this.router.navigateByUrl('/tabs/wardrobe');
     } catch (error) {
       this.message = readMessage(error, 'Could not archive item.');
+    } finally {
+      this.isArchiving = false;
     }
   }
 
@@ -980,7 +1066,9 @@ export class ItemDetailPage {
             <div class="outfit-item-list">
               <span *ngFor="let id of outfit.itemIds">{{ nameFor(id) }}</span>
             </div>
-            <ion-button class="primary-button small-action" (click)="save(outfit)">Save outfit</ion-button>
+            <ion-button class="primary-button small-action" (click)="save(outfit)" [disabled]="isSavingGeneratedOutfit(outfit)">
+              {{ isSavingGeneratedOutfit(outfit) ? 'Saving...' : 'Save outfit' }}
+            </ion-button>
           </div>
         </article>
         <p class="muted" *ngIf="message">{{ message }}</p>
@@ -1000,6 +1088,7 @@ export class BuilderPage {
   manualItemIds: string[] = [];
   message = '';
   isBusy = false;
+  private readonly savingGeneratedOutfitKeys = new Set<string>();
 
   async ionViewWillEnter(): Promise<void> {
     this.message = '';
@@ -1081,12 +1170,20 @@ export class BuilderPage {
   }
 
   async save(outfit: GeneratedOutfitDto): Promise<void> {
+    const key = this.generatedOutfitKey(outfit);
+    if (this.savingGeneratedOutfitKeys.has(key)) {
+      return;
+    }
+
+    this.savingGeneratedOutfitKeys.add(key);
     this.message = '';
     try {
       await this.api.saveOutfit(outfit.title, this.query, outfit.explanation, outfit.itemIds, outfit.imageUrl);
       this.message = 'Outfit saved.';
     } catch (error) {
       this.message = readMessage(error, 'Could not save outfit.');
+    } finally {
+      this.savingGeneratedOutfitKeys.delete(key);
     }
   }
 
@@ -1125,11 +1222,15 @@ export class BuilderPage {
       return '';
     }
 
-    if (!selected.some((item) => item.categoryId === 'footwear')) {
+    if (!selected.some((item) => this.manualCategory(item) === 'footwear')) {
       return 'Add shoes to complete the outfit.';
     }
 
-    return 'Select a top and bottom, a dress, or one piece with shoes.';
+    if (!this.isValidManualOutfit(selected)) {
+      return 'Choose a top and bottom (including activewear variants), a dress, or one piece, with one pair of shoes.';
+    }
+
+    return '';
   }
 
   private selectedManualItems(): WardrobeItemDto[] {
@@ -1140,14 +1241,15 @@ export class BuilderPage {
 
   private isValidManualOutfit(items: WardrobeItemDto[]): boolean {
     const count = (predicate: (item: WardrobeItemDto) => boolean): number => items.filter(predicate).length;
-    const tops = count((item) => item.categoryId === 'tops' || item.categoryId === 'knitwear');
-    const bottoms = count((item) => item.categoryId === 'bottoms');
-    const dresses = count((item) => item.categoryId === 'dresses');
-    const onePieces = count((item) => item.categoryId === 'one_pieces');
-    const footwear = count((item) => item.categoryId === 'footwear');
-    const outerwear = count((item) => item.categoryId === 'outerwear');
-    const bags = count((item) => item.categoryId === 'bags');
-    const supportedItems = tops + bottoms + dresses + onePieces + footwear + outerwear + bags + count((item) => item.categoryId === 'accessories');
+    const tops = count((item) => this.manualCategory(item) === 'tops');
+    const bottoms = count((item) => this.manualCategory(item) === 'bottoms');
+    const dresses = count((item) => this.manualCategory(item) === 'dresses');
+    const onePieces = count((item) => this.manualCategory(item) === 'one_pieces');
+    const footwear = count((item) => this.manualCategory(item) === 'footwear');
+    const outerwear = count((item) => this.manualCategory(item) === 'outerwear');
+    const bags = count((item) => this.manualCategory(item) === 'bags');
+    const accessories = count((item) => this.manualCategory(item) === 'accessories');
+    const supportedItems = tops + bottoms + dresses + onePieces + footwear + outerwear + bags + accessories;
 
     if (supportedItems !== items.length || footwear !== 1 || outerwear > 1 || bags > 1) {
       return false;
@@ -1160,6 +1262,47 @@ export class BuilderPage {
 
   trackById(_: number, item: WardrobeItemDto): string {
     return item.id;
+  }
+
+  isSavingGeneratedOutfit(outfit: GeneratedOutfitDto): boolean {
+    return this.savingGeneratedOutfitKeys.has(this.generatedOutfitKey(outfit));
+  }
+
+  private manualCategory(item: WardrobeItemDto): string | null {
+    if (item.categoryId === 'activewear') {
+      if (this.isActivewearTop(item)) return 'tops';
+      if (this.isActivewearBottom(item)) return 'bottoms';
+      return null;
+    }
+
+    if (item.categoryId === 'tops' || item.categoryId === 'knitwear') {
+      return 'tops';
+    }
+
+    if (item.categoryId === 'one_pieces') {
+      return 'one_pieces';
+    }
+
+    return item.categoryId === 'accessories'
+      || item.categoryId === 'bags'
+      || item.categoryId === 'bottoms'
+      || item.categoryId === 'dresses'
+      || item.categoryId === 'footwear'
+      || item.categoryId === 'outerwear'
+      ? item.categoryId
+      : null;
+  }
+
+  private isActivewearTop(item: WardrobeItemDto): boolean {
+    return isActivewearTopSubcategory(item.subcategoryId);
+  }
+
+  private isActivewearBottom(item: WardrobeItemDto): boolean {
+    return isActivewearBottomSubcategory(item.subcategoryId);
+  }
+
+  private generatedOutfitKey(outfit: GeneratedOutfitDto): string {
+    return `${outfit.title}::${outfit.itemIds.join(',')}::${outfit.imageUrl ?? ''}`;
   }
 }
 
@@ -1198,8 +1341,14 @@ export class BuilderPage {
           </div>
           <div class="outfit-actions">
             <ion-button class="secondary-button compact-button" fill="outline" (click)="open(outfit)">Open</ion-button>
-            <ion-button class="secondary-button compact-button" fill="outline" (click)="markWorn(outfit)">Mark worn</ion-button>
-            <ion-button class="quiet-button compact-button" fill="clear" (click)="remove(outfit)">Delete</ion-button>
+            <ion-button class="secondary-button compact-button" fill="outline" (click)="markWorn(outfit)"
+              [disabled]="isMarkingOutfit(outfit.id) || isRemovingOutfit(outfit.id)">
+              {{ isMarkingOutfit(outfit.id) ? 'Marking...' : 'Mark worn' }}
+            </ion-button>
+            <ion-button class="quiet-button compact-button" fill="clear" (click)="remove(outfit)"
+              [disabled]="isRemovingOutfit(outfit.id) || isMarkingOutfit(outfit.id)">
+              {{ isRemovingOutfit(outfit.id) ? 'Deleting...' : 'Delete' }}
+            </ion-button>
           </div>
         </article>
         <article class="panel outfit-detail-panel" *ngIf="selectedOutfit">
@@ -1234,6 +1383,8 @@ export class OutfitsPage {
   selectedOutfit: OutfitDto | null = null;
   isLoading = true;
   message = '';
+  private readonly markingOutfitIds = new Set<string>();
+  private readonly deletingOutfitIds = new Set<string>();
 
   async ionViewWillEnter(): Promise<void> {
     await this.load();
@@ -1264,21 +1415,50 @@ export class OutfitsPage {
   }
 
   async markWorn(outfit: OutfitDto): Promise<void> {
+    if (this.markingOutfitIds.has(outfit.id)) return;
+    this.markingOutfitIds.add(outfit.id);
+    this.message = '';
     try {
       await this.api.markWorn(outfit.id);
       this.message = 'Marked as worn.';
     } catch (error) {
       this.message = readMessage(error, 'Could not mark outfit as worn.');
+    } finally {
+      this.markingOutfitIds.delete(outfit.id);
     }
   }
 
   async remove(outfit: OutfitDto): Promise<void> {
+    if (this.deletingOutfitIds.has(outfit.id)) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete outfit "${outfit.name}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.deletingOutfitIds.add(outfit.id);
+    this.message = '';
     try {
       await this.api.deleteOutfit(outfit.id);
+      if (this.selectedOutfit?.id === outfit.id) {
+        this.selectedOutfit = null;
+      }
       await this.load();
     } catch (error) {
       this.message = readMessage(error, 'Could not delete outfit.');
+    } finally {
+      this.deletingOutfitIds.delete(outfit.id);
     }
+  }
+
+  isMarkingOutfit(outfitId: string): boolean {
+    return this.markingOutfitIds.has(outfitId);
+  }
+
+  isRemovingOutfit(outfitId: string): boolean {
+    return this.deletingOutfitIds.has(outfitId);
   }
 }
 
@@ -1447,6 +1627,62 @@ function colourSwatch(id: string): string {
     multi: 'linear-gradient(135deg, #0e0d0c 0 25%, #eadfc9 25% 50%, #9e4137 50% 75%, #687158 75%)'
   };
   return colours[id] ?? '#c4b8a8';
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const ACTIVEWEAR_TOP_SUBCATEGORIES = new Set([
+  'active_tops',
+  'active_top',
+  'top_activewear',
+  'activewear_top',
+  'activewear_tops',
+  'tops_activewear',
+  'athletic_top',
+  'athletic_tops',
+  'sports_bra',
+  'active_tee',
+  'active_tshirt',
+  'sports_top',
+  'sport_top',
+  'sport_tops'
+]);
+
+const ACTIVEWEAR_BOTTOM_SUBCATEGORIES = new Set([
+  'active_bottoms',
+  'active_bottom',
+  'bottom_activewear',
+  'activewear_bottom',
+  'activewear_bottoms',
+  'bottoms_activewear',
+  'athletic_bottom',
+  'athletic_bottoms',
+  'active_short',
+  'active_shorts',
+  'sport_bottom',
+  'sports_bottom',
+  'sports_bottoms',
+  'legging',
+  'leggings',
+  'joggers'
+]);
+
+function isActivewearTopSubcategory(subcategoryId: string): boolean {
+  const normalised = subcategoryId.trim().toLowerCase();
+  if (ACTIVEWEAR_TOP_SUBCATEGORIES.has(normalised)) {
+    return true;
+  }
+
+  return /(^|[_-])(top|jersey|tank|shirt|tshirt|tee|vest|hoodie|sweatshirt|bra|polo|sleeveless)($|[_-])/i.test(normalised);
+}
+
+function isActivewearBottomSubcategory(subcategoryId: string): boolean {
+  const normalised = subcategoryId.trim().toLowerCase();
+  if (ACTIVEWEAR_BOTTOM_SUBCATEGORIES.has(normalised)) {
+    return true;
+  }
+
+  return /(^|[_-])(bottom|short|shorts|legging|leggings|pant|pants|trouser|tights|jogger|joggers)($|[_-])/i.test(normalised);
 }
 
 const AI_CONSENT_KEY = 'wardrobe-ai-openai-consent';
