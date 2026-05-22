@@ -65,8 +65,18 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychain -d user -s "$KEYCHAIN_PATH"
 
+          PP_PLIST="$RUNNER_TEMP/build_pp.plist"
+          security cms -D -i "$PP_PATH" > "$PP_PLIST"
+          PP_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$PP_PLIST")
+          PP_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" "$PP_PLIST")
+
+          if [ "$PP_NAME" != "$PROVISIONING_PROFILE_SPECIFIER" ]; then
+            echo "Provisioning profile name '$PP_NAME' does not match expected '$PROVISIONING_PROFILE_SPECIFIER'."
+            exit 1
+          fi
+
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PP_UUID.mobileprovision"
 
       - name: Build signed release IPA
         run: bundle exec fastlane ios build_release
