@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { environment } from '../environments/environment';
+import { apiBaseUrl } from './api-url';
 import { AuthService } from './auth.service';
 import {
   AiUsageCostSummaryDto,
@@ -22,6 +22,7 @@ export interface ImageGenerationStatusStream {
 export class WardrobeApiService {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
+  private readonly apiBaseUrl = apiBaseUrl();
   private lookupsPromise: Promise<WardrobeLookupsDto> | null = null;
 
   async getLookups(): Promise<WardrobeLookupsDto> {
@@ -129,7 +130,8 @@ export class WardrobeApiService {
       accessToken,
       controller.signal,
       onUpdate)
-      .catch(() => {
+      .catch(async (error) => {
+        await this.auth.handleUnauthorized(error);
         if (!closed) {
           onError?.();
         }
@@ -160,7 +162,7 @@ export class WardrobeApiService {
   }
 
   private url(path: string): string {
-    return `${environment.apiBaseUrl}${path}`;
+    return `${this.apiBaseUrl}${path}`;
   }
 
   private queryString(params: Record<string, string | number | boolean | null | undefined>): string {
@@ -201,7 +203,9 @@ export class WardrobeApiService {
     });
 
     if (!response.ok || !response.body) {
-      throw new Error(`Image generation stream failed with status ${response.status}.`);
+      const error = new Error(`Image generation stream failed with status ${response.status}.`) as Error & { status?: number };
+      error.status = response.status;
+      throw error;
     }
 
     const reader = response.body.getReader();
@@ -276,12 +280,24 @@ export class WardrobeApiService {
       return value;
     }
 
-    if (/^(https?:|data:|blob:)/i.test(value)) {
-      return value;
+    if (value.startsWith('/')) {
+      return `${this.apiBaseUrl}${value}`;
     }
 
-    return value.startsWith('/')
-      ? `${environment.apiBaseUrl}${value}`
-      : `${environment.apiBaseUrl}/${value}`;
+    if (/^https?:/i.test(value)) {
+      try {
+        const apiOrigin = new URL(this.apiBaseUrl).origin;
+        const parsed = new URL(value);
+        return parsed.origin === apiOrigin ? parsed.toString() : null;
+      } catch {
+        return null;
+      }
+    }
+
+    if (/^(data:|blob:)/i.test(value)) {
+      return null;
+    }
+
+    return `${this.apiBaseUrl}/${value}`;
   }
 }

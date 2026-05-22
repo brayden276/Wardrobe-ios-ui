@@ -1135,10 +1135,6 @@ export class AddItemPage {
       return 'The selected file is empty.';
     }
 
-    if (file.size > MAX_UPLOAD_FILE_BYTES) {
-      return `Image file is too large. Maximum size is ${this.formatBytes(MAX_UPLOAD_FILE_BYTES)}.`;
-    }
-
     return null;
   }
 
@@ -1162,10 +1158,6 @@ export class AddItemPage {
     const sourceUrl = URL.createObjectURL(file);
     try {
       const image = await this.decodeImage(sourceUrl);
-      const maxSide = Math.max(image.naturalWidth, image.naturalHeight);
-      const scale = Math.min(1, IMAGE_MAX_SIDE / maxSide);
-      const targetWidth = Math.max(1, Math.round(image.naturalWidth * scale));
-      const targetHeight = Math.max(1, Math.round(image.naturalHeight * scale));
       if (image.naturalWidth < IMAGE_MIN_SIDE || image.naturalHeight < IMAGE_MIN_SIDE) {
         throw new Error('Images must be at least 600x600 for reliable classification.');
       }
@@ -1176,11 +1168,36 @@ export class AddItemPage {
         throw new Error('Could not prepare image canvas.');
       }
 
-      canvas.width = targetWidth;
-      canvas.height = targetHeight;
-      context.drawImage(image, 0, 0, targetWidth, targetHeight);
-      const compressedBlob = await this.toBlob(canvas, `image/${MIME_IMAGE_OUTPUT_EXTENSION}`, IMAGE_COMPRESSION_QUALITY);
-      if (!compressedBlob.size || compressedBlob.size >= originalBytes) {
+      let smallestBlob: Blob | null = null;
+      for (const maxSide of IMAGE_COMPRESSION_MAX_SIDES) {
+        const sourceMaxSide = Math.max(image.naturalWidth, image.naturalHeight);
+        const scale = Math.min(1, maxSide / sourceMaxSide);
+        const targetWidth = Math.max(1, Math.round(image.naturalWidth * scale));
+        const targetHeight = Math.max(1, Math.round(image.naturalHeight * scale));
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+        for (const quality of IMAGE_COMPRESSION_QUALITIES) {
+          const compressedBlob = await this.toBlob(canvas, `image/${MIME_IMAGE_OUTPUT_EXTENSION}`, quality);
+          if (compressedBlob.size && (!smallestBlob || compressedBlob.size < smallestBlob.size)) {
+            smallestBlob = compressedBlob;
+          }
+
+          if (compressedBlob.size && compressedBlob.size <= MAX_UPLOAD_FILE_BYTES && compressedBlob.size < originalBytes) {
+            const preparedName = this.normaliseUploadFileName(fileName, MIME_IMAGE_OUTPUT_EXTENSION);
+            const preparedFile = new File([compressedBlob], preparedName, { type: `image/${MIME_IMAGE_OUTPUT_EXTENSION}` });
+            return {
+              file: preparedFile,
+              name: preparedFile.name,
+              originalBytes,
+              preparedBytes: preparedFile.size
+            };
+          }
+        }
+      }
+
+      if (originalBytes <= MAX_UPLOAD_FILE_BYTES && (!smallestBlob || smallestBlob.size >= originalBytes)) {
         return {
           file,
           name: fileName,
@@ -1189,14 +1206,7 @@ export class AddItemPage {
         };
       }
 
-      const preparedName = this.normaliseUploadFileName(fileName, MIME_IMAGE_OUTPUT_EXTENSION);
-      const preparedFile = new File([compressedBlob], preparedName, { type: `image/${MIME_IMAGE_OUTPUT_EXTENSION}` });
-      return {
-        file: preparedFile,
-        name: preparedFile.name,
-        originalBytes,
-        preparedBytes: preparedFile.size
-      };
+      throw new Error(`Image file could not be compressed below ${this.formatBytes(MAX_UPLOAD_FILE_BYTES)}.`);
     } finally {
       URL.revokeObjectURL(sourceUrl);
     }
@@ -1282,7 +1292,7 @@ export class AddItemPage {
           <div class="detail-chips">
             <span class="detail-chip" *ngFor="let tag of visibleTags">{{ tag }}</span>
         </div>
-          <a class="text-link" *ngIf="item.image.originalUrl" [href]="item.image.originalUrl" target="_blank">View original</a>
+          <a class="text-link" *ngIf="item.image.originalUrl" [href]="item.image.originalUrl" target="_blank" rel="noopener noreferrer">View original</a>
         <p class="muted center-message" *ngIf="message && !editing">{{ message }}</p>
         <form class="panel form-stack editor-panel" *ngIf="editing" (ngSubmit)="save()">
           <label>Name<ion-input class="field" [(ngModel)]="form.name" name="name"></ion-input></label>
@@ -2367,9 +2377,9 @@ export class OutfitsPage implements OnDestroy {
         </article>
         <article class="panel settings-card" *ngIf="settingsMode === 'legal'">
           <h2 class="section-title">Legal and support</h2>
-          <a class="text-link" [href]="privacyPolicyUrl" target="_blank" rel="noreferrer">Privacy policy</a>
-          <a class="text-link" [href]="termsUrl" target="_blank" rel="noreferrer">Terms of use</a>
-          <a class="text-link" [href]="supportUrl" target="_blank" rel="noreferrer">Support</a>
+          <a class="text-link" [href]="privacyPolicyUrl" target="_blank" rel="noopener noreferrer">Privacy policy</a>
+          <a class="text-link" [href]="termsUrl" target="_blank" rel="noopener noreferrer">Terms of use</a>
+          <a class="text-link" [href]="supportUrl" target="_blank" rel="noopener noreferrer">Support</a>
         </article>
         <article class="panel settings-card danger-panel" *ngIf="settingsMode === 'danger'">
           <h2 class="section-title">Delete account</h2>
@@ -2595,9 +2605,9 @@ const AI_DISCLOSURE_TEXT = 'Wardrobe AI uses OpenAI to classify wardrobe photos,
 const MAX_BATCH_UPLOAD_COUNT = 10;
 const MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
 const IMAGE_COMPRESSION_TRIGGER_BYTES = 1.5 * 1024 * 1024;
-const IMAGE_MAX_SIDE = 2200;
 const IMAGE_MIN_SIDE = 600;
-const IMAGE_COMPRESSION_QUALITY = 0.82;
+const IMAGE_COMPRESSION_MAX_SIDES = [2200, 1800, 1400, 1000];
+const IMAGE_COMPRESSION_QUALITIES = [0.82, 0.72, 0.62];
 const MIME_IMAGE_OUTPUT_EXTENSION = 'jpeg';
 
 async function hasAiConsent(): Promise<boolean> {

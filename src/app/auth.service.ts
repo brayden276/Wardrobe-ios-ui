@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Preferences } from '@capacitor/preferences';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
-import { environment } from '../environments/environment';
+import { apiBaseUrl } from './api-url';
 import { AuthProviderDto, AuthResponse, AuthUserDto } from './models';
 
 interface Session {
@@ -16,6 +16,7 @@ interface Session {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
+  private readonly apiBaseUrl = apiBaseUrl();
   private readonly sessionSubject = new BehaviorSubject<Session | null>(null);
   private restorePromise: Promise<void> | null = null;
   readonly session$ = this.sessionSubject.asObservable();
@@ -63,21 +64,21 @@ export class AuthService {
   }
 
   async getProviders(): Promise<AuthProviderDto[]> {
-    return firstValueFrom(this.http.get<AuthProviderDto[]>(`${environment.apiBaseUrl}/api/auth/providers`));
+    return firstValueFrom(this.http.get<AuthProviderDto[]>(`${this.apiBaseUrl}/api/auth/providers`));
   }
 
   async register(email: string, password: string, displayName: string): Promise<void> {
-    const response = await firstValueFrom(this.http.post<AuthResponse>(`${environment.apiBaseUrl}/api/auth/register`, { email, password, displayName }));
+    const response = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/api/auth/register`, { email, password, displayName }));
     await this.setSession(response);
   }
 
   async login(email: string, password: string): Promise<void> {
-    const response = await firstValueFrom(this.http.post<AuthResponse>(`${environment.apiBaseUrl}/api/auth/login`, { email, password }));
+    const response = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/api/auth/login`, { email, password }));
     await this.setSession(response);
   }
 
   async loginExternal(provider: string, identityToken: string): Promise<void> {
-    const response = await firstValueFrom(this.http.post<AuthResponse>(`${environment.apiBaseUrl}/api/auth/external`, { provider, identityToken }));
+    const response = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/api/auth/external`, { provider, identityToken }));
     await this.setSession(response);
   }
 
@@ -92,7 +93,7 @@ export class AuthService {
       return;
     }
 
-    await firstValueFrom(this.http.delete(`${environment.apiBaseUrl}/api/auth/account`, {
+    await firstValueFrom(this.http.delete(`${this.apiBaseUrl}/api/auth/account`, {
       headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
     }));
     await this.clearSession();
@@ -111,7 +112,7 @@ export class AuthService {
       return;
     }
 
-    const response = await firstValueFrom(this.http.post<AuthResponse>(`${environment.apiBaseUrl}/api/auth/refresh`, { refreshToken }));
+    const response = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/api/auth/refresh`, { refreshToken }));
     await this.setSession(response);
   }
 
@@ -122,7 +123,7 @@ export class AuthService {
       return;
     }
 
-    const user = await firstValueFrom(this.http.get<AuthUserDto>(`${environment.apiBaseUrl}/api/auth/me`, {
+    const user = await firstValueFrom(this.http.get<AuthUserDto>(`${this.apiBaseUrl}/api/auth/me`, {
       headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
     }));
 
