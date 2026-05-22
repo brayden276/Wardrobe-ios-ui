@@ -24,7 +24,7 @@ jobs:
     env:
       APP_IDENTIFIER: ai.wardrobe.app
       APPLE_TEAM_ID: 454Z8R39M9
-      PROVISIONING_PROFILE_SPECIFIER: Wardrobe AI App Store
+      PROVISIONING_PROFILE_SPECIFIER: Wardrobe AI Provisioning
       UI_API_BASE_URL: ${{ vars.UI_API_BASE_URL }}
 
     steps:

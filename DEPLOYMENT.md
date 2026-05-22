@@ -14,7 +14,7 @@ Current release values:
 - Display name: `Wardrobe AI`
 - Scheme: `App`
 - Apple team ID: `454Z8R39M9`
-- Provisioning profile specifier: `Wardrobe AI App Store`
+- Provisioning profile specifier: `Wardrobe AI Provisioning`
 - Privacy manifest: `ios/App/App/PrivacyInfo.xcprivacy`
 - iOS permission strings: `ios/App/App/Info.plist`
 
@@ -79,7 +79,7 @@ From a macOS machine with the production signing assets installed:
 ```sh
 APP_IDENTIFIER=ai.wardrobe.app \
 APPLE_TEAM_ID=454Z8R39M9 \
-PROVISIONING_PROFILE_SPECIFIER="Wardrobe AI App Store" \
+PROVISIONING_PROFILE_SPECIFIER="Wardrobe AI Provisioning" \
 UI_API_BASE_URL=https://your-api.up.railway.app \
 bundle exec fastlane ios build_release
 ```
