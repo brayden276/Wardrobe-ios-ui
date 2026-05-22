@@ -106,8 +106,7 @@ def signing_xcargs
     "CODE_SIGN_STYLE=Manual",
     "CODE_SIGN_IDENTITY=\"iPhone Developer\"",
     "DEVELOPMENT_TEAM=#{APPLE_TEAM_ID}",
-    "PRODUCT_BUNDLE_IDENTIFIER=#{APP_IDENTIFIER}",
-    "PROVISIONING_PROFILE_SPECIFIER=\"#{PROFILE_NAME}\""
+    "PRODUCT_BUNDLE_IDENTIFIER=#{APP_IDENTIFIER}"
   ].join(" ")
 end
 
@@ -117,7 +116,6 @@ def release_signing_xcargs(app_identifier, apple_team_id, profile_name, export_m
     "CODE_SIGN_STYLE=Manual",
     "CODE_SIGN_IDENTITY=\"#{identity}\"",
     "DEVELOPMENT_TEAM=#{apple_team_id}",
-    "PRODUCT_BUNDLE_IDENTIFIER=#{app_identifier}",
-    "PROVISIONING_PROFILE_SPECIFIER=\"#{profile_name}\""
+    "PRODUCT_BUNDLE_IDENTIFIER=#{app_identifier}"
   ].join(" ")
 end
