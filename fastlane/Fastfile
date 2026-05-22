@@ -3,7 +3,6 @@ default_platform(:ios)
 REPO_ROOT = File.expand_path("..", __dir__)
 APP_IDENTIFIER = ENV.fetch("APP_IDENTIFIER", "ai.wardrobe.app")
 APPLE_TEAM_ID = ENV.fetch("APPLE_TEAM_ID", "YOURTEAMID")
-PROFILE_NAME = ENV.fetch("PROVISIONING_PROFILE_SPECIFIER", "Wardrobe AI Development")
 IOS_PROJECT = File.join(REPO_ROOT, "ios", "App", "App.xcodeproj")
 IOS_SCHEME = ENV.fetch("IOS_SCHEME", "App")
 IOS_CONFIGURATION = ENV.fetch("IOS_CONFIGURATION", "Release")
@@ -23,6 +22,7 @@ platform :ios do
   desc "Build a manually signed development IPA for Wardrobe AI"
   lane :build_dev do
     ensure_signing_inputs!
+    profile_name = ENV.fetch("PROVISIONING_PROFILE_SPECIFIER", "Wardrobe AI Development")
     ENV["UI_ALLOW_LOCALHOST_API"] = "true"
     sync
 
@@ -42,9 +42,21 @@ platform :ios do
         signingStyle: "manual",
         teamID: APPLE_TEAM_ID,
         provisioningProfiles: {
-          APP_IDENTIFIER => PROFILE_NAME
+          APP_IDENTIFIER => profile_name
         }
       }
+    )
+  end
+
+  desc "Create or repair App Store signing assets with fastlane match"
+  lane :bootstrap_signing do
+    app_identifier = required_env("APP_IDENTIFIER")
+    apple_team_id = required_env("APPLE_TEAM_ID")
+
+    sync_app_store_signing(
+      app_identifier: app_identifier,
+      apple_team_id: apple_team_id,
+      readonly: false
     )
   end
 
@@ -52,9 +64,14 @@ platform :ios do
   lane :build_release do
     app_identifier = required_env("APP_IDENTIFIER")
     apple_team_id = required_env("APPLE_TEAM_ID")
-    profile_name = required_env("PROVISIONING_PROFILE_SPECIFIER")
     export_method = ENV.fetch("IOS_EXPORT_METHOD", "app-store")
     required_env("UI_API_BASE_URL")
+
+    profile_mapping = sync_app_store_signing(
+      app_identifier: app_identifier,
+      apple_team_id: apple_team_id,
+      readonly: match_readonly?
+    )
 
     ENV["UI_REQUIRE_PRODUCTION_API"] = "true"
     sync
@@ -73,11 +90,55 @@ platform :ios do
         method: export_method,
         signingStyle: "manual",
         teamID: apple_team_id,
-        provisioningProfiles: {
-          app_identifier => profile_name
-        }
+        provisioningProfiles: profile_mapping
       }
     )
+  end
+
+  private_lane :sync_app_store_signing do |options|
+    app_identifier = options[:app_identifier]
+    apple_team_id = options[:apple_team_id]
+    readonly = options[:readonly]
+    required_env("MATCH_GIT_URL")
+    required_env("MATCH_PASSWORD")
+
+    api_key = app_store_connect_api_key(
+      key_id: required_env("APPSTORE_API_KEY_ID"),
+      issuer_id: required_env("APPSTORE_ISSUER_ID"),
+      key_content: app_store_connect_private_key,
+      duration: 1200,
+      in_house: false
+    )
+
+    match_options = {
+      type: "appstore",
+      app_identifier: app_identifier,
+      team_id: apple_team_id,
+      readonly: readonly,
+      api_key: api_key,
+      generate_apple_certs: true
+    }
+
+    keychain_password = ENV["KEYCHAIN_PASSWORD"]
+    unless keychain_password.to_s.strip.empty?
+      keychain_name = ENV.fetch("MATCH_KEYCHAIN_NAME", "app-signing.keychain")
+      create_keychain(
+        name: keychain_name,
+        password: keychain_password,
+        default_keychain: true,
+        unlock: true,
+        timeout: 21600,
+        lock_when_sleeps: false
+      )
+      match_options[:keychain_name] = keychain_name
+      match_options[:keychain_password] = keychain_password
+    end
+
+    match(**match_options)
+
+    profile_mapping = lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING] || {}
+    UI.user_error!("fastlane match did not return a provisioning profile mapping for #{app_identifier}") if profile_mapping[app_identifier].to_s.strip.empty?
+    profile_mapping
   end
 
   private_lane :ensure_node_dependencies do
@@ -98,6 +159,15 @@ def required_env(name)
   value = ENV[name]
   UI.user_error!("#{name} is required for production builds") if value.to_s.strip.empty?
   value
+end
+
+def app_store_connect_private_key
+  required_env("APPSTORE_API_PRIVATE_KEY").gsub("\\n", "\n")
+end
+
+def match_readonly?
+  value = ENV.fetch("MATCH_READONLY", "true").downcase
+  !["false", "0", "no"].include?(value)
 end
 
 def signing_xcargs

@@ -14,7 +14,7 @@ Current release values:
 - Display name: `Wardrobe AI`
 - Scheme: `App`
 - Apple team ID: `454Z8R39M9`
-- Provisioning profile specifier: `Wardrobe AI Provisioning`
+- Provisioning profile specifier: `match AppStore ai.wardrobe.app`
 - Privacy manifest: `ios/App/App/PrivacyInfo.xcprivacy`
 - iOS permission strings: `ios/App/App/Info.plist`
 
@@ -23,23 +23,20 @@ Repository variables required by the workflow:
 - `UI_API_BASE_URL`
 - `APPSTORE_API_KEY_ID`
 - `APPSTORE_ISSUER_ID`
+- `MATCH_GIT_URL`
 
 Repository secrets required by the workflow:
 
-- `BUILD_CERTIFICATE_BASE64`
-- `P12_PASSWORD`
-- `BUILD_PROVISION_PROFILE_BASE64`
 - `KEYCHAIN_PASSWORD`
 - `APPSTORE_API_PRIVATE_KEY`
+- `MATCH_PASSWORD`
+- `MATCH_GIT_BASIC_AUTHORIZATION` or `MATCH_GIT_PRIVATE_KEY`
 
-`BUILD_CERTIFICATE_BASE64` should be the Base64-encoded `.p12` Apple signing certificate. `BUILD_PROVISION_PROFILE_BASE64` should be the Base64-encoded `.mobileprovision` file for `ai.wardrobe.app`.
+`MATCH_GIT_URL` must point to the private encrypted fastlane match signing repository. `MATCH_PASSWORD` is the encryption password for that repository. Use either `MATCH_GIT_BASIC_AUTHORIZATION` for HTTPS access or `MATCH_GIT_PRIVATE_KEY` for SSH access.
 
-From a macOS machine, you can generate the GitHub secret values with:
+The App Store Connect API key must be a Team key with access to Certificates, Identifiers & Profiles. `APPSTORE_API_PRIVATE_KEY` should contain the `.p8` private key content.
 
-```sh
-base64 -i path/to/wardrobeai_distribution.p12 | pbcopy
-base64 -i path/to/WardrobeAI.mobileprovision | pbcopy
-```
+The first signing setup or a future signing repair can be run from the `iOS Release` workflow by setting `repair_signing_assets=true`. Normal release runs should leave that input as `false`, which makes fastlane match read-only in CI.
 
 After the variables and secrets are configured:
 
@@ -47,17 +44,21 @@ After the variables and secrets are configured:
 2. Run it with `upload_to_testflight=true` for a full signed release upload, or `false` to build only and keep the IPA as a workflow artifact.
 3. Download the `wardrobe-ai-ios-release` artifact if you need the signed IPA outside TestFlight.
 
-The workflow builds the Angular app, runs `npx cap sync ios` through Fastlane, signs the checked-in Xcode project on a macOS runner, uploads `build/ios/WardrobeAI.ipa` as an artifact, and can then upload that IPA to TestFlight using the App Store Connect API key.
+The workflow builds the Angular app, runs `npx cap sync ios` through Fastlane, fetches App Store signing assets through fastlane match, signs the checked-in Xcode project on a macOS runner, uploads `build/ios/WardrobeAI.ipa` as an artifact, and can then upload that IPA to TestFlight using the App Store Connect API key.
 
 ## Local Fastlane
 
 Fastlane is configured against the checked-in Capacitor iOS target at `ios/App/App.xcodeproj`.
 
-Manual signing values still come from Fastlane environment variables:
+Release signing values come from fastlane match and the App Store Connect API key:
 
 - `APP_IDENTIFIER`
 - `APPLE_TEAM_ID`
-- `PROVISIONING_PROFILE_SPECIFIER`
+- `APPSTORE_API_KEY_ID`
+- `APPSTORE_ISSUER_ID`
+- `APPSTORE_API_PRIVATE_KEY`
+- `MATCH_GIT_URL`
+- `MATCH_PASSWORD`
 
 From a macOS machine with Xcode, Ruby, Bundler, Node.js, and the matching Apple certificate/profile installed:
 
@@ -79,12 +80,29 @@ From a macOS machine with the production signing assets installed:
 ```sh
 APP_IDENTIFIER=ai.wardrobe.app \
 APPLE_TEAM_ID=454Z8R39M9 \
-PROVISIONING_PROFILE_SPECIFIER="Wardrobe AI Provisioning" \
+APPSTORE_API_KEY_ID=your-key-id \
+APPSTORE_ISSUER_ID=your-issuer-id \
+APPSTORE_API_PRIVATE_KEY="$(cat path/to/AuthKey.p8)" \
+MATCH_GIT_URL=git@github.com:your-org/wardrobe-ios-signing.git \
+MATCH_PASSWORD=your-match-password \
 UI_API_BASE_URL=https://your-api.up.railway.app \
 bundle exec fastlane ios build_release
 ```
 
 `build_release` fails if `UI_API_BASE_URL` is missing or points to localhost.
+
+To create or repair the encrypted signing repository outside CI:
+
+```sh
+APP_IDENTIFIER=ai.wardrobe.app \
+APPLE_TEAM_ID=454Z8R39M9 \
+APPSTORE_API_KEY_ID=your-key-id \
+APPSTORE_ISSUER_ID=your-issuer-id \
+APPSTORE_API_PRIVATE_KEY="$(cat path/to/AuthKey.p8)" \
+MATCH_GIT_URL=git@github.com:your-org/wardrobe-ios-signing.git \
+MATCH_PASSWORD=your-match-password \
+bundle exec fastlane ios bootstrap_signing
+```
 
 ## API URL
 

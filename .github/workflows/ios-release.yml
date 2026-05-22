@@ -13,6 +13,11 @@ on:
         type: string
         required: false
         default: ""
+      repair_signing_assets:
+        description: Allow fastlane match to create or repair signing assets
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -24,8 +29,16 @@ jobs:
     env:
       APP_IDENTIFIER: ai.wardrobe.app
       APPLE_TEAM_ID: 454Z8R39M9
-      PROVISIONING_PROFILE_SPECIFIER: WardrobeAI Provisioning v2
       UI_API_BASE_URL: ${{ vars.UI_API_BASE_URL }}
+      APPSTORE_API_KEY_ID: ${{ vars.APPSTORE_API_KEY_ID }}
+      APPSTORE_ISSUER_ID: ${{ vars.APPSTORE_ISSUER_ID }}
+      APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+      MATCH_GIT_URL: ${{ vars.MATCH_GIT_URL }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+      MATCH_GIT_PRIVATE_KEY: ${{ secrets.MATCH_GIT_PRIVATE_KEY }}
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      MATCH_READONLY: ${{ inputs.repair_signing_assets && 'false' || 'true' }}
 
     steps:
       - name: Checkout repository
@@ -43,40 +56,6 @@ jobs:
         with:
           ruby-version: "3.2"
           bundler-cache: true
-
-      - name: Install Apple certificate and provisioning profile
-        env:
-          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-        run: |
-          CERTIFICATE_PATH="$RUNNER_TEMP/build_certificate.p12"
-          PP_PATH="$RUNNER_TEMP/build_pp.mobileprovision"
-          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
-
-          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERTIFICATE_PATH"
-          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o "$PP_PATH"
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH"
-
-          PP_PLIST="$RUNNER_TEMP/build_pp.plist"
-          security cms -D -i "$PP_PATH" > "$PP_PLIST"
-          PP_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" "$PP_PLIST")
-          PP_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" "$PP_PLIST")
-
-          if [ "$PP_NAME" != "$PROVISIONING_PROFILE_SPECIFIER" ]; then
-            echo "Provisioning profile name '$PP_NAME' does not match expected '$PROVISIONING_PROFILE_SPECIFIER'."
-            exit 1
-          fi
-
-          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PP_UUID.mobileprovision"
 
       - name: Build signed release IPA
         run: bundle exec fastlane ios build_release
