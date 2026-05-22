@@ -23,16 +23,14 @@ Repository variables required by the workflow:
 - `UI_API_BASE_URL`
 - `APPSTORE_API_KEY_ID`
 - `APPSTORE_ISSUER_ID`
-- `MATCH_GIT_URL`
 
 Repository secrets required by the workflow:
 
 - `KEYCHAIN_PASSWORD`
 - `APPSTORE_API_PRIVATE_KEY`
 - `MATCH_PASSWORD`
-- `MATCH_GIT_BASIC_AUTHORIZATION` or `MATCH_GIT_PRIVATE_KEY`
 
-`MATCH_GIT_URL` must point to the private encrypted fastlane match signing repository. `MATCH_PASSWORD` is the encryption password for that repository. Use either `MATCH_GIT_BASIC_AUTHORIZATION` for HTTPS access or `MATCH_GIT_PRIVATE_KEY` for SSH access.
+The workflow stores encrypted fastlane match signing assets in this private repository on the dedicated `match-signing` branch. `MATCH_PASSWORD` is the encryption password for those assets.
 
 The App Store Connect API key must be a Team key with access to Certificates, Identifiers & Profiles. `APPSTORE_API_PRIVATE_KEY` should contain the `.p8` private key content.
 
@@ -57,7 +55,6 @@ Release signing values come from fastlane match and the App Store Connect API ke
 - `APPSTORE_API_KEY_ID`
 - `APPSTORE_ISSUER_ID`
 - `APPSTORE_API_PRIVATE_KEY`
-- `MATCH_GIT_URL`
 - `MATCH_PASSWORD`
 
 From a macOS machine with Xcode, Ruby, Bundler, Node.js, and the matching Apple certificate/profile installed:
@@ -99,7 +96,8 @@ APPLE_TEAM_ID=454Z8R39M9 \
 APPSTORE_API_KEY_ID=your-key-id \
 APPSTORE_ISSUER_ID=your-issuer-id \
 APPSTORE_API_PRIVATE_KEY="$(cat path/to/AuthKey.p8)" \
-MATCH_GIT_URL=git@github.com:your-org/wardrobe-ios-signing.git \
+MATCH_GIT_URL=https://github.com/brayden276/Wardrobe-ios-ui.git \
+MATCH_GIT_BRANCH=match-signing \
 MATCH_PASSWORD=your-match-password \
 bundle exec fastlane ios bootstrap_signing
 ```

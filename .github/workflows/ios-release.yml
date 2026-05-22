@@ -20,7 +20,7 @@ on:
         default: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   release:
@@ -33,10 +33,9 @@ jobs:
       APPSTORE_API_KEY_ID: ${{ vars.APPSTORE_API_KEY_ID }}
       APPSTORE_ISSUER_ID: ${{ vars.APPSTORE_ISSUER_ID }}
       APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-      MATCH_GIT_URL: ${{ vars.MATCH_GIT_URL }}
+      MATCH_GIT_URL: https://github.com/${{ github.repository }}.git
+      MATCH_GIT_BRANCH: match-signing
       MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-      MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
-      MATCH_GIT_PRIVATE_KEY: ${{ secrets.MATCH_GIT_PRIVATE_KEY }}
       KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
       MATCH_READONLY: ${{ inputs.repair_signing_assets && 'false' || 'true' }}
 
@@ -56,6 +55,20 @@ jobs:
         with:
           ruby-version: "3.2"
           bundler-cache: true
+
+      - name: Configure match git access
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          MATCH_AUTH=$(printf "%s:%s" "$GITHUB_ACTOR" "$GITHUB_TOKEN" | base64)
+          echo "::add-mask::$MATCH_AUTH"
+          echo "MATCH_GIT_BASIC_AUTHORIZATION=$MATCH_AUTH" >> "$GITHUB_ENV"
+
+      - name: Ensure match signing branch exists
+        run: |
+          if ! git ls-remote --exit-code --heads origin "$MATCH_GIT_BRANCH" > /dev/null; then
+            git push origin HEAD:refs/heads/"$MATCH_GIT_BRANCH"
+          fi
 
       - name: Build signed release IPA
         run: bundle exec fastlane ios build_release
