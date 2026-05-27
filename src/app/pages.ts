@@ -692,8 +692,8 @@ export class WardrobePage implements OnDestroy {
   selector: 'app-add-item',
   standalone: false,
   template: `
-    <ion-content class="app-content capture-content">
-      <section class="screen capture-screen">
+    <ion-content class="app-content">
+      <section class="screen add-item-screen">
         <header class="nav-header">
           <button type="button" class="nav-button" routerLink="/tabs/wardrobe" aria-label="Back to wardrobe">
             <ion-icon name="chevron-back-outline"></ion-icon>
