@@ -270,13 +270,20 @@ export class WardrobeApiService {
   }
 
   private async normaliseItem(item: WardrobeItemDto): Promise<WardrobeItemDto> {
+    const image = item.image ?? {
+      originalUrl: '',
+      displayUrl: '',
+      canonicalUrl: null,
+      thumbnailUrl: null
+    };
+
     return {
       ...item,
       image: {
-        originalUrl: this.normaliseAssetUrl(item.image.originalUrl) ?? '',
-        displayUrl: await this.normaliseDisplayAssetUrl(item.image.displayUrl) ?? '',
-        canonicalUrl: this.normaliseAssetUrl(item.image.canonicalUrl),
-        thumbnailUrl: this.normaliseAssetUrl(item.image.thumbnailUrl)
+        originalUrl: this.normaliseAssetUrl(image.originalUrl) ?? '',
+        displayUrl: await this.normaliseDisplayAssetUrl(image.displayUrl) ?? '',
+        canonicalUrl: this.normaliseAssetUrl(image.canonicalUrl),
+        thumbnailUrl: this.normaliseAssetUrl(image.thumbnailUrl)
       }
     };
   }
