@@ -1,0 +1,136 @@
+    <ion-content class="app-content">
+      <section class="screen">
+        <header class="nav-header">
+          <button type="button" class="nav-button" routerLink="/tabs/wardrobe" aria-label="Back to wardrobe">
+            <ion-icon name="chevron-back-outline"></ion-icon>
+          </button>
+          <h1>Build an outfit</h1>
+          <span></span>
+        </header>
+        <div class="builder-mode-switch" role="tablist" aria-label="Outfit builder mode">
+          <button type="button" [class.active]="builderMode === 'generate'" (click)="setBuilderMode('generate')">Generate</button>
+          <button type="button" [class.active]="builderMode === 'manual'" (click)="setBuilderMode('manual')">Manual</button>
+        </div>
+        <ng-container *ngIf="builderMode === 'generate'">
+          <article class="query-card form-stack generate-panel">
+            <div class="intent-group">
+              <span>Occasion</span>
+              <div class="option-row">
+                <button type="button" class="option-button" *ngFor="let option of occasionOptions" [class.active]="occasion === option" (click)="setOccasion(option)">{{ option }}</button>
+              </div>
+            </div>
+            <div class="intent-group">
+              <span>Dress code</span>
+              <div class="option-row">
+                <button type="button" class="option-button" *ngFor="let option of dressCodeOptions" [class.active]="dressCode === option" (click)="setDressCode(option)">{{ option }}</button>
+              </div>
+            </div>
+            <div class="intent-group">
+              <span>Avoid</span>
+              <div class="option-row">
+                <button type="button" class="option-button" *ngFor="let option of avoidOptions" [class.active]="isAvoidSelected(option)" (click)="toggleAvoid(option)">{{ option }}</button>
+              </div>
+            </div>
+            <div class="must-include" *ngIf="items.length">
+              <div class="panel-heading">
+                <h2 class="section-title">Must include</h2>
+                <button type="button" class="text-link" *ngIf="requiredItemId" (click)="clearRequiredItem()">Clear</button>
+              </div>
+              <div class="include-strip">
+                <button type="button" class="include-item include-any" [class.selected]="!requiredItemId" (click)="selectRequiredItem(null)">Any item</button>
+                <button type="button" class="include-item" *ngFor="let item of items; trackBy: trackById" [class.selected]="requiredItemId === item.id" (click)="selectRequiredItem(item.id)">
+                  <img [src]="item.image.displayUrl" [alt]="item.name">
+                  <span>{{ item.name }}</span>
+                </button>
+              </div>
+            </div>
+            <div class="textarea-wrap">
+              <ion-textarea class="field outfit-query" rows="3" maxlength="160" [(ngModel)]="query" placeholder="Add anything specific, like using black jeans or no heels"></ion-textarea>
+              <button type="button" class="clear-button" aria-label="Clear outfit request" (click)="clearQuery()" *ngIf="query">
+                <ion-icon name="close-outline"></ion-icon>
+              </button>
+              <span class="character-count">{{ query.length }}/160</span>
+            </div>
+            <ion-button class="primary-button" expand="block" (click)="search()" [disabled]="isBusy || !canGenerate">{{ isBuildingOutfits ? 'Building...' : 'Build outfits' }}</ion-button>
+            <p class="muted consent-note">Wardrobe AI sends your outfit request and wardrobe item details to Google Gemini to generate outfit suggestions.</p>
+          </article>
+          <article class="panel loading-outfits" *ngIf="isBuildingOutfits">
+            <div class="status-line"><ion-spinner name="crescent"></ion-spinner><span>{{ loadingStatus }}</span></div>
+            <div class="outfit-skeleton" *ngFor="let row of loadingRows">
+              <span></span>
+              <div>
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </article>
+          <h2 class="section-title" *ngIf="results.length">Outfit ideas</h2>
+          <article class="outfit-card idea-card generated-outfit-card" *ngFor="let outfit of results">
+            <img class="outfit-hero-image" *ngIf="outfit.displayImageUrl" [src]="outfit.displayImageUrl" [alt]="outfit.title">
+            <div class="outfit-images generated-fallback-images" *ngIf="!outfit.displayImageUrl">
+              <img *ngFor="let id of outfit.itemIds" [src]="imageFor(id)" [alt]="nameFor(id)">
+            </div>
+            <div class="outfit-copy">
+              <h3>{{ outfit.title }}</h3>
+              <p class="muted">{{ outfit.explanation }}</p>
+              <div class="outfit-item-list">
+                <span *ngFor="let id of outfit.itemIds">{{ nameFor(id) }}</span>
+              </div>
+              <div class="generated-actions">
+                <ion-button class="primary-button small-action" (click)="save(outfit)" [disabled]="generatedSaveState(outfit) === 'saving' || generatedSaveState(outfit) === 'saved'">
+                  {{ generatedSaveLabel(outfit) }}
+                </ion-button>
+                <span class="save-state failed" *ngIf="generatedSaveState(outfit) === 'failed'">Could not save.</span>
+              </div>
+            </div>
+          </article>
+          <article class="panel empty-results" *ngIf="hasGeneratedSearchRun && !isBuildingOutfits && !message && !results.length">
+            <h2 class="plain-title">No outfit matched that request.</h2>
+            <p class="muted">Try relaxing one restriction and build again.</p>
+            <div class="recovery-actions">
+              <button type="button" class="option-button" *ngIf="selectedAvoids.length" (click)="clearAvoids()">Allow avoided items</button>
+              <button type="button" class="option-button" *ngIf="requiredItemId" (click)="clearRequiredItem()">Use any item</button>
+              <button type="button" class="option-button" *ngIf="query" (click)="clearQuery()">Clear notes</button>
+            </div>
+          </article>
+        </ng-container>
+        <article class="panel form-stack manual-builder" *ngIf="builderMode === 'manual'">
+          <div class="panel-heading">
+            <h2 class="section-title">{{ manualItemIds.length ? 'Selected outfit' : 'Pick items' }}</h2>
+            <button type="button" class="icon-button" aria-label="Clear selected manual items" (click)="clearManualSelection()" [disabled]="!manualItemIds.length || isBusy">
+              <ion-icon name="close-outline"></ion-icon>
+            </button>
+          </div>
+          <label *ngIf="manualItemIds.length">
+            Outfit name
+            <ion-input class="field" [(ngModel)]="manualName" name="manualName"></ion-input>
+          </label>
+          <div class="manual-summary">
+            <span>{{ manualItemIds.length }} selected</span>
+            <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="selectAllItems()" [disabled]="!items.length || isBusy">Select all</ion-button>
+          </div>
+          <div class="manual-grid" *ngIf="items.length">
+            <button type="button" class="item-card manual-item" *ngFor="let item of items; trackBy: trackById" [class.selected]="isManualSelected(item.id)" (click)="toggleManualItem(item.id)">
+              <div class="item-card__image-wrap manual-item__image-wrap">
+                <img [src]="item.image.displayUrl" [alt]="item.name">
+                <span class="manual-item__check">
+                  <ion-icon [name]="isManualSelected(item.id) ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+                </span>
+              </div>
+              <div class="item-card__body">
+                <h3>{{ item.name }}</h3>
+                <div class="meta-line"><span>{{ label(item.subcategoryId) }}</span></div>
+                <div class="colour-dots" aria-label="Item colours">
+                  <span class="colour-dot" *ngFor="let colour of coloursFor(item)" [style.background]="colourSwatch(colour)"></span>
+                </div>
+              </div>
+            </button>
+          </div>
+          <p class="muted" *ngIf="!items.length">Load wardrobe items to build a manual outfit.</p>
+          <p class="muted" *ngIf="manualItemIds.length && !manualCanSave">{{ manualHint }}</p>
+          <ion-button class="primary-button" expand="block" *ngIf="manualItemIds.length" (click)="saveManual()" [disabled]="isBusy || !manualCanSave">{{ isSavingManualOutfit ? 'Saving...' : 'Save outfit' }}</ion-button>
+        </article>
+        <p class="muted" *ngIf="message">{{ message }}</p>
+      </section>
+    </ion-content>

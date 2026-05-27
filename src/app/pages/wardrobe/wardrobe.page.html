@@ -1,0 +1,160 @@
+    <ion-content class="app-content" [scrollEvents]="true" (ionScroll)="onWardrobeScroll($event)">
+      <section class="screen">
+        <header class="page-header">
+          <h1>Wardrobe</h1>
+          <button type="button" class="icon-button" aria-label="Refresh wardrobe" (click)="load()">
+            <ion-icon name="refresh-outline"></ion-icon>
+          </button>
+        </header>
+        <div class="search-row">
+          <ion-searchbar class="wardrobe-search" [(ngModel)]="search" placeholder="Search black jeans, blazers..." (ionInput)="scheduleLoad()"></ion-searchbar>
+          <button type="button" class="filter-button" [class.active]="filtersExpanded || hasFilters" [attr.aria-label]="filtersExpanded ? 'Hide wardrobe filters' : 'Show wardrobe filters'" (click)="toggleFilters()">
+            <ion-icon [name]="filtersExpanded ? 'close-outline' : 'options-outline'"></ion-icon>
+          </button>
+        </div>
+        <article class="panel filter-summary" *ngIf="!filtersExpanded && hasFilters">
+          <div class="filter-group">
+            <span class="filter-label">Active filters</span>
+            <p class="muted">{{ activeFilterSummary }}</p>
+            <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="toggleFilters()">Edit filters</ion-button>
+          </div>
+        </article>
+        <article class="panel filter-panel" *ngIf="filtersExpanded">
+          <div class="panel-heading">
+            <h2 class="section-title">Filters</h2>
+            <button type="button" class="icon-button" aria-label="Close filters" (click)="toggleFilters()">
+              <ion-icon name="close-outline"></ion-icon>
+            </button>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Category</span>
+            <div class="chip-row">
+              <button type="button" class="chip" [class.active]="!categoryId" (click)="setCategory(null)">All</button>
+              <button type="button" class="chip" *ngFor="let category of lookups?.categories || []" [class.active]="categoryId === category.id" (click)="setCategory(category.id)">{{ category.label }}</button>
+            </div>
+          </div>
+          <details class="advanced-filter">
+            <summary>
+              <span>Advanced filters</span>
+              <ion-icon name="chevron-down-outline"></ion-icon>
+            </summary>
+            <div class="filter-group">
+              <span class="filter-label">Subcategory</span>
+              <div class="chip-row">
+                <button type="button" class="chip" [class.active]="!subcategoryId" (click)="setSubcategory(null)">Any</button>
+                <button type="button" class="chip" *ngFor="let option of subcategoryOptions" [class.active]="subcategoryId === option.id" (click)="setSubcategory(option.id)">{{ option.label }}</button>
+              </div>
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Colour</span>
+              <div class="chip-row">
+                <button type="button" class="chip" [class.active]="!colourId" (click)="setColour(null)">Any</button>
+                <button type="button" class="chip" *ngFor="let option of lookups?.colours || []" [class.active]="colourId === option.id" (click)="setColour(option.id)">{{ option.label }}</button>
+              </div>
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Pattern</span>
+              <div class="chip-row">
+                <button type="button" class="chip" [class.active]="!patternId" (click)="setPattern(null)">Any</button>
+                <button type="button" class="chip" *ngFor="let option of lookups?.patterns || []" [class.active]="patternId === option.id" (click)="setPattern(option.id)">{{ option.label }}</button>
+              </div>
+            </div>
+            <div class="filter-select-grid">
+              <label>
+                Material
+                <ion-select class="field" [(ngModel)]="visibleMaterialId" name="visibleMaterialId" (ionChange)="scheduleLoad()">
+                  <ion-select-option [value]="null">Any</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.visibleMaterials || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                </ion-select>
+              </label>
+              <label>
+                Neckline
+                <ion-select class="field" [(ngModel)]="necklineId" name="necklineId" (ionChange)="scheduleLoad()">
+                  <ion-select-option [value]="null">Any</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.necklines || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                </ion-select>
+              </label>
+              <label>
+                Sleeve
+                <ion-select class="field" [(ngModel)]="sleeveLengthId" name="sleeveLengthId" (ionChange)="scheduleLoad()">
+                  <ion-select-option [value]="null">Any</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.sleeveLengths || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                </ion-select>
+              </label>
+              <label>
+                Fit
+                <ion-select class="field" [(ngModel)]="fitId" name="fitId" (ionChange)="scheduleLoad()">
+                  <ion-select-option [value]="null">Any</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.fits || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                </ion-select>
+              </label>
+              <label>
+                Length
+                <ion-select class="field" [(ngModel)]="lengthId" name="lengthId" (ionChange)="scheduleLoad()">
+                  <ion-select-option [value]="null">Any</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.garmentLengths || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                </ion-select>
+              </label>
+              <label>
+                Shape
+                <ion-select class="field" [(ngModel)]="bottomShapeId" name="bottomShapeId" (ionChange)="scheduleLoad()">
+                  <ion-select-option [value]="null">Any</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.bottomShapes || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                </ion-select>
+              </label>
+              <label>
+                Rise
+                <ion-select class="field" [(ngModel)]="riseId" name="riseId" (ionChange)="scheduleLoad()">
+                  <ion-select-option [value]="null">Any</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.rises || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                </ion-select>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <span>Include archived</span>
+              <ion-toggle [checked]="includeArchived" (ionChange)="setIncludeArchived($event.detail.checked)"></ion-toggle>
+            </div>
+          </details>
+          <ion-button class="secondary-button" fill="outline" expand="block" (click)="clearFilters()" [disabled]="!hasFilters">Clear filters</ion-button>
+        </article>
+        <article class="panel state-panel" *ngIf="isLoading">
+          <ion-spinner name="crescent"></ion-spinner>
+          <p class="muted">Loading wardrobe...</p>
+        </article>
+        <article class="panel state-panel" *ngIf="!isLoading && message">
+          <p class="muted">{{ message }}</p>
+          <ion-button class="secondary-button" fill="outline" size="small" (click)="load()">Try again</ion-button>
+        </article>
+        <div #wardrobeGrid class="wardrobe-grid wardrobe-grid--virtual" *ngIf="!isLoading && !message && items.length; else emptyWardrobe">
+          <div class="wardrobe-grid__spacer" [style.height.px]="virtualTopSpacerHeight"></div>
+          <a class="item-card" *ngFor="let item of visibleItems; let index = index; trackBy: trackById" [routerLink]="['/tabs/wardrobe', item.id]">
+            <div class="item-card__image-wrap">
+              <img [appLazyImage]="wardrobeImageUrl(item)" [appLazyImagePriority]="shouldPrioritiseImage(index)" [alt]="item.name" loading="lazy" decoding="async">
+              <div class="image-generation-overlay" *ngIf="imageGenerationMessage(item) as status" [class.failed]="!isImageGenerationInProgress(item.imageGenerationStatus)">
+                <ion-spinner *ngIf="isImageGenerationInProgress(item.imageGenerationStatus)" name="crescent"></ion-spinner>
+                <span>{{ status }}</span>
+              </div>
+            </div>
+            <div class="item-card__body">
+              <h3>{{ item.name }}</h3>
+              <div class="meta-line"><span>{{ label(item.subcategoryId) }}</span></div>
+              <div class="colour-dots" aria-label="Item colours">
+                <span class="colour-dot" *ngFor="let colour of coloursFor(item)" [style.background]="colourSwatch(colour)"></span>
+              </div>
+            </div>
+          </a>
+          <div class="wardrobe-grid__spacer" [style.height.px]="virtualBottomSpacerHeight"></div>
+        </div>
+        <ng-template #emptyWardrobe>
+          <article class="panel" *ngIf="!isLoading && !message">
+            <h2 class="plain-title">{{ hasFilters ? 'No matching items found.' : 'Your wardrobe is empty.' }}</h2>
+            <p class="muted">{{ hasFilters ? 'Clear filters to see more wardrobe items.' : 'Add your first item.' }}</p>
+            <ion-button *ngIf="hasFilters" class="secondary-button" fill="outline" size="small" (click)="clearFilters()">Clear filters</ion-button>
+            <ion-button *ngIf="!hasFilters" class="primary-button" size="small" routerLink="/tabs/add">Add Item</ion-button>
+          </article>
+        </ng-template>
+      </section>
+        <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+          <ion-fab-button class="fab-camera" routerLink="/tabs/add" aria-label="Add item"><ion-icon name="camera-outline"></ion-icon></ion-fab-button>
+        </ion-fab>
+      </ion-content>

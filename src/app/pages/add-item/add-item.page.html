@@ -1,0 +1,45 @@
+    <ion-content class="app-content">
+      <section class="screen add-item-screen">
+        <header class="nav-header">
+          <button type="button" class="nav-button" routerLink="/tabs/wardrobe" aria-label="Back to wardrobe">
+            <ion-icon name="chevron-back-outline"></ion-icon>
+          </button>
+          <h1>Add item</h1>
+          <span></span>
+        </header>
+        <input #cameraInput class="file-input" type="file" accept="image/*" capture="environment" (change)="handleCameraFileSelection($event)">
+        <input #batchInput class="file-input" type="file" accept="image/*" multiple (change)="handlePhotoSelection($event)">
+        <article class="panel form-stack batch-panel upload-panel">
+          <ion-button class="primary-button olive-button" expand="block" (click)="openAddPhotoOptions()" [disabled]="isSaving || isPreparing || isBatchSaving">
+            <ion-icon name="images-outline" slot="start"></ion-icon>
+            {{ batchFiles.length ? 'Add more photos' : 'Add photos' }}
+          </ion-button>
+          <div class="batch-summary" *ngIf="batchFiles.length">
+            <span>{{ batchSummary }}</span>
+            <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="clearBatchSelection()" [disabled]="isSaving || isBatchSaving || isPreparing">Clear</ion-button>
+          </div>
+          <div class="batch-grid" *ngIf="batchFiles.length">
+            <div class="batch-item" *ngFor="let file of batchFiles; let index = index">
+              <button type="button" class="icon-button batch-item__remove" aria-label="Remove photo" (click)="removeBatchFile(index)" [disabled]="isSaving || isBatchSaving || isPreparing">
+                <ion-icon name="close-outline"></ion-icon>
+              </button>
+              <img [src]="batchPreviewUrls[index]" [alt]="file.name">
+              <div class="batch-item__body">
+                <strong>Ready</strong>
+                <span>{{ file.name }}</span>
+              </div>
+            </div>
+          </div>
+          <p class="muted" *ngIf="!batchFiles.length">Take a photo or select up to {{ maxBatchUploadCount }} photos.</p>
+          <p class="muted consent-note">Wardrobe AI sends uploaded wardrobe photos to Google Gemini to classify items and generate cleaned display images.</p>
+          <p class="muted consent-note">Only upload clothing photos you are comfortable sharing with that provider.</p>
+          <div class="processing-line" *ngIf="isPreparing || isSaving || isBatchSaving">
+            <ion-spinner name="crescent"></ion-spinner>
+            <span>{{ progressLabel }}</span>
+          </div>
+          <p class="muted" *ngIf="statusMessage && !isSaving && !isBatchSaving">{{ statusMessage }}</p>
+          <p class="muted" *ngIf="message">{{ message }}</p>
+          <ion-button class="primary-button" expand="block" (click)="uploadSelectedPhotos()" [disabled]="isSaving || isBatchSaving || !batchFiles.length || isPreparing">{{ uploadButtonLabel }}</ion-button>
+        </article>
+      </section>
+    </ion-content>

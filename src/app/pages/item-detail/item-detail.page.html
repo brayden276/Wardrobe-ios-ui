@@ -1,0 +1,151 @@
+    <ion-content class="app-content">
+      <section class="screen" *ngIf="isLoading">
+        <article class="panel state-panel">
+          <ion-spinner name="crescent"></ion-spinner>
+          <p class="muted">Loading item...</p>
+        </article>
+      </section>
+      <section class="screen" *ngIf="!isLoading && !item">
+        <header class="nav-header">
+          <button type="button" class="nav-button" routerLink="/tabs/wardrobe" aria-label="Back to wardrobe">
+            <ion-icon name="chevron-back-outline"></ion-icon>
+          </button>
+          <h1>Item</h1>
+          <span></span>
+        </header>
+        <article class="panel state-panel">
+          <p class="muted">{{ message || 'Could not load item.' }}</p>
+        </article>
+      </section>
+        <section class="screen" *ngIf="!isLoading && item">
+        <header class="nav-header">
+          <button type="button" class="nav-button" routerLink="/tabs/wardrobe" aria-label="Back to wardrobe">
+            <ion-icon name="chevron-back-outline"></ion-icon>
+          </button>
+          <h1>{{ item.name }}</h1>
+          <button type="button" class="nav-button" aria-label="Edit item" (click)="setItemMode('edit')" *ngIf="!editing">
+            <ion-icon name="create-outline"></ion-icon>
+          </button>
+        </header>
+          <div class="product-stage">
+            <img class="product-image" [src]="item.image.displayUrl" [alt]="item.name">
+            <div class="image-generation-overlay detail-overlay" *ngIf="imageGenerationMessage(item.imageGenerationStatus) as status" [class.failed]="!isImageGenerationInProgress(item.imageGenerationStatus)">
+              <ion-spinner *ngIf="isImageGenerationInProgress(item.imageGenerationStatus)" name="crescent"></ion-spinner>
+              <span>{{ status }}</span>
+            </div>
+          </div>
+          <ion-button class="taupe-button" expand="block" (click)="markWorn()" *ngIf="!editing" [disabled]="isMarkingWorn">{{ isMarkingWorn ? 'Marking worn...' : 'Mark worn' }}</ion-button>
+          <div class="detail-chips">
+            <span class="detail-chip" *ngFor="let tag of visibleTags">{{ tag }}</span>
+        </div>
+          <button type="button" class="text-link original-image-link" *ngIf="item.image?.originalUrl" (click)="openOriginalImage()">View original</button>
+        <p class="muted center-message" *ngIf="message && !editing">{{ message }}</p>
+        <form class="panel form-stack editor-panel" *ngIf="editing" (ngSubmit)="save()">
+          <label>Name<ion-input class="field" [(ngModel)]="form.name" name="name"></ion-input></label>
+          <label>
+            Category
+            <ion-select class="field" [(ngModel)]="form.categoryId" name="categoryId" (ionChange)="syncSubcategory()">
+              <ion-select-option *ngFor="let option of lookups?.categories || []" [value]="option.id">{{ option.label }}</ion-select-option>
+            </ion-select>
+          </label>
+          <label>
+            Subcategory
+            <ion-select class="field" [(ngModel)]="form.subcategoryId" name="subcategoryId">
+              <ion-select-option *ngFor="let option of selectedSubcategories" [value]="option.id">{{ option.label }}</ion-select-option>
+            </ion-select>
+          </label>
+          <label>
+            Primary colour
+            <ion-select class="field" [(ngModel)]="form.primaryColourId" name="primaryColourId">
+              <ion-select-option *ngFor="let option of lookups?.colours || []" [value]="option.id">{{ option.label }}</ion-select-option>
+            </ion-select>
+          </label>
+          <label>
+            Secondary colours
+            <ion-select class="field" multiple="true" [(ngModel)]="form.secondaryColourIds" name="secondaryColourIds">
+              <ion-select-option *ngFor="let option of lookups?.colours || []" [value]="option.id">{{ option.label }}</ion-select-option>
+            </ion-select>
+          </label>
+          <label>
+            Pattern
+            <ion-select class="field" [(ngModel)]="form.patternId" name="patternId">
+              <ion-select-option [value]="null">None</ion-select-option>
+              <ion-select-option *ngFor="let option of lookups?.patterns || []" [value]="option.id">{{ option.label }}</ion-select-option>
+            </ion-select>
+          </label>
+          <label>
+            Visible material
+            <ion-select class="field" [(ngModel)]="form.visibleMaterialId" name="visibleMaterialId">
+              <ion-select-option [value]="null">None</ion-select-option>
+              <ion-select-option *ngFor="let option of lookups?.visibleMaterials || []" [value]="option.id">{{ option.label }}</ion-select-option>
+            </ion-select>
+          </label>
+          <details class="advanced-editor">
+            <summary>Garment details</summary>
+            <label>
+              Neckline
+              <ion-select class="field" [(ngModel)]="form.necklineId" name="necklineId">
+                <ion-select-option [value]="null">None</ion-select-option>
+                <ion-select-option *ngFor="let option of lookups?.necklines || []" [value]="option.id">{{ option.label }}</ion-select-option>
+              </ion-select>
+            </label>
+            <label>
+              Sleeve length
+              <ion-select class="field" [(ngModel)]="form.sleeveLengthId" name="sleeveLengthId">
+                <ion-select-option [value]="null">None</ion-select-option>
+                <ion-select-option *ngFor="let option of lookups?.sleeveLengths || []" [value]="option.id">{{ option.label }}</ion-select-option>
+              </ion-select>
+            </label>
+            <label>
+              Fit
+              <ion-select class="field" [(ngModel)]="form.fitId" name="fitId">
+                <ion-select-option [value]="null">None</ion-select-option>
+                <ion-select-option *ngFor="let option of lookups?.fits || []" [value]="option.id">{{ option.label }}</ion-select-option>
+              </ion-select>
+            </label>
+            <label>
+              Length
+              <ion-select class="field" [(ngModel)]="form.lengthId" name="lengthId">
+                <ion-select-option [value]="null">None</ion-select-option>
+                <ion-select-option *ngFor="let option of lookups?.garmentLengths || []" [value]="option.id">{{ option.label }}</ion-select-option>
+              </ion-select>
+            </label>
+            <label>
+              Bottom shape
+              <ion-select class="field" [(ngModel)]="form.bottomShapeId" name="bottomShapeId">
+                <ion-select-option [value]="null">None</ion-select-option>
+                <ion-select-option *ngFor="let option of lookups?.bottomShapes || []" [value]="option.id">{{ option.label }}</ion-select-option>
+              </ion-select>
+            </label>
+            <label>
+              Rise
+              <ion-select class="field" [(ngModel)]="form.riseId" name="riseId">
+                <ion-select-option [value]="null">None</ion-select-option>
+                <ion-select-option *ngFor="let option of lookups?.rises || []" [value]="option.id">{{ option.label }}</ion-select-option>
+              </ion-select>
+            </label>
+          </details>
+          <ion-button class="primary-button" expand="block" type="submit" [disabled]="isSaving || isArchiving">{{ isSaving ? 'Saving...' : 'Save details' }}</ion-button>
+          <ion-button class="secondary-button" fill="outline" expand="block" type="button" (click)="deleteItem()" [disabled]="isArchiving || isSaving || isMarkingWorn">
+            {{ isArchiving ? 'Archiving...' : 'Archive item' }}
+          </ion-button>
+          <ion-button class="secondary-button" fill="clear" expand="block" type="button" (click)="cancelEdit()">Cancel</ion-button>
+          <p class="muted" *ngIf="message">{{ message }}</p>
+        </form>
+      </section>
+      <ion-modal class="original-image-modal" [isOpen]="isOriginalImageOpen" (didDismiss)="closeOriginalImage()">
+        <ng-template>
+          <ion-content class="original-image-viewer" fullscreen="true">
+            <header class="original-image-viewer__header">
+              <h2>{{ item?.name || 'Original image' }}</h2>
+              <button type="button" class="nav-button" aria-label="Close original image" (click)="closeOriginalImage()">
+                <ion-icon name="close-outline"></ion-icon>
+              </button>
+            </header>
+            <div class="original-image-viewer__stage">
+              <img *ngIf="item?.image?.originalUrl" [src]="item?.image?.originalUrl" [alt]="item?.name || 'Original wardrobe image'">
+            </div>
+          </ion-content>
+        </ng-template>
+      </ion-modal>
+    </ion-content>

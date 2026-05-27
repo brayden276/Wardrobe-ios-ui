@@ -39,7 +39,7 @@ export class WardrobeApiService {
   async getItems(params: Record<string, string | number | boolean | null | undefined> = {}): Promise<WardrobeItemDto[]> {
     const query = this.queryString(params);
     const response = await this.authorized(() => firstValueFrom(this.http.get<{ items: WardrobeItemDto[] }>(this.url(`/api/wardrobe/items${query ? `?${query}` : ''}`), this.authOptions())));
-    return Promise.all(response.items.map((item) => this.normaliseItem(item)));
+    return Promise.all(response.items.map((item) => this.normaliseItem(item, false)));
   }
 
   async getItem(id: string): Promise<WardrobeItemDto> {
@@ -265,11 +265,11 @@ export class WardrobeApiService {
     return {
       ...outfit,
       imageUrl: await this.normaliseDisplayAssetUrl(outfit.imageUrl),
-      items: await Promise.all(outfit.items.map((item) => this.normaliseItem(item)))
+      items: await Promise.all(outfit.items.map((item) => this.normaliseItem(item, false)))
     };
   }
 
-  private async normaliseItem(item: WardrobeItemDto): Promise<WardrobeItemDto> {
+  private async normaliseItem(item: WardrobeItemDto, resolveDisplayImage = true): Promise<WardrobeItemDto> {
     const image = item.image ?? {
       originalUrl: '',
       displayUrl: '',
@@ -281,7 +281,9 @@ export class WardrobeApiService {
       ...item,
       image: {
         originalUrl: this.normaliseAssetUrl(image.originalUrl) ?? '',
-        displayUrl: await this.normaliseDisplayAssetUrl(image.displayUrl) ?? '',
+        displayUrl: resolveDisplayImage
+          ? await this.normaliseDisplayAssetUrl(image.displayUrl) ?? ''
+          : this.normaliseAssetUrl(image.displayUrl) ?? '',
         canonicalUrl: this.normaliseAssetUrl(image.canonicalUrl),
         thumbnailUrl: this.normaliseAssetUrl(image.thumbnailUrl)
       }

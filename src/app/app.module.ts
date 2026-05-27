@@ -6,6 +6,7 @@ import { RouteReuseStrategy } from '@angular/router';
 import { IonicModule, IonicRouteStrategy } from '@ionic/angular';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
+import { LazyImageDirective } from './lazy-image.directive';
 import {
   AddItemPage,
   BuilderPage,
@@ -20,6 +21,7 @@ import {
 @NgModule({
   declarations: [
     AppComponent,
+    LazyImageDirective,
     LoginPage,
     TabsPage,
     WardrobePage,

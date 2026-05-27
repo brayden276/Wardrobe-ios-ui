@@ -1,0 +1,74 @@
+    <ion-content class="app-content">
+      <section class="screen">
+        <header class="page-header">
+          <h1>Outfits</h1>
+          <button type="button" class="icon-button" aria-label="Refresh outfits" (click)="load()">
+            <ion-icon name="refresh-outline"></ion-icon>
+          </button>
+        </header>
+        <article class="panel state-panel" *ngIf="isLoading">
+          <ion-spinner name="crescent"></ion-spinner>
+          <p class="muted">Loading outfits...</p>
+        </article>
+        <article class="panel state-panel" *ngIf="!isLoading && message">
+          <p class="muted">{{ message }}</p>
+        </article>
+        <ng-container *ngIf="!selectedOutfit">
+          <article class="outfit-card" *ngFor="let outfit of outfits">
+            <button type="button" class="outfit-open" (click)="open(outfit)">
+              <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [src]="outfit.imageUrl" [alt]="outfit.name">
+            </button>
+            <div class="outfit-images" *ngIf="!outfit.imageUrl">
+              <img *ngFor="let item of outfit.items" [src]="item.image.displayUrl" [alt]="item.name">
+            </div>
+            <div class="outfit-copy">
+              <h3>{{ outfit.name }}</h3>
+              <p class="muted">{{ outfit.explanation || 'Saved from your wardrobe.' }}</p>
+              <div class="muted" *ngIf="outfitGenerationMessage(outfit.imageGenerationStatus) as status">
+                <span>{{ status }}</span>
+              </div>
+              <div class="outfit-item-list">
+                <span *ngFor="let item of outfit.items">{{ item.name }}</span>
+              </div>
+            </div>
+            <div class="outfit-actions">
+              <ion-button class="secondary-button compact-button" fill="outline" (click)="open(outfit)">Open</ion-button>
+              <ion-button class="secondary-button compact-button" fill="outline" (click)="markWorn(outfit)"
+                [disabled]="isMarkingOutfit(outfit.id) || isRemovingOutfit(outfit.id)">
+                {{ isMarkingOutfit(outfit.id) ? 'Marking...' : 'Mark worn' }}
+              </ion-button>
+              <ion-button class="quiet-button compact-button" fill="clear" (click)="remove(outfit)"
+                [disabled]="isRemovingOutfit(outfit.id) || isMarkingOutfit(outfit.id)">
+                {{ isRemovingOutfit(outfit.id) ? 'Deleting...' : 'Delete' }}
+              </ion-button>
+            </div>
+          </article>
+        </ng-container>
+        <article class="panel outfit-detail-panel" *ngIf="selectedOutfit">
+          <div class="panel-heading">
+            <h2 class="section-title">{{ selectedOutfit.name }}</h2>
+            <button type="button" class="icon-button" aria-label="Close outfit details" (click)="close()">
+              <ion-icon name="close-outline"></ion-icon>
+            </button>
+          </div>
+          <img class="outfit-detail-image" *ngIf="selectedOutfit.imageUrl" [src]="selectedOutfit.imageUrl" [alt]="selectedOutfit.name">
+          <p class="muted center-message image-status-line" *ngIf="outfitGenerationMessage(selectedOutfit.imageGenerationStatus)">
+            <ion-spinner *ngIf="isOutfitImageGenerationInProgress(selectedOutfit.imageGenerationStatus)" name="crescent"></ion-spinner>
+            <span>{{ outfitGenerationMessage(selectedOutfit.imageGenerationStatus) }}</span>
+          </p>
+          <div class="outfit-detail-items">
+            <div class="outfit-detail-item" *ngFor="let item of selectedOutfit.items">
+              <img [src]="item.image.displayUrl" [alt]="item.name">
+              <div>
+                <strong>{{ item.name }}</strong>
+                <span>{{ item.subcategoryId }}</span>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="panel" *ngIf="!selectedOutfit && !isLoading && !message && !outfits.length">
+          <h2 class="plain-title">No saved outfits</h2>
+          <p class="muted">Build an outfit and save the ones worth repeating.</p>
+        </article>
+      </section>
+    </ion-content>

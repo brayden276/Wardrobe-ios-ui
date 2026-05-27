@@ -1,0 +1,36 @@
+  <ion-content class="app-content">
+    <section class="screen login-screen">
+        <div>
+          <h1 class="plain-title">Wardrobe AI</h1>
+          <p class="muted">Your private wardrobe catalogue and outfit builder.</p>
+          <p class="muted">{{ authModeHint }}</p>
+        </div>
+      <div class="intent-switch" role="tablist" aria-label="Authentication intent">
+        <button type="button" class="intent-tab" [class.active]="mode === 'login'" (click)="setAuthMode('login')" role="tab">Sign in</button>
+        <button type="button" class="intent-tab" [class.active]="mode === 'register'" (click)="setAuthMode('register')" role="tab">Create account</button>
+      </div>
+      <form class="panel form-stack" (ngSubmit)="submit()">
+        <label>
+          Email
+          <ion-input class="field" type="email" [(ngModel)]="email" name="email"></ion-input>
+        </label>
+          <p class="muted field-error" *ngIf="emailValidationMessage">{{ emailValidationMessage }}</p>
+          <label>
+            Password
+            <ion-input class="field" type="password" [(ngModel)]="password" name="password"></ion-input>
+          </label>
+          <p class="muted field-error" *ngIf="passwordValidationMessage">{{ passwordValidationMessage }}</p>
+        <label *ngIf="mode === 'register'">
+          Name
+          <ion-input class="field" [(ngModel)]="displayName" name="displayName"></ion-input>
+        </label>
+        <p class="muted field-error" *ngIf="mode === 'register' && displayNameValidationMessage">{{ displayNameValidationMessage }}</p>
+        <ion-button class="primary-button" expand="block" type="submit" [disabled]="isBusy || !canSubmit">{{ authSubmitLabel }}</ion-button>
+        <div class="status-line" *ngIf="isBusy">
+          <ion-spinner name="crescent"></ion-spinner>
+          <span>{{ authStatusMessage }}</span>
+        </div>
+        <p class="muted" *ngIf="message">{{ message }}</p>
+      </form>
+    </section>
+  </ion-content>
