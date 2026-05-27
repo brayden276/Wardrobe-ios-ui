@@ -23,12 +23,20 @@ on:
         type: boolean
         required: true
         default: false
+  workflow_run:
+    workflows:
+      - UI CI
+    types:
+      - completed
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   release:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
     runs-on: macos-26
     timeout-minutes: 60
     env:
@@ -42,12 +50,14 @@ jobs:
       MATCH_GIT_BRANCH: match-signing
       MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
       KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-      MATCH_READONLY: ${{ inputs.repair_signing_assets && 'false' || 'true' }}
-      IOS_BUILD_NUMBER: ${{ inputs.build_number != '' && inputs.build_number || github.run_number }}
+      MATCH_READONLY: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.repair_signing_assets == 'true' && 'false' || 'true' }}
+      IOS_BUILD_NUMBER: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.build_number != '' && github.event.inputs.build_number || github.run_number }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -87,11 +97,11 @@ jobs:
           if-no-files-found: error
 
       - name: Upload to TestFlight
-        if: ${{ inputs.upload_to_testflight }}
+        if: ${{ github.event_name == 'workflow_run' || github.event.inputs.upload_to_testflight == 'true' }}
         uses: apple-actions/upload-testflight-build@v5
         with:
           app-path: build/ios/WardrobeAI.ipa
           issuer-id: ${{ vars.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ vars.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-          release-notes: ${{ inputs.release_notes }}
+          release-notes: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_notes || '' }}

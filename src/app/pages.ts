@@ -729,7 +729,7 @@ export class WardrobePage implements OnDestroy {
               <span>{{ isPreparing ? 'Preparing image...' : 'Uploading and categorising item...' }}</span>
             </div>
             <p>{{ imageBlob ? singleReadyLabel : 'Upload one item here, or tap Upload multiple photos for a batch.' }}</p>
-            <p class="muted consent-note">Wardrobe AI sends uploaded wardrobe photos to OpenAI to classify items and generate cleaned display images.</p>
+            <p class="muted consent-note">Wardrobe AI sends uploaded wardrobe photos to Google Gemini to classify items and generate cleaned display images.</p>
             <p class="muted consent-note">Only upload clothing photos you are comfortable sharing with that provider.</p>
             <p class="muted" *ngIf="statusMessage">{{ statusMessage }}</p>
             <p class="muted" *ngIf="message">{{ message }}</p>
@@ -757,7 +757,7 @@ export class WardrobePage implements OnDestroy {
               </div>
             </div>
             <p class="muted" *ngIf="!batchFiles.length">Select up to {{ maxBatchUploadCount }} photos and upload them together.</p>
-            <p class="muted consent-note">Batch uploads use the same OpenAI-powered classification flow as single-item uploads.</p>
+            <p class="muted consent-note">Batch uploads use the same Gemini-powered classification flow as single-item uploads.</p>
             <div class="processing-line" *ngIf="isBatchSaving">
               <ion-spinner name="crescent"></ion-spinner>
               <span>Uploading batch...</span>
@@ -936,9 +936,9 @@ export class AddItemPage {
     if (!this.imageBlob) return;
 
     if (!await ensureAiConsent(
-      'Wardrobe AI uses OpenAI to classify wardrobe photos and generate cleaned display images. Do you want to continue with AI processing for this device?'))
+      'Wardrobe AI uses Google Gemini to classify wardrobe photos and generate cleaned display images. Do you want to continue with AI processing for this device?'))
     {
-      this.message = 'OpenAI consent is required before you can upload wardrobe photos.';
+      this.message = 'Gemini consent is required before you can upload wardrobe photos.';
       this.uploadError = true;
       return;
     }
@@ -965,9 +965,9 @@ export class AddItemPage {
     }
 
     if (!await ensureAiConsent(
-      'Wardrobe AI uses OpenAI to classify wardrobe photos and generate cleaned display images. Do you want to continue with AI processing for this device?'))
+      'Wardrobe AI uses Google Gemini to classify wardrobe photos and generate cleaned display images. Do you want to continue with AI processing for this device?'))
     {
-      this.message = 'OpenAI consent is required before you can upload wardrobe photos.';
+      this.message = 'Gemini consent is required before you can upload wardrobe photos.';
       this.uploadError = true;
       return;
     }
@@ -1292,7 +1292,7 @@ export class AddItemPage {
           <div class="detail-chips">
             <span class="detail-chip" *ngFor="let tag of visibleTags">{{ tag }}</span>
         </div>
-          <a class="text-link" *ngIf="item.image.originalUrl" [href]="item.image.originalUrl" target="_blank" rel="noopener noreferrer">View original</a>
+          <button type="button" class="text-link original-image-link" *ngIf="item.image.originalUrl" (click)="openOriginalImage()">View original</button>
         <p class="muted center-message" *ngIf="message && !editing">{{ message }}</p>
         <form class="panel form-stack editor-panel" *ngIf="editing" (ngSubmit)="save()">
           <label>Name<ion-input class="field" [(ngModel)]="form.name" name="name"></ion-input></label>
@@ -1387,6 +1387,21 @@ export class AddItemPage {
           <p class="muted" *ngIf="message">{{ message }}</p>
         </form>
       </section>
+      <ion-modal class="original-image-modal" [isOpen]="isOriginalImageOpen" (didDismiss)="closeOriginalImage()">
+        <ng-template>
+          <ion-content class="original-image-viewer" fullscreen="true">
+            <header class="original-image-viewer__header">
+              <h2>{{ item?.name || 'Original image' }}</h2>
+              <button type="button" class="nav-button" aria-label="Close original image" (click)="closeOriginalImage()">
+                <ion-icon name="close-outline"></ion-icon>
+              </button>
+            </header>
+            <div class="original-image-viewer__stage">
+              <img *ngIf="item?.image?.originalUrl" [src]="item?.image?.originalUrl" [alt]="item?.name || 'Original wardrobe image'">
+            </div>
+          </ion-content>
+        </ng-template>
+      </ion-modal>
     </ion-content>
   `
 })
@@ -1402,6 +1417,7 @@ export class ItemDetailPage implements OnDestroy {
   isSaving = false;
   isMarkingWorn = false;
   isArchiving = false;
+  isOriginalImageOpen = false;
   itemMode: ItemDetailMode = 'view';
   private imageGenerationStatusStream: ImageGenerationStatusStream | null = null;
   private readonly imageGenerationPollingIntervalMs = 1800;
@@ -1445,6 +1461,7 @@ export class ItemDetailPage implements OnDestroy {
     this.isLoading = true;
     this.message = '';
     this.item = null;
+    this.isOriginalImageOpen = false;
     this.setItemMode('view');
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
@@ -1610,6 +1627,18 @@ export class ItemDetailPage implements OnDestroy {
     return status === 'queued' || status === 'generating';
   }
 
+  openOriginalImage(): void {
+    if (!this.item?.image.originalUrl) {
+      return;
+    }
+
+    this.isOriginalImageOpen = true;
+  }
+
+  closeOriginalImage(): void {
+    this.isOriginalImageOpen = false;
+  }
+
   async markWorn(): Promise<void> {
     if (!this.item) return;
     if (this.isMarkingWorn) {
@@ -1722,7 +1751,7 @@ export class ItemDetailPage implements OnDestroy {
             <button type="button" class="chip" *ngFor="let chip of chips" (click)="append(chip)">{{ chip }}</button>
           </div>
           <ion-button class="primary-button" expand="block" (click)="search()" [disabled]="isBusy || !query.trim()">{{ isBuildingOutfits ? 'Building...' : 'Build outfits' }}</ion-button>
-          <p class="muted consent-note">Wardrobe AI sends your outfit request and wardrobe item details to OpenAI to generate outfit suggestions.</p>
+          <p class="muted consent-note">Wardrobe AI sends your outfit request and wardrobe item details to Google Gemini to generate outfit suggestions.</p>
           <div class="status-line" *ngIf="isBuildingOutfits"><ion-spinner name="crescent"></ion-spinner><span>Building outfit suggestions...</span></div>
         </article>
         <article class="panel form-stack manual-builder">
@@ -1763,8 +1792,8 @@ export class ItemDetailPage implements OnDestroy {
         </article>
         <h2 class="section-title" *ngIf="results.length">Outfit ideas</h2>
         <article class="outfit-card idea-card" *ngFor="let outfit of results">
-          <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [src]="outfit.imageUrl" [alt]="outfit.title">
-          <div class="outfit-images" *ngIf="!outfit.imageUrl">
+          <img class="outfit-hero-image" *ngIf="outfit.displayImageUrl" [src]="outfit.displayImageUrl" [alt]="outfit.title">
+          <div class="outfit-images" *ngIf="!outfit.displayImageUrl">
             <img *ngFor="let id of outfit.itemIds" [src]="imageFor(id)" [alt]="nameFor(id)">
           </div>
           <div class="outfit-copy">
@@ -1840,9 +1869,9 @@ export class BuilderPage {
 
   async search(): Promise<void> {
     if (!await ensureAiConsent(
-      'Wardrobe AI uses OpenAI to interpret your outfit request and generate outfit suggestions from your wardrobe. Do you want to continue with AI processing for this device?'))
+      'Wardrobe AI uses Google Gemini to interpret your outfit request and generate outfit suggestions from your wardrobe. Do you want to continue with AI processing for this device?'))
     {
-      this.message = 'OpenAI consent is required before Wardrobe AI can build outfit suggestions.';
+      this.message = 'Gemini consent is required before Wardrobe AI can build outfit suggestions.';
       return;
     }
 
@@ -2370,7 +2399,7 @@ export class OutfitsPage implements OnDestroy {
             <strong>{{ aiUsageTotalLabel }}</strong>
           </div>
           <p class="muted" *ngIf="aiUsage">Based on {{ aiUsage.wardrobeItemClassifications }} item scans, {{ aiUsage.outfitSearches }} saved AI outfit searches, and {{ aiUsage.displayImages + aiUsage.outfitImages }} generated images.</p>
-          <p class="muted">{{ aiConsentAccepted ? 'This device is allowed to send wardrobe photos and outfit requests to OpenAI.' : 'This device has not granted OpenAI processing consent yet.' }}</p>
+          <p class="muted">{{ aiConsentAccepted ? 'This device is allowed to send wardrobe photos and outfit requests to Google Gemini.' : 'This device has not granted Gemini processing consent yet.' }}</p>
           <p class="muted">{{ aiDisclosure }}</p>
           <ion-button class="secondary-button" fill="outline" (click)="resetAiConsent()" [disabled]="isBusy || !aiConsentAccepted">Require consent again</ion-button>
           <p class="muted" *ngIf="message">{{ message }}</p>
@@ -2453,13 +2482,13 @@ export class SettingsPage {
   }
 
   async resetAiConsent(): Promise<void> {
-    if (!this.aiConsentAccepted || !window.confirm('Require consent again for OpenAI wardrobe processing on this device?')) {
+    if (!this.aiConsentAccepted || !window.confirm('Require consent again for Gemini wardrobe processing on this device?')) {
       return;
     }
 
     await clearAiConsent();
     this.aiConsentAccepted = false;
-    this.message = 'OpenAI consent was cleared for this device.';
+    this.message = 'Gemini consent was cleared for this device.';
   }
 
   async deleteAccount(): Promise<void> {
@@ -2597,11 +2626,11 @@ function isActivewearBottomSubcategory(subcategoryId: string): boolean {
   return /(^|[_-])(bottom|short|shorts|legging|leggings|pant|pants|trouser|tights|jogger|joggers)($|[_-])/i.test(normalised);
 }
 
-const AI_CONSENT_KEY = 'wardrobe-ai-openai-consent';
+const AI_CONSENT_KEY = 'wardrobe-ai-gemini-consent';
 const PRIVACY_POLICY_URL = 'https://wardrobe.ai/privacy';
 const TERMS_OF_USE_URL = 'https://wardrobe.ai/terms';
 const SUPPORT_URL = 'mailto:support@wardrobe.ai';
-const AI_DISCLOSURE_TEXT = 'Wardrobe AI uses OpenAI to classify wardrobe photos, generate cleaned display images, and suggest outfits from your saved wardrobe. Avoid uploading photos or prompts that you do not want processed by that provider.';
+const AI_DISCLOSURE_TEXT = 'Wardrobe AI uses Google Gemini to classify wardrobe photos, generate cleaned display images, and suggest outfits from your saved wardrobe. Avoid uploading photos or prompts that you do not want processed by that provider.';
 const MAX_BATCH_UPLOAD_COUNT = 10;
 const MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024;
 const IMAGE_COMPRESSION_TRIGGER_BYTES = 1.5 * 1024 * 1024;

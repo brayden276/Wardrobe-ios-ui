@@ -114,6 +114,7 @@ export interface GeneratedOutfitDto {
   itemIds: string[];
   explanation: string;
   imageUrl: string | null;
+  displayImageUrl?: string | null;
 }
 
 export interface OutfitDto {

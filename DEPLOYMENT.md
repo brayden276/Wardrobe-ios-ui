@@ -36,7 +36,9 @@ The App Store Connect API key must be a Team key with access to Certificates, Id
 
 The first signing setup or a future signing repair can be run from the `iOS Release` workflow by setting `repair_signing_assets=true`. Normal release runs should leave that input as `false`, which makes fastlane match read-only in CI.
 
-After the variables and secrets are configured:
+After the variables and secrets are configured, successful `UI CI` runs on `main` automatically trigger the `iOS Release` workflow and upload the signed IPA to TestFlight.
+
+To run the release workflow manually:
 
 1. Open the `iOS Release` workflow in GitHub Actions.
 2. Run it with `upload_to_testflight=true` for a full signed release upload, or `false` to build only and keep the IPA as a workflow artifact.

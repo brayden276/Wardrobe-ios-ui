@@ -3,6 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { apiBaseUrl } from './api-url';
 import { AuthService } from './auth.service';
+import { DeviceImageCacheService } from './device-image-cache.service';
 import {
   AiUsageCostSummaryDto,
   BatchWardrobeItemsResponse,
@@ -22,6 +23,7 @@ export interface ImageGenerationStatusStream {
 export class WardrobeApiService {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
+  private readonly imageCache = inject(DeviceImageCacheService);
   private readonly apiBaseUrl = apiBaseUrl();
   private lookupsPromise: Promise<WardrobeLookupsDto> | null = null;
 
@@ -37,7 +39,7 @@ export class WardrobeApiService {
   async getItems(params: Record<string, string | number | boolean | null | undefined> = {}): Promise<WardrobeItemDto[]> {
     const query = this.queryString(params);
     const response = await this.authorized(() => firstValueFrom(this.http.get<{ items: WardrobeItemDto[] }>(this.url(`/api/wardrobe/items${query ? `?${query}` : ''}`), this.authOptions())));
-    return response.items.map((item) => this.normaliseItem(item));
+    return Promise.all(response.items.map((item) => this.normaliseItem(item)));
   }
 
   async getItem(id: string): Promise<WardrobeItemDto> {
@@ -60,10 +62,10 @@ export class WardrobeApiService {
     const response = await this.authorized(() => firstValueFrom(this.http.post<BatchWardrobeItemsResponse>(this.url('/api/wardrobe/items/batch'), body, this.authOptions())));
     return {
       ...response,
-      results: response.results.map((result) => ({
+      results: await Promise.all(response.results.map(async (result) => ({
         ...result,
-        item: result.item ? this.normaliseItem(result.item) : null
-      }))
+        item: result.item ? await this.normaliseItem(result.item) : null
+      })))
     };
   }
 
@@ -78,9 +80,13 @@ export class WardrobeApiService {
 
   async searchOutfits(query: string, requiredItemId: string | null = null): Promise<GeneratedOutfitDto[]> {
     const response = await this.authorized(() => firstValueFrom(this.http.post<{ outfits: GeneratedOutfitDto[] }>(this.url('/api/outfits/search'), { query, requiredItemId }, this.authOptions())));
-    return response.outfits.map((outfit) => ({
-      ...outfit,
-      imageUrl: this.normaliseAssetUrl(outfit.imageUrl)
+    return Promise.all(response.outfits.map(async (outfit) => {
+      const imageUrl = this.normaliseAssetUrl(outfit.imageUrl);
+      return {
+        ...outfit,
+        imageUrl,
+        displayImageUrl: await this.imageCache.resolve(imageUrl)
+      };
     }));
   }
 
@@ -91,7 +97,7 @@ export class WardrobeApiService {
 
   async getOutfits(): Promise<OutfitDto[]> {
     const response = await this.authorized(() => firstValueFrom(this.http.get<{ outfits: OutfitDto[] }>(this.url('/api/outfits'), this.authOptions())));
-    return response.outfits.map((outfit) => this.normaliseOutfit(outfit));
+    return Promise.all(response.outfits.map((outfit) => this.normaliseOutfit(outfit)));
   }
 
   streamImageGenerationStatuses(
@@ -255,24 +261,28 @@ export class WardrobeApiService {
     }
   }
 
-  private normaliseOutfit(outfit: OutfitDto): OutfitDto {
+  private async normaliseOutfit(outfit: OutfitDto): Promise<OutfitDto> {
     return {
       ...outfit,
-      imageUrl: this.normaliseAssetUrl(outfit.imageUrl),
-      items: outfit.items.map((item) => this.normaliseItem(item))
+      imageUrl: await this.normaliseDisplayAssetUrl(outfit.imageUrl),
+      items: await Promise.all(outfit.items.map((item) => this.normaliseItem(item)))
     };
   }
 
-  private normaliseItem(item: WardrobeItemDto): WardrobeItemDto {
+  private async normaliseItem(item: WardrobeItemDto): Promise<WardrobeItemDto> {
     return {
       ...item,
       image: {
         originalUrl: this.normaliseAssetUrl(item.image.originalUrl) ?? '',
-        displayUrl: this.normaliseAssetUrl(item.image.displayUrl) ?? '',
+        displayUrl: await this.normaliseDisplayAssetUrl(item.image.displayUrl) ?? '',
         canonicalUrl: this.normaliseAssetUrl(item.image.canonicalUrl),
         thumbnailUrl: this.normaliseAssetUrl(item.image.thumbnailUrl)
       }
     };
+  }
+
+  private async normaliseDisplayAssetUrl(value: string | null): Promise<string | null> {
+    return this.imageCache.resolve(this.normaliseAssetUrl(value));
   }
 
   private normaliseAssetUrl(value: string | null): string | null {

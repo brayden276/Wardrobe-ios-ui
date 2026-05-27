@@ -12,8 +12,8 @@
 
 - Verify `ios/App/App/PrivacyInfo.xcprivacy` is still accurate for the shipped SDK set.
 - Verify `ios/App/App/Info.plist` camera and photo library usage strings still describe the app accurately.
-- Confirm the first AI-powered upload and outfit generation flows still require OpenAI consent on-device.
-- Prepare App Privacy answers that match the hosted backend and OpenAI processing path.
+- Confirm the first AI-powered upload and outfit generation flows still require Gemini consent on-device.
+- Prepare App Privacy answers that match the hosted backend and Gemini processing path.
 
 ## Submission Notes
 
