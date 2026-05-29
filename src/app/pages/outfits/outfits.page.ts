@@ -20,6 +20,7 @@ export class OutfitsPage implements OnDestroy {
   private readonly deletingOutfitIds = new Set<string>();
   private readonly outfitGenerationPollingIntervalMs = 1800;
   private readonly outfitRenderIncrement = 20;
+  readonly outfitImageGenerationSteps = ['Collecting items', 'Styling layout', 'Rendering preview', 'Finalising image'];
   private outfitGenerationPollTimeout: ReturnType<typeof setTimeout> | null = null;
   private isRefreshingOutfits = false;
   visibleOutfitCount = this.outfitRenderIncrement;
@@ -201,14 +202,44 @@ export class OutfitsPage implements OnDestroy {
   outfitGenerationMessage(status: string | null): string | null {
     switch (status) {
       case 'queued':
-        return 'Image generation queued...';
+        return 'We are collecting the outfit images and starting the render.';
       case 'generating':
-        return 'Generating outfit image...';
+        return 'Rendering the outfit preview. Multiple saved outfits render in parallel.';
       case 'failed':
-        return 'Image generation failed.';
+        return 'Preview render did not finish, but the outfit is saved and item photos are shown.';
       default:
         return null;
     }
+  }
+
+  outfitGenerationTitle(status: string | null): string {
+    switch (status) {
+      case 'queued':
+        return 'Preparing preview';
+      case 'generating':
+        return 'Building outfit image';
+      case 'failed':
+        return 'Preview unavailable';
+      default:
+        return '';
+    }
+  }
+
+  outfitGenerationStepState(status: string | null, index: number): string {
+    const activeStep = this.outfitGenerationActiveStep(status);
+    if (activeStep < 0) {
+      return '';
+    }
+
+    if (status === 'failed') {
+      return index < activeStep ? 'complete' : index === activeStep ? 'failed' : 'pending';
+    }
+
+    if (index < activeStep) {
+      return 'complete';
+    }
+
+    return index === activeStep ? 'active' : 'pending';
   }
 
   isOutfitImageGenerationInProgress(status: string | null): boolean {
@@ -290,6 +321,19 @@ export class OutfitsPage implements OnDestroy {
       : candidate);
     if (this.selectedOutfit?.id === outfitId) {
       this.selectedOutfit = this.outfits.find((candidate) => candidate.id === outfitId) ?? null;
+    }
+  }
+
+  private outfitGenerationActiveStep(status: string | null): number {
+    switch (status) {
+      case 'queued':
+        return 0;
+      case 'generating':
+        return 2;
+      case 'failed':
+        return 3;
+      default:
+        return -1;
     }
   }
 }

@@ -24,8 +24,17 @@
             <div class="outfit-copy">
               <h3>{{ outfit.name }}</h3>
               <p class="muted">{{ outfit.explanation || 'Saved from your wardrobe.' }}</p>
-              <div class="muted" *ngIf="outfitGenerationMessage(outfit.imageGenerationStatus) as status">
-                <span>{{ status }}</span>
+              <div class="outfit-generation-progress compact" *ngIf="outfitGenerationMessage(outfit.imageGenerationStatus) as status" [class.failed]="outfit.imageGenerationStatus === 'failed'">
+                <div class="generation-orbit" aria-hidden="true"><span></span><span></span><span></span></div>
+                <div class="generation-copy">
+                  <strong>{{ outfitGenerationTitle(outfit.imageGenerationStatus) }}</strong>
+                  <p>{{ status }}</p>
+                  <ol class="generation-steps">
+                    <li *ngFor="let step of outfitImageGenerationSteps; let index = index" [class]="outfitGenerationStepState(outfit.imageGenerationStatus, index)">
+                      <span></span>{{ step }}
+                    </li>
+                  </ol>
+                </div>
               </div>
               <div class="outfit-item-list">
                 <span *ngFor="let item of outfit.items">{{ item.name }}</span>
@@ -53,10 +62,18 @@
             </button>
           </div>
           <img class="outfit-detail-image" *ngIf="selectedOutfit.imageUrl" [appLazyImage]="selectedOutfit.imageUrl" [appLazyImagePriority]="true" [alt]="selectedOutfit.name" loading="eager" decoding="async">
-          <p class="muted center-message image-status-line" *ngIf="outfitGenerationMessage(selectedOutfit.imageGenerationStatus)">
-            <ion-spinner *ngIf="isOutfitImageGenerationInProgress(selectedOutfit.imageGenerationStatus)" name="crescent"></ion-spinner>
-            <span>{{ outfitGenerationMessage(selectedOutfit.imageGenerationStatus) }}</span>
-          </p>
+          <div class="outfit-generation-progress detail" *ngIf="outfitGenerationMessage(selectedOutfit.imageGenerationStatus) as status" [class.failed]="selectedOutfit.imageGenerationStatus === 'failed'">
+            <div class="generation-orbit" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="generation-copy">
+              <strong>{{ outfitGenerationTitle(selectedOutfit.imageGenerationStatus) }}</strong>
+              <p>{{ status }}</p>
+              <ol class="generation-steps">
+                <li *ngFor="let step of outfitImageGenerationSteps; let index = index" [class]="outfitGenerationStepState(selectedOutfit.imageGenerationStatus, index)">
+                  <span></span>{{ step }}
+                </li>
+              </ol>
+            </div>
+          </div>
           <div class="outfit-detail-items">
             <div class="outfit-detail-item" *ngFor="let item of selectedOutfit.items">
               <img [appLazyImage]="outfitItemImageUrl(item)" [alt]="item.name" loading="lazy" decoding="async">
