@@ -271,9 +271,27 @@ export class WardrobeApiService {
     try {
       return await request();
     } catch (error) {
+      if (this.isUnauthorized(error)) {
+        const refreshed = await this.auth.refreshSession();
+        if (refreshed) {
+          try {
+            return await request();
+          } catch (retryError) {
+            await this.auth.handleUnauthorized(retryError);
+            throw retryError;
+          }
+        }
+
+        throw error;
+      }
+
       await this.auth.handleUnauthorized(error);
       throw error;
     }
+  }
+
+  private isUnauthorized(error: unknown): boolean {
+    return (error as { status?: number }).status === 401;
   }
 
   private async readImageGenerationStatusStream(

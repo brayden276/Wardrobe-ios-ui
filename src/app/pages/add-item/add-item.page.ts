@@ -388,20 +388,20 @@ export class AddItemPage {
 
     const originalBytes = file.size;
     const fileName = file.name || 'wardrobe-item.jpg';
-    if (originalBytes <= IMAGE_COMPRESSION_TRIGGER_BYTES) {
-      return {
-        file,
-        name: fileName,
-        originalBytes,
-        preparedBytes: originalBytes
-      };
-    }
-
     const sourceUrl = URL.createObjectURL(file);
     try {
       const image = await this.decodeImage(sourceUrl);
       if (image.naturalWidth < IMAGE_MIN_SIDE || image.naturalHeight < IMAGE_MIN_SIDE) {
         throw new Error('Images must be at least 600x600 for reliable classification.');
+      }
+
+      if (originalBytes <= IMAGE_COMPRESSION_TRIGGER_BYTES) {
+        return {
+          file,
+          name: fileName,
+          originalBytes,
+          preparedBytes: originalBytes
+        };
       }
 
       const canvas = document.createElement('canvas');

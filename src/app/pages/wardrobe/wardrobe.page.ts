@@ -42,8 +42,8 @@ export class WardrobePage implements OnDestroy {
   virtualEndIndex = 0;
   private loadDebounceHandle: ReturnType<typeof setTimeout> | null = null;
   private readonly loadDebounceMs = 250;
-  private readonly virtualColumns = 2;
-  private readonly virtualRowHeight = 258;
+  private virtualColumns = 2;
+  private virtualRowHeight = 258;
   private readonly virtualOverscanRows = 3;
   private readonly firstPreloadItemCount = 2;
   private viewportHeight = 900;
@@ -202,13 +202,42 @@ export class WardrobePage implements OnDestroy {
   }
 
   onWardrobeScroll(event: CustomEvent<{ scrollTop: number }>): void {
-    this.viewportHeight = Math.max(1, window.innerHeight || this.viewportHeight);
+    this.syncVirtualMetrics();
     this.updateVirtualWindow(event.detail.scrollTop);
   }
 
   private resetVirtualWindow(): void {
+    this.syncVirtualMetrics();
     this.virtualStartIndex = 0;
     this.virtualEndIndex = Math.min(this.items.length, this.virtualColumns * (Math.ceil(this.viewportHeight / this.virtualRowHeight) + this.virtualOverscanRows));
+  }
+
+  private syncVirtualMetrics(): void {
+    this.viewportHeight = Math.max(1, window.innerHeight || this.viewportHeight);
+    const grid = this.wardrobeGrid?.nativeElement;
+    if (!grid) {
+      return;
+    }
+
+    const styles = window.getComputedStyle(grid);
+    const columnCount = styles.gridTemplateColumns
+      .split(' ')
+      .filter((value) => value && value !== 'none')
+      .length;
+    if (columnCount > 0) {
+      this.virtualColumns = columnCount;
+    }
+
+    const firstCard = grid.querySelector<HTMLElement>('.item-card');
+    if (!firstCard) {
+      return;
+    }
+
+    const rowGap = Number.parseFloat(styles.rowGap || '0') || 0;
+    const cardHeight = firstCard.getBoundingClientRect().height;
+    if (cardHeight > 0) {
+      this.virtualRowHeight = Math.max(1, Math.ceil(cardHeight + rowGap));
+    }
   }
 
   private updateVirtualWindow(scrollTop: number): void {

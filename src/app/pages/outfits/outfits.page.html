@@ -14,7 +14,7 @@
           <p class="muted">{{ message }}</p>
         </article>
         <ng-container *ngIf="!selectedOutfit">
-          <article class="outfit-card" *ngFor="let outfit of outfits">
+          <article class="outfit-card" *ngFor="let outfit of visibleOutfits; trackBy: trackById">
             <button type="button" class="outfit-open" (click)="open(outfit)">
               <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [appLazyImage]="outfit.imageUrl" [alt]="outfit.name" loading="lazy" decoding="async">
             </button>
@@ -43,6 +43,7 @@
               </ion-button>
             </div>
           </article>
+          <ion-button class="secondary-button" fill="outline" expand="block" *ngIf="canShowMoreOutfits" (click)="showMoreOutfits()">Show more outfits</ion-button>
         </ng-container>
         <article class="panel outfit-detail-panel" *ngIf="selectedOutfit">
           <div class="panel-heading">

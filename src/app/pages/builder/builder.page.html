@@ -38,11 +38,12 @@
               </div>
               <div class="include-strip">
                 <button type="button" class="include-item include-any" [class.selected]="!requiredItemId" (click)="selectRequiredItem(null)">Any item</button>
-                <button type="button" class="include-item" *ngFor="let item of items; trackBy: trackById" [class.selected]="requiredItemId === item.id" (click)="selectRequiredItem(item.id)">
+                <button type="button" class="include-item" *ngFor="let item of includeItems; trackBy: trackById" [class.selected]="requiredItemId === item.id" (click)="selectRequiredItem(item.id)">
                   <img [appLazyImage]="itemImageUrl(item)" [alt]="item.name" loading="lazy" decoding="async">
                   <span>{{ item.name }}</span>
                 </button>
               </div>
+              <ion-button class="quiet-button compact-button" fill="clear" size="small" *ngIf="canShowMoreBuilderItems" (click)="showMoreBuilderItems()">Show more items</ion-button>
             </div>
             <div class="textarea-wrap">
               <ion-textarea class="field outfit-query" rows="3" maxlength="160" [(ngModel)]="query" placeholder="Add anything specific, like using black jeans or no heels"></ion-textarea>
@@ -111,7 +112,7 @@
             <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="selectAllItems()" [disabled]="!items.length || isBusy">Select all</ion-button>
           </div>
           <div class="manual-grid" *ngIf="items.length">
-            <button type="button" class="item-card manual-item" *ngFor="let item of items; trackBy: trackById" [class.selected]="isManualSelected(item.id)" (click)="toggleManualItem(item.id)">
+            <button type="button" class="item-card manual-item" *ngFor="let item of manualItems; trackBy: trackById" [class.selected]="isManualSelected(item.id)" (click)="toggleManualItem(item.id)">
               <div class="item-card__image-wrap manual-item__image-wrap">
                 <img [appLazyImage]="itemImageUrl(item)" [alt]="item.name" loading="lazy" decoding="async">
                 <span class="manual-item__check">
@@ -127,6 +128,7 @@
               </div>
             </button>
           </div>
+          <ion-button class="secondary-button" fill="outline" expand="block" *ngIf="canShowMoreBuilderItems" (click)="showMoreBuilderItems()">Show more wardrobe items</ion-button>
           <p class="muted" *ngIf="!items.length">Load wardrobe items to build a manual outfit.</p>
           <p class="muted" *ngIf="manualItemIds.length && !manualCanSave">{{ manualHint }}</p>
           <ion-button class="primary-button" expand="block" *ngIf="manualItemIds.length" (click)="saveManual()" [disabled]="isBusy || !manualCanSave">{{ isSavingManualOutfit ? 'Saving...' : 'Save outfit' }}</ion-button>

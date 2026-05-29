@@ -19,8 +19,22 @@ export class OutfitsPage implements OnDestroy {
   private readonly markingOutfitIds = new Set<string>();
   private readonly deletingOutfitIds = new Set<string>();
   private readonly outfitGenerationPollingIntervalMs = 1800;
+  private readonly outfitRenderIncrement = 20;
   private outfitGenerationPollTimeout: ReturnType<typeof setTimeout> | null = null;
   private isRefreshingOutfits = false;
+  visibleOutfitCount = this.outfitRenderIncrement;
+
+  get visibleOutfits(): OutfitDto[] {
+    return this.outfits.slice(0, this.visibleOutfitCount);
+  }
+
+  get canShowMoreOutfits(): boolean {
+    return this.visibleOutfitCount < this.outfits.length;
+  }
+
+  showMoreOutfits(): void {
+    this.visibleOutfitCount = Math.min(this.outfits.length, this.visibleOutfitCount + this.outfitRenderIncrement);
+  }
 
   async ionViewWillEnter(): Promise<void> {
     await this.load();
@@ -207,6 +221,14 @@ export class OutfitsPage implements OnDestroy {
     this.message = '';
     try {
       await this.api.markWorn(outfit.id);
+      try {
+        const outfits = await this.api.getOutfits({ forceRefresh: true });
+        const selectedOutfitId = this.selectedOutfit?.id ?? null;
+        this.outfits = outfits;
+        this.selectedOutfit = selectedOutfitId ? outfits.find((candidate) => candidate.id === selectedOutfitId) ?? null : null;
+      } catch {
+        this.updateOutfitAfterWear(outfit.id);
+      }
       this.message = 'Marked as worn.';
     } catch (error) {
       this.message = readMessage(error, 'Could not mark outfit as worn.');
@@ -248,7 +270,26 @@ export class OutfitsPage implements OnDestroy {
     return this.deletingOutfitIds.has(outfitId);
   }
 
+  trackById(_: number, outfit: OutfitDto): string {
+    return outfit.id;
+  }
+
   outfitItemImageUrl(item: OutfitDto['items'][number]): string {
     return item.image.thumbnailUrl || item.image.displayUrl;
+  }
+
+  private updateOutfitAfterWear(outfitId: string): void {
+    const now = new Date().toISOString();
+    this.outfits = this.outfits.map((candidate) => candidate.id === outfitId
+      ? {
+          ...candidate,
+          wearCount: candidate.wearCount + 1,
+          lastWornAt: now,
+          updatedAt: now
+        }
+      : candidate);
+    if (this.selectedOutfit?.id === outfitId) {
+      this.selectedOutfit = this.outfits.find((candidate) => candidate.id === outfitId) ?? null;
+    }
   }
 }

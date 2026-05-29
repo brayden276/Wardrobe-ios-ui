@@ -1,9 +1,11 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
+import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
 export class DeviceImageCacheService {
+  private readonly auth = inject(AuthService);
   private readonly cacheDirectory = 'image-cache';
   private readonly inFlight = new Map<string, Promise<string>>();
   private readonly resolvedUrls = new Map<string, string>();
@@ -54,7 +56,10 @@ export class DeviceImageCacheService {
     }
 
     try {
-      const response = await fetch(url);
+      const accessToken = this.auth.token;
+      const response = await fetch(url, accessToken
+        ? { headers: { Authorization: `Bearer ${accessToken}` } }
+        : undefined);
       if (!response.ok) {
         return url;
       }

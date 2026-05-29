@@ -266,7 +266,24 @@ export class ItemDetailPage implements OnDestroy {
     this.isMarkingWorn = true;
     this.message = 'Marking item as worn...';
     try {
-      await this.api.markItemWorn(this.item.id);
+      const currentItem = this.item;
+      const itemId = currentItem.id;
+      await this.api.markItemWorn(itemId);
+      try {
+        const latestItem = await this.api.getItem(itemId);
+        this.item = latestItem;
+        this.form = { ...latestItem, secondaryColourIds: latestItem.secondaryColourIds.slice() };
+      } catch {
+        const fallbackItem = this.item ?? currentItem;
+        const now = new Date().toISOString();
+        this.item = {
+          ...fallbackItem,
+          wearCount: fallbackItem.wearCount + 1,
+          lastWornAt: now,
+          updatedAt: now
+        };
+        this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
+      }
       this.message = 'Marked as worn.';
     } catch (error) {
       this.message = readMessage(error, 'Could not mark item as worn.');

@@ -45,9 +45,42 @@ export class BuilderPage {
   private readonly savingGeneratedOutfitKeys = new Set<string>();
   private readonly savedGeneratedOutfitKeys = new Set<string>();
   private readonly failedGeneratedOutfitKeys = new Set<string>();
+  private readonly builderItemRenderIncrement = 60;
+  visibleBuilderItemCount = this.builderItemRenderIncrement;
 
   get isBusy(): boolean {
     return this.isBuildingOutfits || this.isSavingManualOutfit;
+  }
+
+  get includeItems(): WardrobeItemDto[] {
+    const visibleItems = this.items.slice(0, this.visibleBuilderItemCount);
+    if (!this.requiredItemId || visibleItems.some((item) => item.id === this.requiredItemId)) {
+      return visibleItems;
+    }
+
+    const requiredItem = this.items.find((item) => item.id === this.requiredItemId);
+    return requiredItem ? [requiredItem, ...visibleItems] : visibleItems;
+  }
+
+  get manualItems(): WardrobeItemDto[] {
+    const visibleItems = this.items.slice(0, this.visibleBuilderItemCount);
+    if (!this.manualItemIds.length) {
+      return visibleItems;
+    }
+
+    const visibleIds = new Set(visibleItems.map((item) => item.id));
+    const selectedOutsideVisibleRange = this.selectedManualItems()
+      .filter((item) => !visibleIds.has(item.id))
+      .slice(0, 20);
+    return [...selectedOutsideVisibleRange, ...visibleItems];
+  }
+
+  get canShowMoreBuilderItems(): boolean {
+    return this.visibleBuilderItemCount < this.items.length;
+  }
+
+  showMoreBuilderItems(): void {
+    this.visibleBuilderItemCount = Math.min(this.items.length, this.visibleBuilderItemCount + this.builderItemRenderIncrement);
   }
 
   get canGenerate(): boolean {
@@ -205,8 +238,9 @@ export class BuilderPage {
     try {
       await this.api.saveOutfit(outfit.title, this.lastGeneratedPrompt || this.buildOutfitQuery(), outfit.explanation, outfit.itemIds, outfit.imageUrl);
       this.savedGeneratedOutfitKeys.add(key);
-    } catch {
+    } catch (error) {
       this.failedGeneratedOutfitKeys.add(key);
+      this.message = readMessage(error, 'Could not save outfit.');
     } finally {
       this.savingGeneratedOutfitKeys.delete(key);
     }

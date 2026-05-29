@@ -19,6 +19,7 @@ export class AuthService {
   private readonly apiBaseUrl = apiBaseUrl();
   private readonly sessionSubject = new BehaviorSubject<Session | null>(null);
   private restorePromise: Promise<void> | null = null;
+  private refreshPromise: Promise<boolean> | null = null;
   readonly session$ = this.sessionSubject.asObservable();
 
   get session(): Session | null {
@@ -44,22 +45,44 @@ export class AuthService {
       return;
     }
 
+    let session: Session;
     try {
-      const session = JSON.parse(stored.value) as Session;
-      if (!session.accessToken || !session.refreshToken || !session.user) {
-        await this.clearSession();
-        return;
-      }
-
-      this.sessionSubject.next(session);
-      if (this.isExpired(session)) {
-        await this.refresh();
-        return;
-      }
-
-      await this.validateSession();
+      session = JSON.parse(stored.value) as Session;
     } catch {
       await this.clearSession();
+      return;
+    }
+
+    if (!session.accessToken || !session.refreshToken || !session.user) {
+      await this.clearSession();
+      return;
+    }
+
+    this.sessionSubject.next(session);
+    if (this.isExpired(session)) {
+      await this.refreshSession();
+      return;
+    }
+
+    try {
+      await this.validateSession();
+    } catch (error) {
+      if (!this.isUnauthorized(error)) {
+        return;
+      }
+
+      const refreshed = await this.refreshSession();
+      if (!refreshed) {
+        return;
+      }
+
+      try {
+        await this.validateSession();
+      } catch (validationError) {
+        if (this.isUnauthorized(validationError)) {
+          await this.clearSession();
+        }
+      }
     }
   }
 
@@ -100,20 +123,40 @@ export class AuthService {
   }
 
   async handleUnauthorized(error: unknown): Promise<void> {
-    if ((error as { status?: number }).status === 401) {
+    if (this.isUnauthorized(error)) {
       await this.clearSession();
     }
   }
 
-  private async refresh(): Promise<void> {
+  async refreshSession(): Promise<boolean> {
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = this.refreshCore().finally(() => {
+      this.refreshPromise = null;
+    });
+    return this.refreshPromise;
+  }
+
+  private async refreshCore(): Promise<boolean> {
     const refreshToken = this.session?.refreshToken;
     if (!refreshToken) {
       await this.clearSession();
-      return;
+      return false;
     }
 
-    const response = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/api/auth/refresh`, { refreshToken }));
-    await this.setSession(response);
+    try {
+      const response = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/api/auth/refresh`, { refreshToken }));
+      await this.setSession(response);
+      return true;
+    } catch (error) {
+      if (this.isUnauthorized(error)) {
+        await this.clearSession();
+      }
+
+      return false;
+    }
   }
 
   private async validateSession(): Promise<void> {
@@ -138,6 +181,10 @@ export class AuthService {
   private isExpired(session: Session): boolean {
     const expiresAt = Date.parse(session.expiresAt);
     return Number.isNaN(expiresAt) || expiresAt <= Date.now() + 60_000;
+  }
+
+  private isUnauthorized(error: unknown): boolean {
+    return (error as { status?: number }).status === 401;
   }
 
   private async clearSession(): Promise<void> {
