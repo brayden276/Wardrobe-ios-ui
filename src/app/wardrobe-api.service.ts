@@ -19,6 +19,17 @@ export interface ImageGenerationStatusStream {
   close(): void;
 }
 
+interface CachedApiResponse<T> {
+  expiresAt: number;
+  promise: Promise<T>;
+}
+
+interface ApiReadOptions {
+  forceRefresh?: boolean;
+}
+
+type WardrobeItemResponse = WardrobeItemDto | { item: WardrobeItemDto };
+
 @Injectable({ providedIn: 'root' })
 export class WardrobeApiService {
   private readonly http = inject(HttpClient);
@@ -26,6 +37,10 @@ export class WardrobeApiService {
   private readonly imageCache = inject(DeviceImageCacheService);
   private readonly apiBaseUrl = apiBaseUrl();
   private lookupsPromise: Promise<WardrobeLookupsDto> | null = null;
+  private readonly cacheTtlMs = 30_000;
+  private readonly itemsCache = new Map<string, CachedApiResponse<WardrobeItemDto[]>>();
+  private readonly outfitsCacheKey = 'all';
+  private readonly outfitsCache = new Map<string, CachedApiResponse<OutfitDto[]>>();
 
   async getLookups(): Promise<WardrobeLookupsDto> {
     this.lookupsPromise ??= this.authorized(() => firstValueFrom(this.http.get<WardrobeLookupsDto>(this.url('/api/lookups/wardrobe'), this.authOptions())))
@@ -36,20 +51,33 @@ export class WardrobeApiService {
     return this.lookupsPromise;
   }
 
-  async getItems(params: Record<string, string | number | boolean | null | undefined> = {}): Promise<WardrobeItemDto[]> {
+  async getItems(
+    params: Record<string, string | number | boolean | null | undefined> = {},
+    options: ApiReadOptions = {}
+  ): Promise<WardrobeItemDto[]> {
     const query = this.queryString(params);
-    const response = await this.authorized(() => firstValueFrom(this.http.get<{ items: WardrobeItemDto[] }>(this.url(`/api/wardrobe/items${query ? `?${query}` : ''}`), this.authOptions())));
-    return Promise.all(response.items.map((item) => this.normaliseItem(item, false)));
+    const cacheKey = query || 'all';
+    const cached = options.forceRefresh ? null : this.getCached(this.itemsCache, cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    return this.setCached(this.itemsCache, cacheKey, async () => {
+      const response = await this.authorized(() => firstValueFrom(this.http.get<{ items: WardrobeItemDto[] }>(this.url(`/api/wardrobe/items${query ? `?${query}` : ''}`), this.authOptions())));
+      return Promise.all(response.items.map((item) => this.normaliseItem(item, false)));
+    });
   }
 
   async getItem(id: string): Promise<WardrobeItemDto> {
-    return this.normaliseItem(await this.authorized(() => firstValueFrom(this.http.get<WardrobeItemDto>(this.url(`/api/wardrobe/items/${id}`), this.authOptions()))));
+    const response = await this.authorized(() => firstValueFrom(this.http.get<WardrobeItemResponse>(this.url(`/api/wardrobe/items/${id}`), this.authOptions())));
+    return this.normaliseItem(this.unwrapItemResponse(response));
   }
 
   async createItem(image: Blob, fileName: string): Promise<WardrobeItemDto> {
     const body = new FormData();
     body.append('image', image, fileName);
     const response = await this.authorized(() => firstValueFrom(this.http.post<{ item: WardrobeItemDto }>(this.url('/api/wardrobe/items'), body, this.authOptions())));
+    this.clearWardrobeCaches();
     return this.normaliseItem(response.item);
   }
 
@@ -60,6 +88,7 @@ export class WardrobeApiService {
     }
 
     const response = await this.authorized(() => firstValueFrom(this.http.post<BatchWardrobeItemsResponse>(this.url('/api/wardrobe/items/batch'), body, this.authOptions())));
+    this.clearWardrobeCaches();
     return {
       ...response,
       results: await Promise.all(response.results.map(async (result) => ({
@@ -71,11 +100,13 @@ export class WardrobeApiService {
 
   async updateItem(id: string, request: UpdateWardrobeItemRequest): Promise<WardrobeItemDto> {
     const response = await this.authorized(() => firstValueFrom(this.http.put<{ item: WardrobeItemDto }>(this.url(`/api/wardrobe/items/${id}`), request, this.authOptions())));
+    this.clearWardrobeCaches();
     return this.normaliseItem(response.item);
   }
 
   async deleteItem(id: string): Promise<void> {
     await this.authorized(() => firstValueFrom(this.http.delete<void>(this.url(`/api/wardrobe/items/${id}`), this.authOptions())));
+    this.clearWardrobeCaches();
   }
 
   async searchOutfits(query: string, requiredItemId: string | null = null): Promise<GeneratedOutfitDto[]> {
@@ -85,19 +116,27 @@ export class WardrobeApiService {
       return {
         ...outfit,
         imageUrl,
-        displayImageUrl: await this.imageCache.resolve(imageUrl)
+        displayImageUrl: imageUrl
       };
     }));
   }
 
   async saveOutfit(name: string, prompt: string | null, explanation: string | null, itemIds: string[], imageUrl: string | null = null): Promise<OutfitDto> {
     const response = await this.authorized(() => firstValueFrom(this.http.post<{ outfit: OutfitDto }>(this.url('/api/outfits'), { name, prompt, explanation, itemIds, imageUrl }, this.authOptions())));
+    this.clearOutfitCaches();
     return this.normaliseOutfit(response.outfit);
   }
 
-  async getOutfits(): Promise<OutfitDto[]> {
-    const response = await this.authorized(() => firstValueFrom(this.http.get<{ outfits: OutfitDto[] }>(this.url('/api/outfits'), this.authOptions())));
-    return Promise.all(response.outfits.map((outfit) => this.normaliseOutfit(outfit)));
+  async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
+    const cached = options.forceRefresh ? null : this.getCached(this.outfitsCache, this.outfitsCacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    return this.setCached(this.outfitsCache, this.outfitsCacheKey, async () => {
+      const response = await this.authorized(() => firstValueFrom(this.http.get<{ outfits: OutfitDto[] }>(this.url('/api/outfits'), this.authOptions())));
+      return Promise.all(response.outfits.map((outfit) => this.normaliseOutfit(outfit)));
+    });
   }
 
   streamImageGenerationStatuses(
@@ -153,14 +192,17 @@ export class WardrobeApiService {
 
   async deleteOutfit(id: string): Promise<void> {
     await this.authorized(() => firstValueFrom(this.http.delete<void>(this.url(`/api/outfits/${id}`), this.authOptions())));
+    this.clearOutfitCaches();
   }
 
   async markWorn(id: string): Promise<void> {
     await this.authorized(() => firstValueFrom(this.http.post(this.url(`/api/outfits/${id}/wear-logs`), {}, this.authOptions())));
+    this.clearOutfitCaches();
   }
 
   async markItemWorn(id: string): Promise<void> {
     await this.authorized(() => firstValueFrom(this.http.post(this.url(`/api/wardrobe/items/${id}/wear-logs`), {}, this.authOptions())));
+    this.clearWardrobeCaches();
   }
 
   async getAiUsageCostSummary(): Promise<AiUsageCostSummaryDto> {
@@ -186,6 +228,43 @@ export class WardrobeApiService {
 
   private authOptions(): { headers: HttpHeaders } {
     return { headers: new HttpHeaders({ Authorization: `Bearer ${this.auth.token ?? ''}` }) };
+  }
+
+  private getCached<T>(cache: Map<string, CachedApiResponse<T>>, key: string): Promise<T> | null {
+    const cached = cache.get(key);
+    if (!cached) {
+      return null;
+    }
+
+    if (cached.expiresAt <= Date.now()) {
+      cache.delete(key);
+      return null;
+    }
+
+    return cached.promise;
+  }
+
+  private setCached<T>(cache: Map<string, CachedApiResponse<T>>, key: string, request: () => Promise<T>): Promise<T> {
+    const promise = request().catch((error) => {
+      cache.delete(key);
+      throw error;
+    });
+
+    cache.set(key, {
+      expiresAt: Date.now() + this.cacheTtlMs,
+      promise
+    });
+
+    return promise;
+  }
+
+  private clearWardrobeCaches(): void {
+    this.itemsCache.clear();
+    this.clearOutfitCaches();
+  }
+
+  private clearOutfitCaches(): void {
+    this.outfitsCache.clear();
   }
 
   private async authorized<T>(request: () => Promise<T>): Promise<T> {
@@ -264,7 +343,7 @@ export class WardrobeApiService {
   private async normaliseOutfit(outfit: OutfitDto): Promise<OutfitDto> {
     return {
       ...outfit,
-      imageUrl: await this.normaliseDisplayAssetUrl(outfit.imageUrl),
+      imageUrl: this.normaliseAssetUrl(outfit.imageUrl),
       items: await Promise.all(outfit.items.map((item) => this.normaliseItem(item, false)))
     };
   }
@@ -292,6 +371,26 @@ export class WardrobeApiService {
 
   private async normaliseDisplayAssetUrl(value: string | null): Promise<string | null> {
     return this.imageCache.resolve(this.normaliseAssetUrl(value));
+  }
+
+  private unwrapItemResponse(response: WardrobeItemResponse): WardrobeItemDto {
+    if (this.isWrappedItemResponse(response)) {
+      return response.item;
+    }
+
+    if (this.isWardrobeItem(response)) {
+      return response;
+    }
+
+    throw new Error('Wardrobe item response was not in the expected format.');
+  }
+
+  private isWrappedItemResponse(response: WardrobeItemResponse): response is { item: WardrobeItemDto } {
+    return !!response && typeof response === 'object' && 'item' in response && this.isWardrobeItem(response.item);
+  }
+
+  private isWardrobeItem(response: unknown): response is WardrobeItemDto {
+    return !!response && typeof response === 'object' && 'id' in response && 'image' in response;
   }
 
   private normaliseAssetUrl(value: string | null): string | null {

@@ -81,12 +81,19 @@ export class ItemDetailPage implements OnDestroy {
       return;
     }
     try {
-      this.lookups = await this.api.getLookups();
-      this.item = await this.api.getItem(id);
+      const [lookups, item] = await Promise.all([
+        this.api.getLookups(),
+        this.api.getItem(id)
+      ]);
+      this.lookups = lookups;
+      this.item = item;
       this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
       this.startImageGenerationStreaming();
     } catch (error) {
       this.message = readMessage(error, 'Could not load item.');
+      if (this.isUnauthorized(error)) {
+        await this.router.navigateByUrl('/login');
+      }
     } finally {
       this.isLoading = false;
     }
@@ -327,5 +334,9 @@ export class ItemDetailPage implements OnDestroy {
     if (mode === 'view' && this.item) {
       this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
     }
+  }
+
+  private isUnauthorized(error: unknown): boolean {
+    return (error as { status?: number }).status === 401;
   }
 }

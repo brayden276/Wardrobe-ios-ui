@@ -65,8 +65,12 @@ export class BuilderPage {
   async ionViewWillEnter(): Promise<void> {
     this.message = '';
     try {
-      this.lookups ??= await this.api.getLookups();
-      this.items = await this.api.getItems();
+      const [lookups, items] = await Promise.all([
+        this.lookups ? Promise.resolve(this.lookups) : this.api.getLookups(),
+        this.api.getItems()
+      ]);
+      this.lookups = lookups;
+      this.items = items;
       this.manualItemIds = this.manualItemIds.filter((id) => this.items.some((item) => item.id === id));
       if (this.requiredItemId && !this.items.some((item) => item.id === this.requiredItemId)) {
         this.requiredItemId = null;
@@ -150,8 +154,12 @@ export class BuilderPage {
     this.savedGeneratedOutfitKeys.clear();
     this.failedGeneratedOutfitKeys.clear();
     try {
-      this.lookups ??= await this.api.getLookups();
-      this.items = await this.api.getItems();
+      const [lookups, items] = await Promise.all([
+        this.lookups ? Promise.resolve(this.lookups) : this.api.getLookups(),
+        this.api.getItems()
+      ]);
+      this.lookups = lookups;
+      this.items = items;
       const prompt = this.buildOutfitQuery();
       this.lastGeneratedPrompt = prompt;
       this.results = await this.api.searchOutfits(prompt, this.requiredItemId);
@@ -205,7 +213,12 @@ export class BuilderPage {
   }
 
   imageFor(id: string): string {
-    return this.items.find((x) => x.id === id)?.image.displayUrl ?? '';
+    const item = this.items.find((x) => x.id === id);
+    return item ? this.itemImageUrl(item) : '';
+  }
+
+  itemImageUrl(item: WardrobeItemDto): string {
+    return item.image.thumbnailUrl || item.image.displayUrl;
   }
 
   nameFor(id: string): string {

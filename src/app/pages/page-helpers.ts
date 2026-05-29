@@ -19,23 +19,31 @@ export function emptyItemForm(): UpdateWardrobeItemRequest {
   };
 }
 
+const lookupLabelCache = new WeakMap<WardrobeLookupsDto, Map<string, string>>();
+
 export function lookupLabel(lookups: WardrobeLookupsDto, id: string | null): string {
   if (!id) return '';
-  const subcategories = lookups.categories.reduce((values, category) => values.concat(category.subcategories), [] as { id: string; label: string }[]);
-  const all = [
-    ...lookups.categories,
-    ...subcategories,
-    ...lookups.colours,
-    ...lookups.patterns,
-    ...lookups.visibleMaterials,
-    ...lookups.necklines,
-    ...lookups.sleeveLengths,
-    ...lookups.fits,
-    ...lookups.garmentLengths,
-    ...lookups.bottomShapes,
-    ...lookups.rises
-  ];
-  return all.find((x) => x.id === id)?.label ?? id.replace(/_/g, ' ');
+  let labels = lookupLabelCache.get(lookups);
+  if (!labels) {
+    const subcategories = lookups.categories.reduce((values, category) => values.concat(category.subcategories), [] as { id: string; label: string }[]);
+    const all = [
+      ...lookups.categories,
+      ...subcategories,
+      ...lookups.colours,
+      ...lookups.patterns,
+      ...lookups.visibleMaterials,
+      ...lookups.necklines,
+      ...lookups.sleeveLengths,
+      ...lookups.fits,
+      ...lookups.garmentLengths,
+      ...lookups.bottomShapes,
+      ...lookups.rises
+    ];
+    labels = new Map(all.map((x) => [x.id, x.label]));
+    lookupLabelCache.set(lookups, labels);
+  }
+
+  return labels.get(id) ?? id.replace(/_/g, ' ');
 }
 
 export function colourSwatch(id: string): string {

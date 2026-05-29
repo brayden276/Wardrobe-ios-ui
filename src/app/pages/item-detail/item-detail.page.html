@@ -28,7 +28,7 @@
           </button>
         </header>
           <div class="product-stage">
-            <img class="product-image" [src]="item.image.displayUrl" [alt]="item.name">
+            <img class="product-image" [appLazyImage]="item.image.displayUrl" [appLazyImagePriority]="true" [alt]="item.name" loading="eager" decoding="async">
             <div class="image-generation-overlay detail-overlay" *ngIf="imageGenerationMessage(item.imageGenerationStatus) as status" [class.failed]="!isImageGenerationInProgress(item.imageGenerationStatus)">
               <ion-spinner *ngIf="isImageGenerationInProgress(item.imageGenerationStatus)" name="crescent"></ion-spinner>
               <span>{{ status }}</span>
@@ -143,7 +143,7 @@
               </button>
             </header>
             <div class="original-image-viewer__stage">
-              <img *ngIf="item?.image?.originalUrl" [src]="item?.image?.originalUrl" [alt]="item?.name || 'Original wardrobe image'">
+              <img *ngIf="item?.image?.originalUrl" [appLazyImage]="item?.image?.originalUrl || ''" [appLazyImagePriority]="true" [alt]="item?.name || 'Original wardrobe image'" loading="eager" decoding="async">
             </div>
           </ion-content>
         </ng-template>

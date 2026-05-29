@@ -31,13 +31,13 @@ export class OutfitsPage implements OnDestroy {
     this.stopOutfitGenerationPolling();
   }
 
-  async load(): Promise<void> {
+  async load(forceRefresh = false): Promise<void> {
     this.stopOutfitGenerationStreaming();
     this.stopOutfitGenerationPolling();
     this.isLoading = true;
     this.message = '';
     try {
-      this.outfits = await this.api.getOutfits();
+      this.outfits = await this.api.getOutfits({ forceRefresh });
       if (this.selectedOutfit) {
         this.selectedOutfit = this.outfits.find((outfit) => outfit.id === this.selectedOutfit?.id) ?? null;
       }
@@ -120,7 +120,7 @@ export class OutfitsPage implements OnDestroy {
 
   private async refreshOutfitsAfterImageGeneration(): Promise<void> {
     try {
-      const outfits = await this.api.getOutfits();
+      const outfits = await this.api.getOutfits({ forceRefresh: true });
       const selectedOutfitId = this.selectedOutfit?.id ?? null;
       this.outfits = outfits;
       this.selectedOutfit = selectedOutfitId ? outfits.find((outfit) => outfit.id === selectedOutfitId) ?? null : null;
@@ -160,7 +160,7 @@ export class OutfitsPage implements OnDestroy {
 
     this.isRefreshingOutfits = true;
     try {
-      const outfits = await this.api.getOutfits();
+      const outfits = await this.api.getOutfits({ forceRefresh: true });
       const selectedOutfitId = this.selectedOutfit?.id ?? null;
       this.outfits = outfits;
       this.selectedOutfit = selectedOutfitId ? outfits.find((outfit) => outfit.id === selectedOutfitId) ?? null : null;
@@ -232,7 +232,7 @@ export class OutfitsPage implements OnDestroy {
       if (this.selectedOutfit?.id === outfit.id) {
         this.selectedOutfit = null;
       }
-      await this.load();
+      await this.load(true);
     } catch (error) {
       this.message = readMessage(error, 'Could not delete outfit.');
     } finally {
@@ -246,5 +246,9 @@ export class OutfitsPage implements OnDestroy {
 
   isRemovingOutfit(outfitId: string): boolean {
     return this.deletingOutfitIds.has(outfitId);
+  }
+
+  outfitItemImageUrl(item: OutfitDto['items'][number]): string {
+    return item.image.thumbnailUrl || item.image.displayUrl;
   }
 }

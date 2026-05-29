@@ -49,6 +49,7 @@ export class WardrobePage implements OnDestroy {
   private viewportHeight = 900;
   private activeLoad: Promise<void> | null = null;
   private hasPendingLoad = false;
+  private hasPendingForceRefresh = false;
   private imageGenerationStatusStream: ImageGenerationStatusStream | null = null;
   private readonly itemImageGenerationPollingIntervalMs = 1800;
   private itemImageGenerationPollTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -155,31 +156,39 @@ export class WardrobePage implements OnDestroy {
     this.stopItemImageGenerationPolling();
   }
 
-  async load(): Promise<void> {
+  async load(forceRefresh = false): Promise<void> {
     if (this.activeLoad) {
       this.hasPendingLoad = true;
+      this.hasPendingForceRefresh = this.hasPendingForceRefresh || forceRefresh;
       return this.activeLoad;
     }
 
     do {
+      forceRefresh = forceRefresh || this.hasPendingForceRefresh;
       this.hasPendingLoad = false;
-      this.activeLoad = this.loadCore();
+      this.hasPendingForceRefresh = false;
+      this.activeLoad = this.loadCore(forceRefresh);
       try {
         await this.activeLoad;
       } finally {
         this.activeLoad = null;
       }
+      forceRefresh = false;
     } while (this.hasPendingLoad);
   }
 
-  private async loadCore(): Promise<void> {
+  private async loadCore(forceRefresh: boolean): Promise<void> {
     this.stopItemImageGenerationStreaming();
     this.stopItemImageGenerationPolling();
     this.isLoading = true;
     this.message = '';
     try {
-      this.lookups ??= await this.api.getLookups();
-      this.items = await this.api.getItems(this.buildItemFilterParams());
+      const [lookups, items] = await Promise.all([
+        this.lookups ? Promise.resolve(this.lookups) : this.api.getLookups(),
+        this.api.getItems(this.buildItemFilterParams(), { forceRefresh })
+      ]);
+      this.lookups = lookups;
+      this.items = items;
       this.resetVirtualWindow();
       await this.content?.scrollToTop(0);
       this.startImageGenerationStreaming();
@@ -290,7 +299,7 @@ export class WardrobePage implements OnDestroy {
 
   private async refreshWardrobeItemsAfterImageGeneration(): Promise<void> {
     try {
-      this.items = await this.api.getItems(this.buildItemFilterParams());
+      this.items = await this.api.getItems(this.buildItemFilterParams(), { forceRefresh: true });
     } catch {
       // Ignore temporary network issues after image generation completes.
     }
@@ -325,7 +334,7 @@ export class WardrobePage implements OnDestroy {
 
     this.isRefreshingImageGeneration = true;
     try {
-      this.items = await this.api.getItems(this.buildItemFilterParams());
+      this.items = await this.api.getItems(this.buildItemFilterParams(), { forceRefresh: true });
     } catch {
       // Ignore temporary network issues while polling for image-generation states.
     } finally {

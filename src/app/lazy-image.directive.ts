@@ -30,6 +30,10 @@ export class LazyImageDirective implements AfterViewInit, OnChanges, OnDestroy {
       return;
     }
 
+    if (!changes['appLazyImage'].firstChange && changes['appLazyImage'].previousValue === changes['appLazyImage'].currentValue) {
+      return;
+    }
+
     this.loadToken++;
     this.isLoaded = false;
     this.hasFailed = false;

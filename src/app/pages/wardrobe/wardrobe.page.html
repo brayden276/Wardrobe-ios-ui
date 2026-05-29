@@ -2,7 +2,7 @@
       <section class="screen">
         <header class="page-header">
           <h1>Wardrobe</h1>
-          <button type="button" class="icon-button" aria-label="Refresh wardrobe" (click)="load()">
+          <button type="button" class="icon-button" aria-label="Refresh wardrobe" (click)="load(true)">
             <ion-icon name="refresh-outline"></ion-icon>
           </button>
         </header>
@@ -123,7 +123,7 @@
         </article>
         <article class="panel state-panel" *ngIf="!isLoading && message">
           <p class="muted">{{ message }}</p>
-          <ion-button class="secondary-button" fill="outline" size="small" (click)="load()">Try again</ion-button>
+          <ion-button class="secondary-button" fill="outline" size="small" (click)="load(true)">Try again</ion-button>
         </article>
         <div #wardrobeGrid class="wardrobe-grid wardrobe-grid--virtual" *ngIf="!isLoading && !message && items.length; else emptyWardrobe">
           <div class="wardrobe-grid__spacer" [style.height.px]="virtualTopSpacerHeight"></div>

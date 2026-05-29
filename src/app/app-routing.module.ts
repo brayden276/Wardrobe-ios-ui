@@ -30,7 +30,7 @@ const routes: Routes = [
       {
         path: 'wardrobe',
         children: [
-          { path: '', component: WardrobePage },
+          { path: '', component: WardrobePage, pathMatch: 'full' },
           { path: ':id', component: ItemDetailPage }
         ]
       },

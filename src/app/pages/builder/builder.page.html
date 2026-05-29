@@ -39,7 +39,7 @@
               <div class="include-strip">
                 <button type="button" class="include-item include-any" [class.selected]="!requiredItemId" (click)="selectRequiredItem(null)">Any item</button>
                 <button type="button" class="include-item" *ngFor="let item of items; trackBy: trackById" [class.selected]="requiredItemId === item.id" (click)="selectRequiredItem(item.id)">
-                  <img [src]="item.image.displayUrl" [alt]="item.name">
+                  <img [appLazyImage]="itemImageUrl(item)" [alt]="item.name" loading="lazy" decoding="async">
                   <span>{{ item.name }}</span>
                 </button>
               </div>
@@ -67,9 +67,9 @@
           </article>
           <h2 class="section-title" *ngIf="results.length">Outfit ideas</h2>
           <article class="outfit-card idea-card generated-outfit-card" *ngFor="let outfit of results">
-            <img class="outfit-hero-image" *ngIf="outfit.displayImageUrl" [src]="outfit.displayImageUrl" [alt]="outfit.title">
+            <img class="outfit-hero-image" *ngIf="outfit.displayImageUrl" [appLazyImage]="outfit.displayImageUrl" [alt]="outfit.title" loading="lazy" decoding="async">
             <div class="outfit-images generated-fallback-images" *ngIf="!outfit.displayImageUrl">
-              <img *ngFor="let id of outfit.itemIds" [src]="imageFor(id)" [alt]="nameFor(id)">
+              <img *ngFor="let id of outfit.itemIds" [appLazyImage]="imageFor(id)" [alt]="nameFor(id)" loading="lazy" decoding="async">
             </div>
             <div class="outfit-copy">
               <h3>{{ outfit.title }}</h3>
@@ -113,7 +113,7 @@
           <div class="manual-grid" *ngIf="items.length">
             <button type="button" class="item-card manual-item" *ngFor="let item of items; trackBy: trackById" [class.selected]="isManualSelected(item.id)" (click)="toggleManualItem(item.id)">
               <div class="item-card__image-wrap manual-item__image-wrap">
-                <img [src]="item.image.displayUrl" [alt]="item.name">
+                <img [appLazyImage]="itemImageUrl(item)" [alt]="item.name" loading="lazy" decoding="async">
                 <span class="manual-item__check">
                   <ion-icon [name]="isManualSelected(item.id) ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
                 </span>

@@ -2,7 +2,7 @@
       <section class="screen">
         <header class="page-header">
           <h1>Outfits</h1>
-          <button type="button" class="icon-button" aria-label="Refresh outfits" (click)="load()">
+          <button type="button" class="icon-button" aria-label="Refresh outfits" (click)="load(true)">
             <ion-icon name="refresh-outline"></ion-icon>
           </button>
         </header>
@@ -16,10 +16,10 @@
         <ng-container *ngIf="!selectedOutfit">
           <article class="outfit-card" *ngFor="let outfit of outfits">
             <button type="button" class="outfit-open" (click)="open(outfit)">
-              <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [src]="outfit.imageUrl" [alt]="outfit.name">
+              <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [appLazyImage]="outfit.imageUrl" [alt]="outfit.name" loading="lazy" decoding="async">
             </button>
             <div class="outfit-images" *ngIf="!outfit.imageUrl">
-              <img *ngFor="let item of outfit.items" [src]="item.image.displayUrl" [alt]="item.name">
+              <img *ngFor="let item of outfit.items" [appLazyImage]="outfitItemImageUrl(item)" [alt]="item.name" loading="lazy" decoding="async">
             </div>
             <div class="outfit-copy">
               <h3>{{ outfit.name }}</h3>
@@ -51,14 +51,14 @@
               <ion-icon name="close-outline"></ion-icon>
             </button>
           </div>
-          <img class="outfit-detail-image" *ngIf="selectedOutfit.imageUrl" [src]="selectedOutfit.imageUrl" [alt]="selectedOutfit.name">
+          <img class="outfit-detail-image" *ngIf="selectedOutfit.imageUrl" [appLazyImage]="selectedOutfit.imageUrl" [appLazyImagePriority]="true" [alt]="selectedOutfit.name" loading="eager" decoding="async">
           <p class="muted center-message image-status-line" *ngIf="outfitGenerationMessage(selectedOutfit.imageGenerationStatus)">
             <ion-spinner *ngIf="isOutfitImageGenerationInProgress(selectedOutfit.imageGenerationStatus)" name="crescent"></ion-spinner>
             <span>{{ outfitGenerationMessage(selectedOutfit.imageGenerationStatus) }}</span>
           </p>
           <div class="outfit-detail-items">
             <div class="outfit-detail-item" *ngFor="let item of selectedOutfit.items">
-              <img [src]="item.image.displayUrl" [alt]="item.name">
+              <img [appLazyImage]="outfitItemImageUrl(item)" [alt]="item.name" loading="lazy" decoding="async">
               <div>
                 <strong>{{ item.name }}</strong>
                 <span>{{ item.subcategoryId }}</span>

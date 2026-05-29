@@ -6,19 +6,42 @@ import { Directory, Filesystem } from '@capacitor/filesystem';
 export class DeviceImageCacheService {
   private readonly cacheDirectory = 'image-cache';
   private readonly inFlight = new Map<string, Promise<string>>();
+  private readonly resolvedUrls = new Map<string, string>();
+  private readonly maxResolvedUrlCount = 300;
 
   async resolve(url: string | null): Promise<string | null> {
     if (!url || !/^https?:/i.test(url) || !Capacitor.isNativePlatform()) {
       return url;
     }
 
+    const cachedUrl = this.resolvedUrls.get(url);
+    if (cachedUrl) {
+      return cachedUrl;
+    }
+
     let promise = this.inFlight.get(url);
     if (!promise) {
-      promise = this.resolveNativeUrl(url).finally(() => this.inFlight.delete(url));
+      promise = this.resolveNativeUrl(url)
+        .then((resolvedUrl) => {
+          this.rememberResolvedUrl(url, resolvedUrl);
+          return resolvedUrl;
+        })
+        .finally(() => this.inFlight.delete(url));
       this.inFlight.set(url, promise);
     }
 
     return promise;
+  }
+
+  private rememberResolvedUrl(url: string, resolvedUrl: string): void {
+    if (this.resolvedUrls.size >= this.maxResolvedUrlCount) {
+      const oldestUrl = this.resolvedUrls.keys().next().value;
+      if (oldestUrl) {
+        this.resolvedUrls.delete(oldestUrl);
+      }
+    }
+
+    this.resolvedUrls.set(url, resolvedUrl);
   }
 
   private async resolveNativeUrl(url: string): Promise<string> {
