@@ -114,6 +114,9 @@ export interface GeneratedOutfitDto {
   itemIds: string[];
   explanation: string;
   imageUrl: string | null;
+  isComplete: boolean;
+  missingCategories: string[];
+  relaxedConstraints: string[];
   displayImageUrl?: string | null;
 }
 
@@ -123,6 +126,7 @@ export interface OutfitDto {
   prompt: string | null;
   explanation: string | null;
   imageUrl: string | null;
+  thumbnailUrl: string | null;
   imageGenerationStatus: string | null;
   items: WardrobeItemDto[];
   wearCount: number;

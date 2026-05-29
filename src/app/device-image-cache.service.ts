@@ -7,7 +7,7 @@ import { AuthService } from './auth.service';
 export class DeviceImageCacheService {
   private readonly auth = inject(AuthService);
   private readonly cacheDirectory = 'image-cache';
-  private readonly inFlight = new Map<string, Promise<string>>();
+  private readonly inFlight = new Map<string, Promise<void>>();
   private readonly resolvedUrls = new Map<string, string>();
   private readonly maxResolvedUrlCount = 300;
 
@@ -16,45 +16,56 @@ export class DeviceImageCacheService {
       return url;
     }
 
-    const cachedUrl = this.resolvedUrls.get(url);
+    const cacheKey = this.cacheKey(url);
+    const cachedUrl = this.resolvedUrls.get(cacheKey);
     if (cachedUrl) {
       return cachedUrl;
     }
 
-    let promise = this.inFlight.get(url);
-    if (!promise) {
-      promise = this.resolveNativeUrl(url)
-        .then((resolvedUrl) => {
-          this.rememberResolvedUrl(url, resolvedUrl);
-          return resolvedUrl;
-        })
-        .finally(() => this.inFlight.delete(url));
-      this.inFlight.set(url, promise);
+    const path = `${this.cacheDirectory}/${this.fileName(cacheKey, url)}`;
+    try {
+      const localUrl = await this.localUrl(path);
+      this.rememberResolvedUrl(cacheKey, localUrl);
+      return localUrl;
+    } catch {
+      // Cache miss. Let the browser show the remote image immediately and warm the device cache in the background.
     }
 
-    return promise;
+    this.primeNativeCache(url, cacheKey, path);
+    return url;
   }
 
-  private rememberResolvedUrl(url: string, resolvedUrl: string): void {
+  private rememberResolvedUrl(cacheKey: string, resolvedUrl: string): void {
     if (this.resolvedUrls.size >= this.maxResolvedUrlCount) {
-      const oldestUrl = this.resolvedUrls.keys().next().value;
-      if (oldestUrl) {
-        this.resolvedUrls.delete(oldestUrl);
+      const oldestKey = this.resolvedUrls.keys().next().value;
+      if (oldestKey) {
+        this.resolvedUrls.delete(oldestKey);
       }
     }
 
-    this.resolvedUrls.set(url, resolvedUrl);
+    this.resolvedUrls.set(cacheKey, resolvedUrl);
   }
 
-  private async resolveNativeUrl(url: string): Promise<string> {
-    const path = `${this.cacheDirectory}/${this.fileName(url)}`;
-
-    try {
-      return await this.localUrl(path);
-    } catch {
-      // Cache miss. Download below and fall back to the remote URL on failure.
+  private primeNativeCache(url: string, cacheKey: string, path: string): void {
+    if (this.inFlight.has(cacheKey)) {
+      return;
     }
 
+    const promise = this.writeNativeCache(url, path)
+      .then((resolvedUrl) => {
+        if (resolvedUrl) {
+          this.rememberResolvedUrl(cacheKey, resolvedUrl);
+        }
+      })
+      .catch(() => {
+        // Keep image display independent from cache write failures.
+      })
+      .finally(() => this.inFlight.delete(cacheKey));
+
+    this.inFlight.set(cacheKey, promise);
+  }
+
+  private async writeNativeCache(url: string, path: string): Promise<string | null> {
     try {
       const accessToken = this.auth.token;
       const response = await fetch(url, accessToken
@@ -78,7 +89,7 @@ export class DeviceImageCacheService {
 
       return await this.localUrl(path);
     } catch {
-      return url;
+      return null;
     }
   }
 
@@ -96,8 +107,17 @@ export class DeviceImageCacheService {
     return Capacitor.convertFileSrc(result.uri);
   }
 
-  private fileName(url: string): string {
-    return `${this.hash(url)}${this.extension(url)}`;
+  private fileName(cacheKey: string, sourceUrl: string): string {
+    return `${this.hash(cacheKey)}${this.extension(sourceUrl)}`;
+  }
+
+  private cacheKey(value: string): string {
+    try {
+      const parsed = new URL(value);
+      return `${parsed.origin}${parsed.pathname}`;
+    } catch {
+      return value.split('?', 2)[0];
+    }
   }
 
   private hash(value: string): string {

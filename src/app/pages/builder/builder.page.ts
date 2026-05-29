@@ -216,7 +216,11 @@ export class BuilderPage {
     this.isSavingManualOutfit = true;
     this.message = '';
     try {
-      await this.api.saveOutfit(this.manualName.trim() || 'Manual outfit', null, 'Built manually from selected wardrobe items.', this.manualItemIds);
+      const selected = this.selectedManualItems();
+      const explanation = this.isValidManualOutfit(selected)
+        ? 'Built manually from selected wardrobe items.'
+        : `Saved as a partial manual look from selected wardrobe items. ${this.manualHint}`;
+      await this.api.saveOutfit(this.manualName.trim() || 'Manual outfit', null, explanation.trim(), this.manualItemIds);
       this.message = 'Outfit saved.';
     } catch (error) {
       this.message = readMessage(error, 'Could not save outfit.');
@@ -277,7 +281,7 @@ export class BuilderPage {
   }
 
   get manualCanSave(): boolean {
-    return this.isValidManualOutfit(this.selectedManualItems());
+    return this.manualItemIds.length > 0;
   }
 
   get manualHint(): string {
@@ -287,11 +291,11 @@ export class BuilderPage {
     }
 
     if (!selected.some((item) => this.manualCategory(item) === 'footwear')) {
-      return 'Add shoes to complete the outfit.';
+      return 'Partial look: add shoes later if you want this to be complete.';
     }
 
     if (!this.isValidManualOutfit(selected)) {
-      return 'Choose a top and bottom (including activewear variants), a dress, or one piece, with one pair of shoes.';
+      return 'Partial look: this saves as selected, even if it is not a classic top-bottom, dress, or one-piece outfit.';
     }
 
     return '';
@@ -356,8 +360,16 @@ export class BuilderPage {
       case 'saved':
         return 'Saved';
       default:
-        return 'Save outfit';
+        return outfit.isComplete ? 'Save outfit' : 'Save anyway';
     }
+  }
+
+  missingCategorySummary(outfit: GeneratedOutfitDto): string {
+    return outfit.missingCategories?.length ? outfit.missingCategories.join(', ') : '';
+  }
+
+  relaxedConstraintSummary(outfit: GeneratedOutfitDto): string {
+    return outfit.relaxedConstraints?.length ? outfit.relaxedConstraints.join(' ') : '';
   }
 
   private buildOutfitQuery(): string {

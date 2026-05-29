@@ -46,6 +46,7 @@ export class WardrobePage implements OnDestroy {
   private virtualRowHeight = 258;
   private readonly virtualOverscanRows = 3;
   private readonly firstPreloadItemCount = 2;
+  private readonly wardrobePageSize = 60;
   private viewportHeight = 900;
   private activeLoad: Promise<void> | null = null;
   private hasPendingLoad = false;
@@ -54,6 +55,8 @@ export class WardrobePage implements OnDestroy {
   private readonly itemImageGenerationPollingIntervalMs = 1800;
   private itemImageGenerationPollTimeout: ReturnType<typeof setTimeout> | null = null;
   private isRefreshingImageGeneration = false;
+  isLoadingMore = false;
+  canLoadMore = false;
 
   get activeFilterSummary(): string {
     const filters: string[] = [];
@@ -185,16 +188,18 @@ export class WardrobePage implements OnDestroy {
     try {
       const [lookups, items] = await Promise.all([
         this.lookups ? Promise.resolve(this.lookups) : this.api.getLookups(),
-        this.api.getItems(this.buildItemFilterParams(), { forceRefresh })
+        this.api.getItems(this.buildPagedItemFilterParams(0), { forceRefresh })
       ]);
       this.lookups = lookups;
       this.items = items;
+      this.canLoadMore = items.length === this.wardrobePageSize;
       this.resetVirtualWindow();
       await this.content?.scrollToTop(0);
       this.startImageGenerationStreaming();
     } catch (error) {
       this.message = readMessage(error, 'Could not load wardrobe. Please try again.');
       this.items = [];
+      this.canLoadMore = false;
       this.resetVirtualWindow();
     } finally {
       this.isLoading = false;
@@ -274,6 +279,40 @@ export class WardrobePage implements OnDestroy {
         search: this.search.trim(),
         includeArchived: this.includeArchived
       };
+  }
+
+  private buildPagedItemFilterParams(offset: number): Record<string, string | number | boolean> {
+    return {
+      ...this.buildItemFilterParams(),
+      limit: this.wardrobePageSize,
+      offset
+    };
+  }
+
+  async loadMore(event?: Event): Promise<void> {
+    if (this.isLoadingMore || this.isLoading || !this.canLoadMore || this.message) {
+      this.completeInfiniteScroll(event);
+      return;
+    }
+
+    this.isLoadingMore = true;
+    try {
+      const nextItems = await this.api.getItems(this.buildPagedItemFilterParams(this.items.length), { forceRefresh: true });
+      this.items = [...this.items, ...nextItems];
+      this.canLoadMore = nextItems.length === this.wardrobePageSize;
+      this.resetVirtualWindow();
+      this.startImageGenerationStreaming();
+    } catch (error) {
+      this.message = readMessage(error, 'Could not load more wardrobe items.');
+      this.canLoadMore = false;
+    } finally {
+      this.isLoadingMore = false;
+      this.completeInfiniteScroll(event);
+    }
+  }
+
+  private completeInfiniteScroll(event?: Event): void {
+    (event?.target as { complete?: () => void } | null)?.complete?.();
   }
 
   private startImageGenerationStreaming(): void {

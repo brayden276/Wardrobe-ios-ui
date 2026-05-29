@@ -20,6 +20,7 @@ export class LazyImageDirective implements AfterViewInit, OnChanges, OnDestroy {
   private observer: IntersectionObserver | null = null;
   private isVisible = false;
   private loadToken = 0;
+  private currentImageKey: string | null = null;
 
   ngAfterViewInit(): void {
     this.observe();
@@ -30,10 +31,12 @@ export class LazyImageDirective implements AfterViewInit, OnChanges, OnDestroy {
       return;
     }
 
-    if (!changes['appLazyImage'].firstChange && changes['appLazyImage'].previousValue === changes['appLazyImage'].currentValue) {
+    const nextImageKey = this.imageKey(changes['appLazyImage'].currentValue as string | null);
+    if (!changes['appLazyImage'].firstChange && this.currentImageKey === nextImageKey) {
       return;
     }
 
+    this.currentImageKey = nextImageKey;
     this.loadToken++;
     this.isLoaded = false;
     this.hasFailed = false;
@@ -88,6 +91,19 @@ export class LazyImageDirective implements AfterViewInit, OnChanges, OnDestroy {
 
       await this.setImageSource(resolvedUrl, token);
     }, this.appLazyImagePriority);
+  }
+
+  private imageKey(value: string | null): string | null {
+    if (!value) {
+      return null;
+    }
+
+    try {
+      const parsed = new URL(value);
+      return `${parsed.origin}${parsed.pathname}`;
+    } catch {
+      return value.split('?', 2)[0];
+    }
   }
 
   private setImageSource(url: string, token: number): Promise<void> {

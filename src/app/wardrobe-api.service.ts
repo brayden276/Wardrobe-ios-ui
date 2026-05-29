@@ -116,6 +116,9 @@ export class WardrobeApiService {
       return {
         ...outfit,
         imageUrl,
+        isComplete: outfit.isComplete ?? true,
+        missingCategories: outfit.missingCategories ?? [],
+        relaxedConstraints: outfit.relaxedConstraints ?? [],
         displayImageUrl: imageUrl
       };
     }));
@@ -362,6 +365,7 @@ export class WardrobeApiService {
     return {
       ...outfit,
       imageUrl: this.normaliseAssetUrl(outfit.imageUrl),
+      thumbnailUrl: this.normaliseAssetUrl(outfit.thumbnailUrl),
       items: await Promise.all(outfit.items.map((item) => this.normaliseItem(item, false)))
     };
   }

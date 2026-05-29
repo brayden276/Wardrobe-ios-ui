@@ -75,6 +75,12 @@
             <div class="outfit-copy">
               <h3>{{ outfit.title }}</h3>
               <p class="muted">{{ outfit.explanation }}</p>
+              <p class="fit-note" *ngIf="!outfit.isComplete && missingCategorySummary(outfit)">
+                Missing: {{ missingCategorySummary(outfit) }}
+              </p>
+              <p class="fit-note" *ngIf="relaxedConstraintSummary(outfit)">
+                {{ relaxedConstraintSummary(outfit) }}
+              </p>
               <div class="outfit-item-list">
                 <span *ngFor="let id of outfit.itemIds">{{ nameFor(id) }}</span>
               </div>
@@ -88,7 +94,7 @@
           </article>
           <article class="panel empty-results" *ngIf="hasGeneratedSearchRun && !isBuildingOutfits && !message && !results.length">
             <h2 class="plain-title">No outfit matched that request.</h2>
-            <p class="muted">Try relaxing one restriction and build again.</p>
+            <p class="muted">Add at least one wardrobe item, then the builder will return the closest usable look.</p>
             <div class="recovery-actions">
               <button type="button" class="option-button" *ngIf="selectedAvoids.length" (click)="clearAvoids()">Allow avoided items</button>
               <button type="button" class="option-button" *ngIf="requiredItemId" (click)="clearRequiredItem()">Use any item</button>
@@ -130,8 +136,8 @@
           </div>
           <ion-button class="secondary-button" fill="outline" expand="block" *ngIf="canShowMoreBuilderItems" (click)="showMoreBuilderItems()">Show more wardrobe items</ion-button>
           <p class="muted" *ngIf="!items.length">Load wardrobe items to build a manual outfit.</p>
-          <p class="muted" *ngIf="manualItemIds.length && !manualCanSave">{{ manualHint }}</p>
-          <ion-button class="primary-button" expand="block" *ngIf="manualItemIds.length" (click)="saveManual()" [disabled]="isBusy || !manualCanSave">{{ isSavingManualOutfit ? 'Saving...' : 'Save outfit' }}</ion-button>
+          <p class="muted" *ngIf="manualItemIds.length && manualHint">{{ manualHint }}</p>
+          <ion-button class="primary-button" expand="block" *ngIf="manualItemIds.length" (click)="saveManual()" [disabled]="isBusy">{{ isSavingManualOutfit ? 'Saving...' : 'Save outfit' }}</ion-button>
         </article>
         <p class="muted" *ngIf="message">{{ message }}</p>
       </section>

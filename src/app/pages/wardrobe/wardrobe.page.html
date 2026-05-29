@@ -145,6 +145,9 @@
           </a>
           <div class="wardrobe-grid__spacer" [style.height.px]="virtualBottomSpacerHeight"></div>
         </div>
+        <ion-infinite-scroll threshold="280px" *ngIf="canLoadMore && !message" (ionInfinite)="loadMore($event)">
+          <ion-infinite-scroll-content loadingSpinner="crescent" loadingText="Loading more wardrobe items..."></ion-infinite-scroll-content>
+        </ion-infinite-scroll>
         <ng-template #emptyWardrobe>
           <article class="panel" *ngIf="!isLoading && !message">
             <h2 class="plain-title">{{ hasFilters ? 'No matching items found.' : 'Your wardrobe is empty.' }}</h2>

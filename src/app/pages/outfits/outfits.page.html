@@ -16,7 +16,7 @@
         <ng-container *ngIf="!selectedOutfit">
           <article class="outfit-card" *ngFor="let outfit of visibleOutfits; trackBy: trackById">
             <button type="button" class="outfit-open" (click)="open(outfit)">
-              <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [appLazyImage]="outfit.imageUrl" [alt]="outfit.name" loading="lazy" decoding="async">
+              <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [appLazyImage]="outfit.thumbnailUrl || outfit.imageUrl" [alt]="outfit.name" loading="lazy" decoding="async">
             </button>
             <div class="outfit-images" *ngIf="!outfit.imageUrl">
               <img *ngFor="let item of outfit.items" [appLazyImage]="outfitItemImageUrl(item)" [alt]="item.name" loading="lazy" decoding="async">
