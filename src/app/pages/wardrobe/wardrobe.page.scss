@@ -2,6 +2,10 @@
   align-items: start;
 }
 
+.wardrobe-skeleton {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .wardrobe-grid__spacer {
   grid-column: 1 / -1;
 }

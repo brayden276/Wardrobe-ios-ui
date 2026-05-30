@@ -1,8 +1,9 @@
     <ion-content class="app-content">
       <section class="screen" *ngIf="isLoading">
-        <article class="panel state-panel">
-          <ion-spinner name="crescent"></ion-spinner>
-          <p class="muted">Loading item...</p>
+        <article class="skeleton-card">
+          <div class="skeleton-image"></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line short"></div>
         </article>
       </section>
       <section class="screen" *ngIf="!isLoading && !item">
@@ -17,14 +18,17 @@
           <p class="muted">{{ message || 'Could not load item.' }}</p>
         </article>
       </section>
-        <section class="screen" *ngIf="!isLoading && item">
+        <section class="screen detail-screen page-workspace" [class.editing-mode]="editing" *ngIf="!isLoading && item">
         <header class="nav-header">
           <button type="button" class="nav-button" routerLink="/tabs/wardrobe" aria-label="Back to wardrobe">
             <ion-icon name="chevron-back-outline"></ion-icon>
           </button>
-          <h1>{{ item.name }}</h1>
+          <h1>{{ editing ? 'Edit item' : item.name }}</h1>
           <button type="button" class="nav-button" aria-label="Edit item" (click)="setItemMode('edit')" *ngIf="!editing">
             <ion-icon name="create-outline"></ion-icon>
+          </button>
+          <button type="button" class="nav-button" aria-label="Cancel editing" (click)="cancelEdit()" *ngIf="editing">
+            <ion-icon name="close-outline"></ion-icon>
           </button>
         </header>
           <div class="product-stage">
@@ -34,13 +38,19 @@
               <span>{{ status }}</span>
             </div>
           </div>
-          <ion-button class="taupe-button" expand="block" (click)="markWorn()" *ngIf="!editing" [disabled]="isMarkingWorn">{{ isMarkingWorn ? 'Marking worn...' : 'Mark worn' }}</ion-button>
-          <div class="detail-chips">
-            <span class="detail-chip" *ngFor="let tag of visibleTags">{{ tag }}</span>
-        </div>
-          <button type="button" class="text-link original-image-link" *ngIf="item.image?.originalUrl" (click)="openOriginalImage()">View original</button>
+          <div class="detail-action-zone" *ngIf="!editing">
+            <ion-button class="taupe-button" expand="block" (click)="markWorn()" [disabled]="isMarkingWorn">{{ isMarkingWorn ? 'Marking worn...' : 'Mark worn' }}</ion-button>
+            <div class="status-line" *ngIf="processingMessage">
+              <ion-spinner name="crescent"></ion-spinner>
+              <span>{{ processingMessage }}</span>
+            </div>
+            <div class="detail-chips">
+              <span class="detail-chip" *ngFor="let tag of visibleTags">{{ tag }}</span>
+            </div>
+            <button type="button" class="text-link original-image-link" *ngIf="item.image?.originalUrl" (click)="openOriginalImage()">View original</button>
+          </div>
         <p class="muted center-message" *ngIf="message && !editing">{{ message }}</p>
-        <form class="panel form-stack editor-panel" *ngIf="editing" (ngSubmit)="save()">
+        <form class="inline-sheet form-stack editor-panel" *ngIf="editing" (ngSubmit)="save()">
           <label>Name<ion-input class="field" [(ngModel)]="form.name" name="name"></ion-input></label>
           <label>
             Category
@@ -125,11 +135,13 @@
               </ion-select>
             </label>
           </details>
-          <ion-button class="primary-button" expand="block" type="submit" [disabled]="isSaving || isArchiving">{{ isSaving ? 'Saving...' : 'Save details' }}</ion-button>
-          <ion-button class="secondary-button" fill="outline" expand="block" type="button" (click)="deleteItem()" [disabled]="isArchiving || isSaving || isMarkingWorn">
-            {{ isArchiving ? 'Archiving...' : 'Archive item' }}
-          </ion-button>
-          <ion-button class="secondary-button" fill="clear" expand="block" type="button" (click)="cancelEdit()">Cancel</ion-button>
+          <div class="form-actions">
+            <ion-button class="primary-button" expand="block" type="submit" [disabled]="isSaving || isArchiving">{{ isSaving ? 'Saving...' : 'Save details' }}</ion-button>
+            <ion-button class="secondary-button" fill="outline" expand="block" type="button" (click)="deleteItem()" [disabled]="isArchiving || isSaving || isMarkingWorn">
+              {{ isArchiving ? 'Archiving...' : 'Archive item' }}
+            </ion-button>
+            <ion-button class="secondary-button" fill="clear" expand="block" type="button" (click)="cancelEdit()">Cancel</ion-button>
+          </div>
           <p class="muted" *ngIf="message">{{ message }}</p>
         </form>
       </section>

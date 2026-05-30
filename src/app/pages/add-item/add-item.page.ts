@@ -5,7 +5,6 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { ActionSheetController } from '@ionic/angular';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import {
-  AI_DISCLOSURE_TEXT,
   IMAGE_COMPRESSION_MAX_SIDES,
   IMAGE_COMPRESSION_QUALITIES,
   IMAGE_COMPRESSION_TRIGGER_BYTES,
@@ -14,7 +13,10 @@ import {
   MAX_UPLOAD_FILE_BYTES,
   MIME_IMAGE_OUTPUT_EXTENSION,
   ensureAiConsent,
-  readMessage
+  lightImpact,
+  readMessage,
+  successFeedback,
+  warningFeedback
 } from '../page-helpers';
 
 type PreparedUploadFile = {
@@ -170,6 +172,7 @@ export class AddItemPage {
     {
       this.message = 'Gemini consent is required before you can upload wardrobe photos.';
       this.uploadError = true;
+      void warningFeedback();
       return;
     }
 
@@ -193,6 +196,7 @@ export class AddItemPage {
 
     this.batchFiles = this.batchFiles.filter((_, currentIndex) => currentIndex !== index);
     this.batchPreviewUrls = this.batchPreviewUrls.filter((_, currentIndex) => currentIndex !== index);
+    void lightImpact();
   }
 
   openBatchPicker(): void {
@@ -219,6 +223,7 @@ export class AddItemPage {
     if (this.batchInput) {
       this.batchInput.nativeElement.value = '';
     }
+    void lightImpact();
   }
 
   private openBrowserFilePicker(source: CameraSource.Camera | CameraSource.Photos): void {
@@ -270,9 +275,11 @@ export class AddItemPage {
       if (!this.message && !this.uploadError) {
         this.statusMessage = preparedFiles.length === 1 ? 'Photo is ready for upload.' : 'Photos are ready for upload.';
       }
+      void lightImpact();
     } catch (error) {
       this.message = error instanceof Error ? error.message : 'Could not prepare images. Try again.';
       this.uploadError = true;
+      void warningFeedback();
     } finally {
       this.isPreparing = false;
     }
@@ -286,10 +293,12 @@ export class AddItemPage {
 
     try {
       await this.api.createItem(photo.file, photo.name);
+      void successFeedback();
       await this.router.navigateByUrl('/tabs/wardrobe');
     } catch (error) {
       this.message = readMessage(error, 'Could not upload photo. Try again.');
       this.uploadError = true;
+      void warningFeedback();
     } finally {
       this.isSaving = false;
       this.statusMessage = '';
@@ -306,6 +315,7 @@ export class AddItemPage {
       const failures = result.results.filter((entry) => !entry.success);
       this.clearBatchSelection();
       if (!failures.length) {
+        void successFeedback();
         await this.router.navigateByUrl('/tabs/wardrobe');
         return;
       }
@@ -317,9 +327,11 @@ export class AddItemPage {
       this.message = result.succeededCount > 0
         ? `${result.succeededCount} item${result.succeededCount === 1 ? '' : 's'} added. ${result.failedCount} could not be uploaded. ${failureSummary}`
         : failureSummary || 'Could not upload photos. Try again.';
+      void warningFeedback();
     } catch (error) {
       this.message = readMessage(error, 'Could not upload photos. Try again.');
       this.uploadError = true;
+      void warningFeedback();
     } finally {
       this.isBatchSaving = false;
       this.statusMessage = '';

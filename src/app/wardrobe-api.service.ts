@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { DeviceImageCacheService } from './device-image-cache.service';
 import {
   AiUsageCostSummaryDto,
+  BulkDeleteResponse,
   BatchWardrobeItemsResponse,
   GeneratedOutfitDto,
   ImageGenerationStreamUpdate,
@@ -26,6 +27,7 @@ interface CachedApiResponse<T> {
 
 interface ApiReadOptions {
   forceRefresh?: boolean;
+  includePending?: boolean;
 }
 
 type WardrobeItemResponse = WardrobeItemDto | { item: WardrobeItemDto };
@@ -109,6 +111,12 @@ export class WardrobeApiService {
     this.clearWardrobeCaches();
   }
 
+  async deleteItems(ids: string[]): Promise<BulkDeleteResponse> {
+    const response = await this.authorized(() => firstValueFrom(this.http.post<BulkDeleteResponse>(this.url('/api/wardrobe/items/bulk-delete'), { ids }, this.authOptions())));
+    this.clearWardrobeCaches();
+    return response;
+  }
+
   async searchOutfits(query: string, requiredItemId: string | null = null): Promise<GeneratedOutfitDto[]> {
     const response = await this.authorized(() => firstValueFrom(this.http.post<{ outfits: GeneratedOutfitDto[] }>(this.url('/api/outfits/search'), { query, requiredItemId }, this.authOptions())));
     return Promise.all(response.outfits.map(async (outfit) => {
@@ -127,17 +135,20 @@ export class WardrobeApiService {
   async saveOutfit(name: string, prompt: string | null, explanation: string | null, itemIds: string[], imageUrl: string | null = null): Promise<OutfitDto> {
     const response = await this.authorized(() => firstValueFrom(this.http.post<{ outfit: OutfitDto }>(this.url('/api/outfits'), { name, prompt, explanation, itemIds, imageUrl }, this.authOptions())));
     this.clearOutfitCaches();
-    return this.normaliseOutfit(response.outfit);
+    const outfit = await this.normaliseOutfit(response.outfit);
+    return outfit.imageUrl ? outfit : this.waitForOutfitImage(outfit.id);
   }
 
   async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
-    const cached = options.forceRefresh ? null : this.getCached(this.outfitsCache, this.outfitsCacheKey);
+    const cacheKey = options.includePending ? `${this.outfitsCacheKey}:include-pending` : this.outfitsCacheKey;
+    const cached = options.forceRefresh ? null : this.getCached(this.outfitsCache, cacheKey);
     if (cached) {
       return cached;
     }
 
-    return this.setCached(this.outfitsCache, this.outfitsCacheKey, async () => {
-      const response = await this.authorized(() => firstValueFrom(this.http.get<{ outfits: OutfitDto[] }>(this.url('/api/outfits'), this.authOptions())));
+    return this.setCached(this.outfitsCache, cacheKey, async () => {
+      const query = options.includePending ? '?includePending=true' : '';
+      const response = await this.authorized(() => firstValueFrom(this.http.get<{ outfits: OutfitDto[] }>(this.url(`/api/outfits${query}`), this.authOptions())));
       return Promise.all(response.outfits.map((outfit) => this.normaliseOutfit(outfit)));
     });
   }
@@ -196,6 +207,12 @@ export class WardrobeApiService {
   async deleteOutfit(id: string): Promise<void> {
     await this.authorized(() => firstValueFrom(this.http.delete<void>(this.url(`/api/outfits/${id}`), this.authOptions())));
     this.clearOutfitCaches();
+  }
+
+  async deleteOutfits(ids: string[]): Promise<BulkDeleteResponse> {
+    const response = await this.authorized(() => firstValueFrom(this.http.post<BulkDeleteResponse>(this.url('/api/outfits/bulk-delete'), { ids }, this.authOptions())));
+    this.clearOutfitCaches();
+    return response;
   }
 
   async markWorn(id: string): Promise<void> {
@@ -268,6 +285,44 @@ export class WardrobeApiService {
 
   private clearOutfitCaches(): void {
     this.outfitsCache.clear();
+  }
+
+  private async waitForOutfitImage(outfitId: string): Promise<OutfitDto> {
+    const deadline = Date.now() + 120_000;
+    while (Date.now() < deadline) {
+      const outfits = await this.getOutfits({ forceRefresh: true, includePending: true });
+      const outfit = outfits.find((candidate) => candidate.id === outfitId);
+      if (!outfit) {
+        throw new Error('Outfit image generation did not return a saved outfit.');
+      }
+
+      if (outfit.imageUrl) {
+        this.clearOutfitCaches();
+        return outfit;
+      }
+
+      if (outfit.imageGenerationStatus === 'failed') {
+        await this.removePendingOutfit(outfitId);
+        throw new Error('Outfit image generation failed.');
+      }
+
+      await this.delay(1800);
+    }
+
+    await this.removePendingOutfit(outfitId);
+    throw new Error('Outfit image generation did not finish in time.');
+  }
+
+  private delay(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+  }
+
+  private async removePendingOutfit(outfitId: string): Promise<void> {
+    try {
+      await this.deleteOutfit(outfitId);
+    } catch {
+      // If cleanup fails, keep the user-facing failure focused on image generation.
+    }
   }
 
   private async authorized<T>(request: () => Promise<T>): Promise<T> {
@@ -364,6 +419,7 @@ export class WardrobeApiService {
   private async normaliseOutfit(outfit: OutfitDto): Promise<OutfitDto> {
     return {
       ...outfit,
+      isDeleted: outfit.isDeleted ?? false,
       imageUrl: this.normaliseAssetUrl(outfit.imageUrl),
       thumbnailUrl: this.normaliseAssetUrl(outfit.thumbnailUrl),
       items: await Promise.all(outfit.items.map((item) => this.normaliseItem(item, false)))
@@ -380,6 +436,7 @@ export class WardrobeApiService {
 
     return {
       ...item,
+      isDeleted: item.isDeleted ?? false,
       image: {
         originalUrl: this.normaliseAssetUrl(image.originalUrl) ?? '',
         displayUrl: resolveDisplayImage

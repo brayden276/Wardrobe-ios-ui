@@ -10,7 +10,10 @@ import {
   TERMS_OF_USE_URL,
   clearAiConsent,
   hasAiConsent,
-  readMessage
+  lightImpact,
+  readMessage,
+  successFeedback,
+  warningFeedback
 } from '../page-helpers';
 
 type SettingsMode = 'account' | 'ai' | 'legal' | 'danger';
@@ -31,17 +34,25 @@ export class SettingsPage {
   readonly aiDisclosure = AI_DISCLOSURE_TEXT;
   aiConsentAccepted = false;
   aiUsage: AiUsageCostSummaryDto | null = null;
+  aiUsageLoadMessage = '';
+  isLoadingAiUsage = false;
   isBusy = false;
+  busyMessage = '';
   message = '';
   settingsMode: SettingsMode = 'account';
 
   async ionViewWillEnter(): Promise<void> {
     this.aiConsentAccepted = await hasAiConsent();
     this.message = '';
+    this.aiUsageLoadMessage = '';
+    this.isLoadingAiUsage = true;
     try {
       this.aiUsage = await this.api.getAiUsageCostSummary();
     } catch {
       this.aiUsage = null;
+      this.aiUsageLoadMessage = 'Could not load AI processing activity right now.';
+    } finally {
+      this.isLoadingAiUsage = false;
     }
   }
 
@@ -64,6 +75,18 @@ export class SettingsPage {
     return value.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 });
   }
 
+  get settingsStatusMessage(): string {
+    if (this.busyMessage) {
+      return this.busyMessage;
+    }
+
+    if (this.isLoadingAiUsage) {
+      return 'Loading AI processing activity...';
+    }
+
+    return '';
+  }
+
   setSettingsMode(mode: SettingsMode): void {
     if (this.settingsMode === mode) {
       return;
@@ -73,13 +96,19 @@ export class SettingsPage {
     if (mode !== 'danger') {
       this.message = '';
     }
+    void lightImpact();
   }
 
   async logout(): Promise<void> {
     this.isBusy = true;
-    await this.auth.logout();
-    this.isBusy = false;
-    await this.router.navigateByUrl('/login');
+    this.busyMessage = 'Signing out...';
+    try {
+      await this.auth.logout();
+      await this.router.navigateByUrl('/login');
+    } finally {
+      this.isBusy = false;
+      this.busyMessage = '';
+    }
   }
 
   async resetAiConsent(): Promise<void> {
@@ -87,9 +116,18 @@ export class SettingsPage {
       return;
     }
 
-    await clearAiConsent();
-    this.aiConsentAccepted = false;
-    this.message = 'Gemini consent was cleared for this device.';
+    this.isBusy = true;
+    this.busyMessage = 'Clearing Gemini consent...';
+    this.message = '';
+    try {
+      await clearAiConsent();
+      this.aiConsentAccepted = false;
+      this.message = 'Gemini consent was cleared for this device.';
+      void successFeedback();
+    } finally {
+      this.isBusy = false;
+      this.busyMessage = '';
+    }
   }
 
   async deleteAccount(): Promise<void> {
@@ -99,15 +137,19 @@ export class SettingsPage {
     }
 
     this.isBusy = true;
+    this.busyMessage = 'Deleting account and wardrobe data...';
     this.message = '';
     try {
       await this.auth.deleteAccount();
       await clearAiConsent();
+      void successFeedback();
       await this.router.navigateByUrl('/login');
     } catch (error) {
       this.message = readMessage(error, 'Could not delete your account. Try again.');
+      void warningFeedback();
     } finally {
       this.isBusy = false;
+      this.busyMessage = '';
     }
   }
 }

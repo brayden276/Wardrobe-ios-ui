@@ -1,47 +1,72 @@
     <ion-content class="app-content">
-      <section class="screen">
-        <header class="page-header">
-          <h1>Outfits</h1>
-          <button type="button" class="icon-button" aria-label="Refresh outfits" (click)="load(true)">
-            <ion-icon name="refresh-outline"></ion-icon>
-          </button>
+      <section class="screen processing-screen" *ngIf="isDeletingSelected; else outfitsContent">
+        <header class="nav-header">
+          <span></span>
+          <h1>Deleting outfits</h1>
+          <span></span>
         </header>
-        <article class="panel state-panel" *ngIf="isLoading">
+        <article class="panel processing-panel">
           <ion-spinner name="crescent"></ion-spinner>
-          <p class="muted">Loading outfits...</p>
+          <p class="muted">{{ processingDetail }}</p>
+          <ol class="processing-steps">
+            <li class="complete"><span></span>Confirming selected outfits</li>
+            <li class="active"><span></span>Updating outfit records</li>
+            <li><span></span>Refreshing saved outfits</li>
+          </ol>
         </article>
+      </section>
+      <ng-template #outfitsContent>
+      <section class="screen page-workspace" [class.sheet-active]="selectedOutfit">
+        <div class="content-layer">
+        <header class="page-header">
+          <div class="page-title-stack">
+            <h1>{{ isSelectionMode ? selectedCount + ' selected' : 'Outfits' }}</h1>
+            <p class="page-meta" *ngIf="!isSelectionMode">{{ isLoading ? loadingMessage : (outfits.length + (outfits.length === 1 ? ' saved outfit' : ' saved outfits')) }}</p>
+            <p class="page-meta" *ngIf="isSelectionMode">Tap outfits to adjust the selection.</p>
+          </div>
+          <div class="header-actions">
+            <button type="button" class="icon-button" *ngIf="!isSelectionMode" aria-label="Refresh outfits" (click)="load(true)" [disabled]="isLoading">
+              <ion-icon name="refresh-outline"></ion-icon>
+            </button>
+            <button type="button" class="icon-button" *ngIf="isSelectionMode" aria-label="Cancel selection" (click)="cancelSelectionMode()">
+              <ion-icon name="close-outline"></ion-icon>
+            </button>
+          </div>
+        </header>
+        <article class="intent-banner selection-summary" *ngIf="isSelectionMode">
+          <p class="muted">{{ selectedCount ? 'Selected saved outfits will be removed. Wardrobe items stay available.' : 'Tap outfits to select them.' }}</p>
+          <div class="selection-inline-actions">
+            <button type="button" class="text-link" (click)="selectVisibleOutfits()">Select visible</button>
+            <button type="button" class="text-link" (click)="clearSelection()" [disabled]="!selectedCount">Clear</button>
+          </div>
+        </article>
+        <div class="skeleton-list outfit-skeleton" *ngIf="isLoading" aria-label="Loading saved outfits">
+          <article class="skeleton-card" *ngFor="let placeholder of [0, 1, 2]">
+            <div class="skeleton-image"></div>
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line short"></div>
+          </article>
+        </div>
         <article class="panel state-panel" *ngIf="!isLoading && message">
           <p class="muted">{{ message }}</p>
         </article>
-        <ng-container *ngIf="!selectedOutfit">
-          <article class="outfit-card" *ngFor="let outfit of visibleOutfits; trackBy: trackById">
-            <button type="button" class="outfit-open" (click)="open(outfit)">
+        <ng-container>
+          <article class="outfit-card" *ngFor="let outfit of visibleOutfits; trackBy: trackById" [class.selection-mode]="isSelectionMode" [class.selected]="isOutfitSelected(outfit.id)" [attr.aria-selected]="isSelectionMode ? isOutfitSelected(outfit.id) : null">
+            <button type="button" class="outfit-open" (pointerdown)="beginOutfitPress(outfit)" (pointerup)="endOutfitPress()" (pointerleave)="cancelOutfitPress()" (pointercancel)="cancelOutfitPress()" (contextmenu)="suppressContextMenu($event)" (click)="open(outfit, $event)">
               <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [appLazyImage]="outfit.thumbnailUrl || outfit.imageUrl" [alt]="outfit.name" loading="lazy" decoding="async">
+              <span class="selection-marker" *ngIf="isSelectionMode">
+                <ion-icon [name]="isOutfitSelected(outfit.id) ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+              </span>
             </button>
-            <div class="outfit-images" *ngIf="!outfit.imageUrl">
-              <img *ngFor="let item of outfit.items" [appLazyImage]="outfitItemImageUrl(item)" [alt]="item.name" loading="lazy" decoding="async">
-            </div>
-            <div class="outfit-copy">
+            <div class="outfit-copy" (pointerdown)="beginOutfitPress(outfit)" (pointerup)="endOutfitPress()" (pointerleave)="cancelOutfitPress()" (pointercancel)="cancelOutfitPress()" (contextmenu)="suppressContextMenu($event)" (click)="open(outfit, $event)">
               <h3>{{ outfit.name }}</h3>
               <p class="muted">{{ outfit.explanation || 'Saved from your wardrobe.' }}</p>
-              <div class="outfit-generation-progress compact" *ngIf="outfitGenerationMessage(outfit.imageGenerationStatus) as status" [class.failed]="outfit.imageGenerationStatus === 'failed'">
-                <div class="generation-orbit" aria-hidden="true"><span></span><span></span><span></span></div>
-                <div class="generation-copy">
-                  <strong>{{ outfitGenerationTitle(outfit.imageGenerationStatus) }}</strong>
-                  <p>{{ status }}</p>
-                  <ol class="generation-steps">
-                    <li *ngFor="let step of outfitImageGenerationSteps; let index = index" [class]="outfitGenerationStepState(outfit.imageGenerationStatus, index)">
-                      <span></span>{{ step }}
-                    </li>
-                  </ol>
-                </div>
-              </div>
               <div class="outfit-item-list">
                 <span *ngFor="let item of outfit.items">{{ item.name }}</span>
               </div>
             </div>
-            <div class="outfit-actions">
-              <ion-button class="secondary-button compact-button" fill="outline" (click)="open(outfit)">Open</ion-button>
+            <div class="outfit-actions" *ngIf="!isSelectionMode">
+              <ion-button class="secondary-button compact-button" fill="outline" (click)="open(outfit, $event)">Open</ion-button>
               <ion-button class="secondary-button compact-button" fill="outline" (click)="markWorn(outfit)"
                 [disabled]="isMarkingOutfit(outfit.id) || isRemovingOutfit(outfit.id)">
                 {{ isMarkingOutfit(outfit.id) ? 'Marking...' : 'Mark worn' }}
@@ -51,10 +76,20 @@
                 {{ isRemovingOutfit(outfit.id) ? 'Deleting...' : 'Delete' }}
               </ion-button>
             </div>
+            <div class="status-line" *ngIf="outfitActionMessage(outfit) as status">
+              <ion-spinner name="crescent"></ion-spinner>
+              <span>{{ status }}</span>
+            </div>
           </article>
           <ion-button class="secondary-button" fill="outline" expand="block" *ngIf="canShowMoreOutfits" (click)="showMoreOutfits()">Show more outfits</ion-button>
         </ng-container>
-        <article class="panel outfit-detail-panel" *ngIf="selectedOutfit">
+        <article class="panel" *ngIf="!isLoading && !message && !outfits.length">
+          <h2 class="plain-title">No saved outfits</h2>
+          <p class="muted">Build an outfit and save the ones worth repeating.</p>
+        </article>
+        </div>
+        <button type="button" class="sheet-backdrop" *ngIf="selectedOutfit" aria-label="Close outfit details" (click)="close()"></button>
+        <article class="inline-sheet bottom-sheet outfit-detail-panel" *ngIf="selectedOutfit">
           <div class="panel-heading">
             <h2 class="section-title">{{ selectedOutfit.name }}</h2>
             <button type="button" class="icon-button" aria-label="Close outfit details" (click)="close()">
@@ -62,18 +97,6 @@
             </button>
           </div>
           <img class="outfit-detail-image" *ngIf="selectedOutfit.imageUrl" [appLazyImage]="selectedOutfit.imageUrl" [appLazyImagePriority]="true" [alt]="selectedOutfit.name" loading="eager" decoding="async">
-          <div class="outfit-generation-progress detail" *ngIf="outfitGenerationMessage(selectedOutfit.imageGenerationStatus) as status" [class.failed]="selectedOutfit.imageGenerationStatus === 'failed'">
-            <div class="generation-orbit" aria-hidden="true"><span></span><span></span><span></span></div>
-            <div class="generation-copy">
-              <strong>{{ outfitGenerationTitle(selectedOutfit.imageGenerationStatus) }}</strong>
-              <p>{{ status }}</p>
-              <ol class="generation-steps">
-                <li *ngFor="let step of outfitImageGenerationSteps; let index = index" [class]="outfitGenerationStepState(selectedOutfit.imageGenerationStatus, index)">
-                  <span></span>{{ step }}
-                </li>
-              </ol>
-            </div>
-          </div>
           <div class="outfit-detail-items">
             <div class="outfit-detail-item" *ngFor="let item of selectedOutfit.items">
               <img [appLazyImage]="outfitItemImageUrl(item)" [alt]="item.name" loading="lazy" decoding="async">
@@ -84,9 +107,12 @@
             </div>
           </div>
         </article>
-        <article class="panel" *ngIf="!selectedOutfit && !isLoading && !message && !outfits.length">
-          <h2 class="plain-title">No saved outfits</h2>
-          <p class="muted">Build an outfit and save the ones worth repeating.</p>
-        </article>
+        <div class="bulk-action-bar" *ngIf="isSelectionMode">
+          <button type="button" class="bulk-action-bar__secondary" (click)="cancelSelectionMode()">Cancel</button>
+          <button type="button" class="bulk-action-bar__danger" (click)="deleteSelectedOutfits()" [disabled]="!selectedCount || isDeletingSelected">
+            {{ selectedCount ? 'Delete selected' : 'Select outfits' }}
+          </button>
+        </div>
       </section>
+      </ng-template>
     </ion-content>

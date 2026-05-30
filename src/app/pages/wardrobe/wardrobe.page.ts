@@ -4,10 +4,11 @@ import { ImageGenerationStreamUpdate, WardrobeItemDto, WardrobeLookupsDto } from
 import { ImageGenerationStatusStream, WardrobeApiService } from '../../wardrobe-api.service';
 import {
   colourSwatch,
-  isActivewearBottomSubcategory,
-  isActivewearTopSubcategory,
+  lightImpact,
   lookupLabel,
-  readMessage
+  readMessage,
+  successFeedback,
+  warningFeedback
 } from '../page-helpers';
 
 @Component({
@@ -38,6 +39,9 @@ export class WardrobePage implements OnDestroy {
   search = '';
   isLoading = true;
   message = '';
+  isSelectionMode = false;
+  isDeletingSelected = false;
+  selectedItemIds = new Set<string>();
   virtualStartIndex = 0;
   virtualEndIndex = 0;
   private loadDebounceHandle: ReturnType<typeof setTimeout> | null = null;
@@ -55,6 +59,9 @@ export class WardrobePage implements OnDestroy {
   private readonly itemImageGenerationPollingIntervalMs = 1800;
   private itemImageGenerationPollTimeout: ReturnType<typeof setTimeout> | null = null;
   private isRefreshingImageGeneration = false;
+  private itemLongPressHandle: ReturnType<typeof setTimeout> | null = null;
+  private suppressNextItemClick = false;
+  private readonly selectionLongPressMs = 450;
   isLoadingMore = false;
   canLoadMore = false;
 
@@ -101,6 +108,25 @@ export class WardrobePage implements OnDestroy {
     return this.items.slice(this.virtualStartIndex, this.virtualEndIndex);
   }
 
+  get loadingMessage(): string {
+    return this.items.length ? 'Refreshing wardrobe...' : 'Loading wardrobe...';
+  }
+
+  get selectedCount(): number {
+    return this.selectedItemIds.size;
+  }
+
+  get processingTitle(): string {
+    return 'Deleting items';
+  }
+
+  get processingDetail(): string {
+    const count = this.selectedCount;
+    return count === 1
+      ? 'Deleting 1 wardrobe item. It will no longer appear in your wardrobe or outfit builder.'
+      : `Deleting ${count} wardrobe items. They will no longer appear in your wardrobe or outfit builder.`;
+  }
+
   get virtualTopSpacerHeight(): number {
     return Math.floor(this.virtualStartIndex / this.virtualColumns) * this.virtualRowHeight;
   }
@@ -113,6 +139,7 @@ export class WardrobePage implements OnDestroy {
 
   toggleFilters(): void {
     this.filtersExpanded = !this.filtersExpanded;
+    void lightImpact();
   }
 
   get hasFilters(): boolean {
@@ -155,6 +182,7 @@ export class WardrobePage implements OnDestroy {
     if (this.loadDebounceHandle) {
       clearTimeout(this.loadDebounceHandle);
     }
+    this.clearItemLongPress();
     this.stopItemImageGenerationStreaming();
     this.stopItemImageGenerationPolling();
   }
@@ -193,6 +221,7 @@ export class WardrobePage implements OnDestroy {
       this.lookups = lookups;
       this.items = items;
       this.canLoadMore = items.length === this.wardrobePageSize;
+      this.pruneSelectedItems();
       this.resetVirtualWindow();
       await this.content?.scrollToTop(0);
       this.startImageGenerationStreaming();
@@ -300,6 +329,7 @@ export class WardrobePage implements OnDestroy {
       const nextItems = await this.api.getItems(this.buildPagedItemFilterParams(this.items.length), { forceRefresh: true });
       this.items = [...this.items, ...nextItems];
       this.canLoadMore = nextItems.length === this.wardrobePageSize;
+      this.pruneSelectedItems();
       this.resetVirtualWindow();
       this.startImageGenerationStreaming();
     } catch (error) {
@@ -484,6 +514,123 @@ export class WardrobePage implements OnDestroy {
     return item.id;
   }
 
+  enterSelectionMode(): void {
+    this.isSelectionMode = true;
+    this.message = '';
+    void lightImpact();
+  }
+
+  cancelSelectionMode(): void {
+    this.clearItemLongPress();
+    this.isSelectionMode = false;
+    this.selectedItemIds.clear();
+    this.message = '';
+    void lightImpact();
+  }
+
+  clearSelection(): void {
+    this.selectedItemIds.clear();
+  }
+
+  selectVisibleItems(): void {
+    for (const item of this.visibleItems) {
+      this.selectedItemIds.add(item.id);
+    }
+  }
+
+  isItemSelected(itemId: string): boolean {
+    return this.selectedItemIds.has(itemId);
+  }
+
+  onItemCardClick(event: Event, item: WardrobeItemDto): void {
+    this.clearItemLongPress();
+    if (this.suppressNextItemClick) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.suppressNextItemClick = false;
+      return;
+    }
+
+    if (!this.isSelectionMode) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    this.toggleItemSelection(item.id);
+  }
+
+  toggleItemSelection(itemId: string): void {
+    if (this.selectedItemIds.has(itemId)) {
+      this.selectedItemIds.delete(itemId);
+      void lightImpact();
+      return;
+    }
+
+    this.selectedItemIds.add(itemId);
+    void lightImpact();
+  }
+
+  beginItemPress(item: WardrobeItemDto): void {
+    if (this.isSelectionMode || this.isLoading || this.isDeletingSelected) {
+      return;
+    }
+
+    this.clearItemLongPress();
+    this.itemLongPressHandle = setTimeout(() => {
+      this.itemLongPressHandle = null;
+      this.suppressNextItemClick = true;
+      this.enterSelectionMode();
+      this.selectedItemIds.add(item.id);
+    }, this.selectionLongPressMs);
+  }
+
+  endItemPress(): void {
+    this.clearItemLongPress();
+  }
+
+  cancelItemPress(): void {
+    this.clearItemLongPress();
+  }
+
+  suppressContextMenu(event: Event): void {
+    if (this.isSelectionMode || this.suppressNextItemClick) {
+      event.preventDefault();
+    }
+  }
+
+  async deleteSelectedItems(): Promise<void> {
+    if (!this.selectedItemIds.size || this.isDeletingSelected) {
+      return;
+    }
+
+    const ids = Array.from(this.selectedItemIds);
+    const confirmed = window.confirm(ids.length === 1
+      ? 'Delete 1 selected wardrobe item?'
+      : `Delete ${ids.length} selected wardrobe items?`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.isDeletingSelected = true;
+    this.message = '';
+    try {
+      const result = await this.api.deleteItems(ids);
+      this.selectedItemIds.clear();
+      this.isSelectionMode = false;
+      await this.load(true);
+      this.message = result.deletedCount === 1
+        ? 'Deleted 1 wardrobe item.'
+        : `Deleted ${result.deletedCount} wardrobe items.`;
+      void successFeedback();
+    } catch (error) {
+      this.message = readMessage(error, 'Could not delete selected wardrobe items.');
+      void warningFeedback();
+    } finally {
+      this.isDeletingSelected = false;
+    }
+  }
+
   wardrobeImageUrl(item: WardrobeItemDto): string {
     return item.image.thumbnailUrl || item.image.displayUrl;
   }
@@ -518,5 +665,24 @@ export class WardrobePage implements OnDestroy {
       this.loadDebounceHandle = null;
       void this.load();
     }, this.loadDebounceMs);
+  }
+
+  private pruneSelectedItems(): void {
+    if (!this.selectedItemIds.size) {
+      return;
+    }
+
+    const visibleIds = new Set(this.items.map((item) => item.id));
+    this.selectedItemIds = new Set(Array.from(this.selectedItemIds).filter((id) => visibleIds.has(id)));
+    if (this.isSelectionMode && !this.selectedItemIds.size) {
+      this.isSelectionMode = false;
+    }
+  }
+
+  private clearItemLongPress(): void {
+    if (this.itemLongPressHandle) {
+      clearTimeout(this.itemLongPressHandle);
+    }
+    this.itemLongPressHandle = null;
   }
 }

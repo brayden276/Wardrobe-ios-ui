@@ -66,6 +66,7 @@ export interface WardrobeItemDto {
   bottomShapeId: string | null;
   riseId: string | null;
   isArchived: boolean;
+  isDeleted: boolean;
   wearCount: number;
   lastWornAt: string | null;
   image: WardrobeItemImageDto;
@@ -91,6 +92,13 @@ export interface BatchWardrobeItemsResponse {
   results: WardrobeItemUploadResultDto[];
   succeededCount: number;
   failedCount: number;
+}
+
+export interface BulkDeleteResponse {
+  requestedCount: number;
+  deletedCount: number;
+  deletedIds: string[];
+  notFoundIds: string[];
 }
 
 export interface UpdateWardrobeItemRequest {
@@ -128,6 +136,7 @@ export interface OutfitDto {
   imageUrl: string | null;
   thumbnailUrl: string | null;
   imageGenerationStatus: string | null;
+  isDeleted: boolean;
   items: WardrobeItemDto[];
   wearCount: number;
   lastWornAt: string | null;

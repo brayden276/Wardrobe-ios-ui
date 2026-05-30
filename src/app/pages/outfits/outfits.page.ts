@@ -1,7 +1,7 @@
-import { Component, OnDestroy, inject } from '@angular/core';
-import { ImageGenerationStreamUpdate, OutfitDto } from '../../models';
-import { ImageGenerationStatusStream, WardrobeApiService } from '../../wardrobe-api.service';
-import { readMessage } from '../page-helpers';
+import { Component, inject } from '@angular/core';
+import { OutfitDto } from '../../models';
+import { WardrobeApiService } from '../../wardrobe-api.service';
+import { lightImpact, readMessage, successFeedback, warningFeedback } from '../page-helpers';
 
 @Component({
   selector: 'app-outfits',
@@ -9,20 +9,21 @@ import { readMessage } from '../page-helpers';
   templateUrl: './outfits.page.html',
   styleUrls: ['./outfits.page.scss']
 })
-export class OutfitsPage implements OnDestroy {
+export class OutfitsPage {
   private readonly api = inject(WardrobeApiService);
   outfits: OutfitDto[] = [];
   selectedOutfit: OutfitDto | null = null;
   isLoading = true;
   message = '';
-  private imageGenerationStatusStream: ImageGenerationStatusStream | null = null;
+  isSelectionMode = false;
+  isDeletingSelected = false;
+  selectedOutfitIds = new Set<string>();
   private readonly markingOutfitIds = new Set<string>();
   private readonly deletingOutfitIds = new Set<string>();
-  private readonly outfitGenerationPollingIntervalMs = 1800;
   private readonly outfitRenderIncrement = 20;
-  readonly outfitImageGenerationSteps = ['Collecting items', 'Styling layout', 'Rendering preview', 'Finalising image'];
-  private outfitGenerationPollTimeout: ReturnType<typeof setTimeout> | null = null;
-  private isRefreshingOutfits = false;
+  private outfitLongPressHandle: ReturnType<typeof setTimeout> | null = null;
+  private suppressNextOutfitClick = false;
+  private readonly selectionLongPressMs = 450;
   visibleOutfitCount = this.outfitRenderIncrement;
 
   get visibleOutfits(): OutfitDto[] {
@@ -33,6 +34,20 @@ export class OutfitsPage implements OnDestroy {
     return this.visibleOutfitCount < this.outfits.length;
   }
 
+  get loadingMessage(): string {
+    return this.outfits.length ? 'Refreshing outfits...' : 'Loading outfits...';
+  }
+
+  get selectedCount(): number {
+    return this.selectedOutfitIds.size;
+  }
+
+  get processingDetail(): string {
+    return this.selectedCount === 1
+      ? 'Deleting 1 saved outfit. Wardrobe items stay available.'
+      : `Deleting ${this.selectedCount} saved outfits. Wardrobe items stay available.`;
+  }
+
   showMoreOutfits(): void {
     this.visibleOutfitCount = Math.min(this.outfits.length, this.visibleOutfitCount + this.outfitRenderIncrement);
   }
@@ -41,22 +56,15 @@ export class OutfitsPage implements OnDestroy {
     await this.load();
   }
 
-  ngOnDestroy(): void {
-    this.stopOutfitGenerationStreaming();
-    this.stopOutfitGenerationPolling();
-  }
-
   async load(forceRefresh = false): Promise<void> {
-    this.stopOutfitGenerationStreaming();
-    this.stopOutfitGenerationPolling();
     this.isLoading = true;
     this.message = '';
     try {
       this.outfits = await this.api.getOutfits({ forceRefresh });
+      this.pruneSelectedOutfits();
       if (this.selectedOutfit) {
         this.selectedOutfit = this.outfits.find((outfit) => outfit.id === this.selectedOutfit?.id) ?? null;
       }
-      this.startOutfitGenerationStreaming();
     } catch (error) {
       this.message = readMessage(error, 'Could not load outfits.');
       this.outfits = [];
@@ -65,191 +73,36 @@ export class OutfitsPage implements OnDestroy {
     }
   }
 
-  open(outfit: OutfitDto): void {
+  open(outfit: OutfitDto, event?: Event): void {
+    this.clearOutfitLongPress();
+    if (this.suppressNextOutfitClick) {
+      event?.preventDefault();
+      event?.stopPropagation();
+      this.suppressNextOutfitClick = false;
+      return;
+    }
+
+    if (this.isSelectionMode) {
+      event?.preventDefault();
+      event?.stopPropagation();
+      this.toggleOutfitSelection(outfit.id);
+      return;
+    }
+
     this.selectedOutfit = outfit;
-    this.startOutfitGenerationStreaming();
+    void lightImpact();
   }
 
   close(): void {
     this.selectedOutfit = null;
     this.message = '';
-  }
-
-  private startOutfitGenerationStreaming(): void {
-    this.stopOutfitGenerationStreaming();
-    this.stopOutfitGenerationPolling();
-
-    if (!this.hasOutfitImageGenerationInProgress()) {
-      return;
-    }
-
-    const trackingOutfitIds = new Set<string>();
-    for (const outfit of this.outfits) {
-      if (this.isOutfitImageGenerationInProgress(outfit.imageGenerationStatus)) {
-        trackingOutfitIds.add(outfit.id);
-      }
-    }
-
-    const stream = this.api.streamImageGenerationStatuses(
-      [],
-      Array.from(trackingOutfitIds),
-      (updates) => this.applyOutfitGenerationStreamUpdates(updates),
-      () => {
-        this.imageGenerationStatusStream = null;
-        this.startOutfitGenerationPolling();
-      });
-
-    if (stream === null) {
-      this.startOutfitGenerationPolling();
-      return;
-    }
-
-    this.imageGenerationStatusStream = stream;
-  }
-
-  private applyOutfitGenerationStreamUpdates(updates: ImageGenerationStreamUpdate[]): void {
-    if (!updates.length) {
-      return;
-    }
-
-    const updateById = new Map<string, ImageGenerationStreamUpdate>(
-      updates.filter((update) => update.kind === 'outfit').map((update) => [update.id, update]));
-    this.outfits = this.outfits.map((outfit) => {
-      const update = updateById.get(outfit.id);
-      if (!update || update.status === outfit.imageGenerationStatus) {
-        return outfit;
-      }
-
-      return { ...outfit, imageGenerationStatus: update.status };
-    });
-
-    if (this.selectedOutfit) {
-      this.selectedOutfit = this.outfits.find((outfit) => outfit.id === this.selectedOutfit?.id) ?? null;
-    }
-
-    if (!this.hasOutfitImageGenerationInProgress()) {
-      this.stopOutfitGenerationStreaming();
-      void this.refreshOutfitsAfterImageGeneration();
-    }
-  }
-
-  private async refreshOutfitsAfterImageGeneration(): Promise<void> {
-    try {
-      const outfits = await this.api.getOutfits({ forceRefresh: true });
-      const selectedOutfitId = this.selectedOutfit?.id ?? null;
-      this.outfits = outfits;
-      this.selectedOutfit = selectedOutfitId ? outfits.find((outfit) => outfit.id === selectedOutfitId) ?? null : null;
-    } catch {
-      // Ignore temporary network issues after outfit image generation completes.
-    }
-  }
-
-  private stopOutfitGenerationStreaming(): void {
-    if (this.imageGenerationStatusStream) {
-      this.imageGenerationStatusStream.close();
-    }
-    this.imageGenerationStatusStream = null;
-  }
-
-  private startOutfitGenerationPolling(): void {
-    this.stopOutfitGenerationPolling();
-    if (!this.hasOutfitImageGenerationInProgress()) {
-      return;
-    }
-
-    this.outfitGenerationPollTimeout = setTimeout(() => {
-      this.outfitGenerationPollTimeout = null;
-      void this.pollOutfitImageGeneration();
-    }, this.outfitGenerationPollingIntervalMs);
-  }
-
-  private async pollOutfitImageGeneration(): Promise<void> {
-    if (this.isRefreshingOutfits) {
-      this.startOutfitGenerationPolling();
-      return;
-    }
-
-    if (!this.hasOutfitImageGenerationInProgress()) {
-      return;
-    }
-
-    this.isRefreshingOutfits = true;
-    try {
-      const outfits = await this.api.getOutfits({ forceRefresh: true });
-      const selectedOutfitId = this.selectedOutfit?.id ?? null;
-      this.outfits = outfits;
-      this.selectedOutfit = selectedOutfitId ? outfits.find((outfit) => outfit.id === selectedOutfitId) ?? null : null;
-    } catch {
-      // Ignore temporary network issues while polling for outfit image status.
-    } finally {
-      this.isRefreshingOutfits = false;
-      this.startOutfitGenerationPolling();
-    }
-  }
-
-  private stopOutfitGenerationPolling(): void {
-    if (this.outfitGenerationPollTimeout) {
-      clearTimeout(this.outfitGenerationPollTimeout);
-    }
-    this.outfitGenerationPollTimeout = null;
-    this.isRefreshingOutfits = false;
-  }
-
-  private hasOutfitImageGenerationInProgress(): boolean {
-    return this.outfits.some((outfit) => this.isOutfitImageGenerationInProgress(outfit.imageGenerationStatus));
-  }
-
-  outfitGenerationMessage(status: string | null): string | null {
-    switch (status) {
-      case 'queued':
-        return 'We are collecting the outfit images and starting the render.';
-      case 'generating':
-        return 'Rendering the outfit preview. Multiple saved outfits render in parallel.';
-      case 'failed':
-        return 'Preview render did not finish, but the outfit is saved and item photos are shown.';
-      default:
-        return null;
-    }
-  }
-
-  outfitGenerationTitle(status: string | null): string {
-    switch (status) {
-      case 'queued':
-        return 'Preparing preview';
-      case 'generating':
-        return 'Building outfit image';
-      case 'failed':
-        return 'Preview unavailable';
-      default:
-        return '';
-    }
-  }
-
-  outfitGenerationStepState(status: string | null, index: number): string {
-    const activeStep = this.outfitGenerationActiveStep(status);
-    if (activeStep < 0) {
-      return '';
-    }
-
-    if (status === 'failed') {
-      return index < activeStep ? 'complete' : index === activeStep ? 'failed' : 'pending';
-    }
-
-    if (index < activeStep) {
-      return 'complete';
-    }
-
-    return index === activeStep ? 'active' : 'pending';
-  }
-
-  isOutfitImageGenerationInProgress(status: string | null): boolean {
-    return status === 'queued' || status === 'generating';
+    void lightImpact();
   }
 
   async markWorn(outfit: OutfitDto): Promise<void> {
     if (this.markingOutfitIds.has(outfit.id)) return;
     this.markingOutfitIds.add(outfit.id);
-    this.message = '';
+    this.message = `Marking "${outfit.name}" as worn...`;
     try {
       await this.api.markWorn(outfit.id);
       try {
@@ -261,8 +114,10 @@ export class OutfitsPage implements OnDestroy {
         this.updateOutfitAfterWear(outfit.id);
       }
       this.message = 'Marked as worn.';
+      void successFeedback();
     } catch (error) {
       this.message = readMessage(error, 'Could not mark outfit as worn.');
+      void warningFeedback();
     } finally {
       this.markingOutfitIds.delete(outfit.id);
     }
@@ -279,17 +134,119 @@ export class OutfitsPage implements OnDestroy {
     }
 
     this.deletingOutfitIds.add(outfit.id);
-    this.message = '';
+    this.message = `Deleting "${outfit.name}"...`;
     try {
       await this.api.deleteOutfit(outfit.id);
       if (this.selectedOutfit?.id === outfit.id) {
         this.selectedOutfit = null;
       }
       await this.load(true);
+      void successFeedback();
     } catch (error) {
       this.message = readMessage(error, 'Could not delete outfit.');
+      void warningFeedback();
     } finally {
       this.deletingOutfitIds.delete(outfit.id);
+    }
+  }
+
+  enterSelectionMode(): void {
+    this.isSelectionMode = true;
+    this.selectedOutfit = null;
+    this.message = '';
+    void lightImpact();
+  }
+
+  cancelSelectionMode(): void {
+    this.clearOutfitLongPress();
+    this.isSelectionMode = false;
+    this.selectedOutfitIds.clear();
+    this.message = '';
+    void lightImpact();
+  }
+
+  clearSelection(): void {
+    this.selectedOutfitIds.clear();
+  }
+
+  selectVisibleOutfits(): void {
+    for (const outfit of this.visibleOutfits) {
+      this.selectedOutfitIds.add(outfit.id);
+    }
+  }
+
+  isOutfitSelected(outfitId: string): boolean {
+    return this.selectedOutfitIds.has(outfitId);
+  }
+
+  toggleOutfitSelection(outfitId: string): void {
+    if (this.selectedOutfitIds.has(outfitId)) {
+      this.selectedOutfitIds.delete(outfitId);
+      void lightImpact();
+      return;
+    }
+
+    this.selectedOutfitIds.add(outfitId);
+    void lightImpact();
+  }
+
+  beginOutfitPress(outfit: OutfitDto): void {
+    if (this.isSelectionMode || this.isLoading || this.isDeletingSelected || this.selectedOutfit) {
+      return;
+    }
+
+    this.clearOutfitLongPress();
+    this.outfitLongPressHandle = setTimeout(() => {
+      this.outfitLongPressHandle = null;
+      this.suppressNextOutfitClick = true;
+      this.enterSelectionMode();
+      this.selectedOutfitIds.add(outfit.id);
+    }, this.selectionLongPressMs);
+  }
+
+  endOutfitPress(): void {
+    this.clearOutfitLongPress();
+  }
+
+  cancelOutfitPress(): void {
+    this.clearOutfitLongPress();
+  }
+
+  suppressContextMenu(event: Event): void {
+    if (this.isSelectionMode || this.suppressNextOutfitClick) {
+      event.preventDefault();
+    }
+  }
+
+  async deleteSelectedOutfits(): Promise<void> {
+    if (!this.selectedOutfitIds.size || this.isDeletingSelected) {
+      return;
+    }
+
+    const ids = Array.from(this.selectedOutfitIds);
+    const confirmed = window.confirm(ids.length === 1
+      ? 'Delete 1 selected outfit?'
+      : `Delete ${ids.length} selected outfits?`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.isDeletingSelected = true;
+    this.message = '';
+    try {
+      const result = await this.api.deleteOutfits(ids);
+      this.selectedOutfitIds.clear();
+      this.isSelectionMode = false;
+      await this.load(true);
+      this.message = result.deletedCount === 1
+        ? 'Deleted 1 outfit.'
+        : `Deleted ${result.deletedCount} outfits.`;
+      void successFeedback();
+    } catch (error) {
+      this.message = readMessage(error, 'Could not delete selected outfits.');
+      void warningFeedback();
+    } finally {
+      this.isDeletingSelected = false;
     }
   }
 
@@ -299,6 +256,18 @@ export class OutfitsPage implements OnDestroy {
 
   isRemovingOutfit(outfitId: string): boolean {
     return this.deletingOutfitIds.has(outfitId);
+  }
+
+  outfitActionMessage(outfit: OutfitDto): string {
+    if (this.isMarkingOutfit(outfit.id)) {
+      return `Marking "${outfit.name}" as worn...`;
+    }
+
+    if (this.isRemovingOutfit(outfit.id)) {
+      return `Deleting "${outfit.name}"...`;
+    }
+
+    return '';
   }
 
   trackById(_: number, outfit: OutfitDto): string {
@@ -324,16 +293,22 @@ export class OutfitsPage implements OnDestroy {
     }
   }
 
-  private outfitGenerationActiveStep(status: string | null): number {
-    switch (status) {
-      case 'queued':
-        return 0;
-      case 'generating':
-        return 2;
-      case 'failed':
-        return 3;
-      default:
-        return -1;
+  private pruneSelectedOutfits(): void {
+    if (!this.selectedOutfitIds.size) {
+      return;
     }
+
+    const visibleIds = new Set(this.outfits.map((outfit) => outfit.id));
+    this.selectedOutfitIds = new Set(Array.from(this.selectedOutfitIds).filter((id) => visibleIds.has(id)));
+    if (this.isSelectionMode && !this.selectedOutfitIds.size) {
+      this.isSelectionMode = false;
+    }
+  }
+
+  private clearOutfitLongPress(): void {
+    if (this.outfitLongPressHandle) {
+      clearTimeout(this.outfitLongPressHandle);
+    }
+    this.outfitLongPressHandle = null;
   }
 }

@@ -4,8 +4,11 @@ import { ImageGenerationStreamUpdate, UpdateWardrobeItemRequest, WardrobeItemDto
 import { ImageGenerationStatusStream, WardrobeApiService } from '../../wardrobe-api.service';
 import {
   emptyItemForm,
+  lightImpact,
   lookupLabel,
-  readMessage
+  readMessage,
+  successFeedback,
+  warningFeedback
 } from '../page-helpers';
 
 type ItemDetailMode = 'view' | 'edit';
@@ -285,8 +288,10 @@ export class ItemDetailPage implements OnDestroy {
         this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
       }
       this.message = 'Marked as worn.';
+      void successFeedback();
     } catch (error) {
       this.message = readMessage(error, 'Could not mark item as worn.');
+      void warningFeedback();
     } finally {
       this.isMarkingWorn = false;
     }
@@ -301,14 +306,16 @@ export class ItemDetailPage implements OnDestroy {
   async save(): Promise<void> {
     if (!this.item) return;
     this.isSaving = true;
-    this.message = '';
+    this.message = 'Saving item details...';
     try {
       this.item = await this.api.updateItem(this.item.id, this.form);
       this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
       this.message = 'Details saved.';
       this.setItemMode('view');
+      void successFeedback();
     } catch (error) {
       this.message = readMessage(error, 'Could not save details.');
+      void warningFeedback();
     } finally {
       this.isSaving = false;
     }
@@ -322,12 +329,14 @@ export class ItemDetailPage implements OnDestroy {
     }
 
     this.isArchiving = true;
-    this.message = '';
+    this.message = 'Archiving item...';
     try {
       await this.api.deleteItem(this.item.id);
+      void successFeedback();
       await this.router.navigateByUrl('/tabs/wardrobe');
     } catch (error) {
       this.message = readMessage(error, 'Could not archive item.');
+      void warningFeedback();
     } finally {
       this.isArchiving = false;
     }
@@ -341,6 +350,22 @@ export class ItemDetailPage implements OnDestroy {
     return this.itemMode === 'edit';
   }
 
+  get processingMessage(): string {
+    if (this.isSaving) {
+      return 'Saving item details...';
+    }
+
+    if (this.isMarkingWorn) {
+      return 'Marking item as worn...';
+    }
+
+    if (this.isArchiving) {
+      return 'Archiving item...';
+    }
+
+    return '';
+  }
+
   setItemMode(mode: ItemDetailMode): void {
     if (this.itemMode === mode) {
       return;
@@ -351,6 +376,7 @@ export class ItemDetailPage implements OnDestroy {
     if (mode === 'view' && this.item) {
       this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
     }
+    void lightImpact();
   }
 
   private isUnauthorized(error: unknown): boolean {

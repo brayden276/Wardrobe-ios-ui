@@ -2,17 +2,20 @@ import { Component, inject } from '@angular/core';
 import { GeneratedOutfitDto, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import {
-  AI_DISCLOSURE_TEXT,
   colourSwatch,
   ensureAiConsent,
   isActivewearBottomSubcategory,
   isActivewearTopSubcategory,
+  lightImpact,
   lookupLabel,
-  readMessage
+  readMessage,
+  successFeedback,
+  warningFeedback
 } from '../page-helpers';
 
 type BuilderMode = 'generate' | 'manual';
 type GeneratedOutfitSaveState = 'idle' | 'saving' | 'saved' | 'failed';
+type BuilderProcessingKind = 'loadingWardrobe' | 'buildingOutfits' | 'savingGeneratedOutfit' | 'savingManualOutfit';
 
 @Component({
   selector: 'app-builder',
@@ -27,7 +30,6 @@ export class BuilderPage {
   readonly occasionOptions = ['Work', 'Dinner', 'Brunch', 'Weekend'];
   readonly dressCodeOptions = ['Smart casual', 'Relaxed', 'Polished', 'Active'];
   readonly avoidOptions = ['No heels', 'No jacket', 'No dress'];
-  readonly loadingRows = [0, 1];
   occasion = 'Dinner';
   dressCode = 'Smart casual';
   selectedAvoids = ['No heels'];
@@ -39,17 +41,29 @@ export class BuilderPage {
   manualItemIds: string[] = [];
   message = '';
   hasGeneratedSearchRun = false;
+  isLoadingWardrobe = true;
   isBuildingOutfits = false;
   isSavingManualOutfit = false;
+  processingKind: BuilderProcessingKind | null = null;
+  processingStepIndex = 0;
   private lastGeneratedPrompt = '';
   private readonly savingGeneratedOutfitKeys = new Set<string>();
   private readonly savedGeneratedOutfitKeys = new Set<string>();
   private readonly failedGeneratedOutfitKeys = new Set<string>();
   private readonly builderItemRenderIncrement = 60;
   visibleBuilderItemCount = this.builderItemRenderIncrement;
+  private readonly processingStepsByKind: Record<BuilderProcessingKind, string[]> = {
+    loadingWardrobe: ['Loading wardrobe items', 'Loading outfit options', 'Preparing builder'],
+    buildingOutfits: ['Reading request', 'Matching wardrobe items', 'Building outfit combinations', 'Preparing suggestions'],
+    savingGeneratedOutfit: ['Collecting selected item images', 'Composing outfit preview', 'Generating outfit image', 'Saving outfit'],
+    savingManualOutfit: ['Collecting selected item images', 'Composing outfit preview', 'Generating outfit image', 'Saving outfit']
+  };
 
   get isBusy(): boolean {
-    return this.isBuildingOutfits || this.isSavingManualOutfit;
+    return this.isLoadingWardrobe
+      || this.isBuildingOutfits
+      || this.isSavingManualOutfit
+      || this.savingGeneratedOutfitKeys.size > 0;
   }
 
   get includeItems(): WardrobeItemDto[] {
@@ -95,13 +109,65 @@ export class BuilderPage {
     return 'Building outfit suggestions...';
   }
 
+  get isFullPageProcessing(): boolean {
+    return this.processingKind !== null;
+  }
+
+  get processingTitle(): string {
+    switch (this.processingKind) {
+      case 'loadingWardrobe':
+        return 'Loading wardrobe';
+      case 'buildingOutfits':
+        return 'Building outfit ideas';
+      case 'savingGeneratedOutfit':
+      case 'savingManualOutfit':
+        return 'Generating outfit image';
+      default:
+        return '';
+    }
+  }
+
+  get processingDetail(): string {
+    switch (this.processingKind) {
+      case 'loadingWardrobe':
+        return 'Loading the items and options needed for the builder.';
+      case 'buildingOutfits':
+        return this.loadingStatus;
+      case 'savingGeneratedOutfit':
+        return 'Using the selected clothing item images to generate the saved outfit preview.';
+      case 'savingManualOutfit':
+        return 'Using your selected clothing item images to generate the saved outfit preview.';
+      default:
+        return '';
+    }
+  }
+
+  get processingSteps(): string[] {
+    return this.processingKind ? this.processingStepsByKind[this.processingKind] : [];
+  }
+
+  processingStepState(index: number): string {
+    if (!this.processingKind) {
+      return '';
+    }
+
+    if (index < this.processingStepIndex) {
+      return 'complete';
+    }
+
+    return index === this.processingStepIndex ? 'active' : 'pending';
+  }
+
   async ionViewWillEnter(): Promise<void> {
     this.message = '';
+    this.isLoadingWardrobe = true;
+    this.startProcessing('loadingWardrobe');
     try {
       const [lookups, items] = await Promise.all([
         this.lookups ? Promise.resolve(this.lookups) : this.api.getLookups(),
         this.api.getItems()
       ]);
+      this.setProcessingStep(2);
       this.lookups = lookups;
       this.items = items;
       this.manualItemIds = this.manualItemIds.filter((id) => this.items.some((item) => item.id === id));
@@ -110,12 +176,16 @@ export class BuilderPage {
       }
     } catch (error) {
       this.message = readMessage(error, 'Could not load wardrobe items.');
+    } finally {
+      this.isLoadingWardrobe = false;
+      this.stopProcessing('loadingWardrobe');
     }
   }
 
   setBuilderMode(mode: BuilderMode): void {
     this.builderMode = mode;
     this.message = '';
+    void lightImpact();
   }
 
   clearQuery(): void {
@@ -133,10 +203,12 @@ export class BuilderPage {
   toggleAvoid(value: string): void {
     if (this.selectedAvoids.includes(value)) {
       this.selectedAvoids = this.selectedAvoids.filter((entry) => entry !== value);
+      void lightImpact();
       return;
     }
 
     this.selectedAvoids = [...this.selectedAvoids, value];
+    void lightImpact();
   }
 
   isAvoidSelected(value: string): boolean {
@@ -149,6 +221,7 @@ export class BuilderPage {
 
   selectRequiredItem(id: string | null): void {
     this.requiredItemId = id;
+    void lightImpact();
   }
 
   clearRequiredItem(): void {
@@ -158,10 +231,12 @@ export class BuilderPage {
   toggleManualItem(id: string): void {
     if (this.manualItemIds.includes(id)) {
       this.manualItemIds = this.manualItemIds.filter((value) => value !== id);
+      void lightImpact();
       return;
     }
 
     this.manualItemIds = [...this.manualItemIds, id];
+    void lightImpact();
   }
 
   clearManualSelection(): void {
@@ -177,10 +252,12 @@ export class BuilderPage {
       'Wardrobe AI uses Google Gemini to interpret your outfit request and generate outfit suggestions from your wardrobe. Do you want to continue with AI processing for this device?'))
     {
       this.message = 'Gemini consent is required before Wardrobe AI can build outfit suggestions.';
+      void warningFeedback();
       return;
     }
 
     this.isBuildingOutfits = true;
+    this.startProcessing('buildingOutfits');
     this.message = '';
     this.hasGeneratedSearchRun = true;
     this.results = [];
@@ -191,19 +268,25 @@ export class BuilderPage {
         this.lookups ? Promise.resolve(this.lookups) : this.api.getLookups(),
         this.api.getItems()
       ]);
+      this.setProcessingStep(1);
       this.lookups = lookups;
       this.items = items;
       const prompt = this.buildOutfitQuery();
       this.lastGeneratedPrompt = prompt;
+      this.setProcessingStep(2);
       this.results = await this.api.searchOutfits(prompt, this.requiredItemId);
+      this.setProcessingStep(3);
       if (!this.results.length) {
         this.message = '';
       }
+      void lightImpact();
     } catch (error) {
       this.results = [];
       this.message = readMessage(error, 'Could not build an outfit from the current wardrobe.');
+      void warningFeedback();
     } finally {
       this.isBuildingOutfits = false;
+      this.stopProcessing('buildingOutfits');
     }
   }
 
@@ -214,18 +297,25 @@ export class BuilderPage {
     }
 
     this.isSavingManualOutfit = true;
+    this.startProcessing('savingManualOutfit');
     this.message = '';
     try {
       const selected = this.selectedManualItems();
+      this.setProcessingStep(1);
       const explanation = this.isValidManualOutfit(selected)
         ? 'Built manually from selected wardrobe items.'
         : `Saved as a partial manual look from selected wardrobe items. ${this.manualHint}`;
+      this.setProcessingStep(2);
       await this.api.saveOutfit(this.manualName.trim() || 'Manual outfit', null, explanation.trim(), this.manualItemIds);
+      this.setProcessingStep(3);
       this.message = 'Outfit saved.';
+      void successFeedback();
     } catch (error) {
       this.message = readMessage(error, 'Could not save outfit.');
+      void warningFeedback();
     } finally {
       this.isSavingManualOutfit = false;
+      this.stopProcessing('savingManualOutfit');
     }
   }
 
@@ -236,17 +326,24 @@ export class BuilderPage {
     }
 
     this.savingGeneratedOutfitKeys.add(key);
+    this.startProcessing('savingGeneratedOutfit');
     this.savedGeneratedOutfitKeys.delete(key);
     this.failedGeneratedOutfitKeys.delete(key);
     this.message = '';
     try {
-      await this.api.saveOutfit(outfit.title, this.lastGeneratedPrompt || this.buildOutfitQuery(), outfit.explanation, outfit.itemIds, outfit.imageUrl);
+      this.setProcessingStep(1);
+      this.setProcessingStep(2);
+      await this.api.saveOutfit(outfit.title, this.lastGeneratedPrompt || this.buildOutfitQuery(), outfit.explanation, outfit.itemIds);
+      this.setProcessingStep(3);
       this.savedGeneratedOutfitKeys.add(key);
+      void successFeedback();
     } catch (error) {
       this.failedGeneratedOutfitKeys.add(key);
       this.message = readMessage(error, 'Could not save outfit.');
+      void warningFeedback();
     } finally {
       this.savingGeneratedOutfitKeys.delete(key);
+      this.stopProcessing('savingGeneratedOutfit');
     }
   }
 
@@ -356,11 +453,24 @@ export class BuilderPage {
   generatedSaveLabel(outfit: GeneratedOutfitDto): string {
     switch (this.generatedSaveState(outfit)) {
       case 'saving':
-        return 'Saving...';
+        return 'Generating...';
       case 'saved':
         return 'Saved';
       default:
         return outfit.isComplete ? 'Save outfit' : 'Save anyway';
+    }
+  }
+
+  generatedSaveStatusMessage(outfit: GeneratedOutfitDto): string {
+    switch (this.generatedSaveState(outfit)) {
+      case 'saving':
+        return `Generating image for "${outfit.title}"...`;
+      case 'saved':
+        return 'Saved to outfits.';
+      case 'failed':
+        return 'Could not save.';
+      default:
+        return '';
     }
   }
 
@@ -416,5 +526,27 @@ export class BuilderPage {
 
   private generatedOutfitKey(outfit: GeneratedOutfitDto): string {
     return `${outfit.title}::${outfit.itemIds.join(',')}::${outfit.imageUrl ?? ''}`;
+  }
+
+  private startProcessing(kind: BuilderProcessingKind): void {
+    this.processingKind = kind;
+    this.processingStepIndex = 0;
+  }
+
+  private setProcessingStep(index: number): void {
+    if (!this.processingKind) {
+      return;
+    }
+
+    this.processingStepIndex = Math.min(index, this.processingSteps.length - 1);
+  }
+
+  private stopProcessing(kind: BuilderProcessingKind): void {
+    if (this.processingKind !== kind) {
+      return;
+    }
+
+    this.processingKind = null;
+    this.processingStepIndex = 0;
   }
 }

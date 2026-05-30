@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../auth.service';
-import { EMAIL_PATTERN, readMessage } from '../page-helpers';
+import { EMAIL_PATTERN, lightImpact, readMessage, successFeedback, warningFeedback } from '../page-helpers';
 
 @Component({
   selector: 'app-login',
@@ -67,6 +67,7 @@ export class LoginPage {
 
     this.mode = mode;
     this.message = '';
+    void lightImpact();
   }
 
   toggleMode(): void {
@@ -101,9 +102,11 @@ export class LoginPage {
       } else {
         await this.auth.register(email, this.password, this.displayName.trim());
       }
+      void successFeedback();
       await this.router.navigateByUrl('/tabs/wardrobe');
     } catch (error) {
       this.message = readMessage(error, 'Could not sign in. Try again.');
+      void warningFeedback();
     } finally {
       this.isBusy = false;
     }

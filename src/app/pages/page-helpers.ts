@@ -1,3 +1,4 @@
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { Preferences } from '@capacitor/preferences';
 import { ApiMessage, UpdateWardrobeItemRequest, WardrobeLookupsDto } from '../models';
 
@@ -158,6 +159,30 @@ export async function ensureAiConsent(prompt: string): Promise<boolean> {
 
 export async function clearAiConsent(): Promise<void> {
   await Preferences.remove({ key: AI_CONSENT_KEY });
+}
+
+export async function lightImpact(): Promise<void> {
+  try {
+    await Haptics.impact({ style: ImpactStyle.Light });
+  } catch {
+    // Haptics are best-effort and unavailable in some browser runtimes.
+  }
+}
+
+export async function successFeedback(): Promise<void> {
+  try {
+    await Haptics.notification({ type: NotificationType.Success });
+  } catch {
+    // Haptics are best-effort and unavailable in some browser runtimes.
+  }
+}
+
+export async function warningFeedback(): Promise<void> {
+  try {
+    await Haptics.notification({ type: NotificationType.Warning });
+  } catch {
+    // Haptics are best-effort and unavailable in some browser runtimes.
+  }
 }
 
 export function readMessage(error: unknown, fallback: string): string {

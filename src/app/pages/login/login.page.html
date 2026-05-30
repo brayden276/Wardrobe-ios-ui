@@ -1,15 +1,15 @@
   <ion-content class="app-content">
-    <section class="screen login-screen">
-        <div>
+    <section class="screen login-screen auth-workspace">
+        <div class="page-title-stack">
           <h1 class="plain-title">Wardrobe AI</h1>
           <p class="muted">Your private wardrobe catalogue and outfit builder.</p>
           <p class="muted">{{ authModeHint }}</p>
         </div>
-      <div class="intent-switch" role="tablist" aria-label="Authentication intent">
-        <button type="button" class="intent-tab" [class.active]="mode === 'login'" (click)="setAuthMode('login')" role="tab">Sign in</button>
-        <button type="button" class="intent-tab" [class.active]="mode === 'register'" (click)="setAuthMode('register')" role="tab">Create account</button>
+      <div class="mode-bar" role="tablist" aria-label="Authentication intent">
+        <button type="button" [class.active]="mode === 'login'" [attr.aria-selected]="mode === 'login'" (click)="setAuthMode('login')" role="tab">Sign in</button>
+        <button type="button" [class.active]="mode === 'register'" [attr.aria-selected]="mode === 'register'" (click)="setAuthMode('register')" role="tab">Create account</button>
       </div>
-      <form class="panel form-stack" (ngSubmit)="submit()">
+      <form class="intent-surface form-stack" (ngSubmit)="submit()">
         <label>
           Email
           <ion-input class="field" type="email" [(ngModel)]="email" name="email"></ion-input>
