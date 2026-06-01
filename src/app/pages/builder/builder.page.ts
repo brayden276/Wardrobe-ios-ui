@@ -283,10 +283,13 @@ export class BuilderPage {
       const prompt = this.buildOutfitQuery();
       this.lastGeneratedPrompt = prompt;
       this.setProcessingStep(2);
-      this.results = await this.api.searchOutfits(prompt, this.requiredItemId);
+      const generatedOutfits = await this.api.searchOutfits(prompt, this.requiredItemId);
+      this.results = generatedOutfits.filter((outfit) => !!outfit.displayImageUrl || !!outfit.imageUrl);
       this.setProcessingStep(3);
       if (!this.results.length) {
-        this.message = '';
+        this.message = generatedOutfits.length
+          ? 'Could not generate outfit previews for that request. Try again with a different outfit brief.'
+          : '';
       }
       void lightImpact();
     } catch (error) {
@@ -342,7 +345,12 @@ export class BuilderPage {
     try {
       this.setProcessingStep(1);
       this.setProcessingStep(2);
-      await this.api.saveOutfit(outfit.title, this.lastGeneratedPrompt || this.buildOutfitQuery(), outfit.explanation, outfit.itemIds);
+      await this.api.saveOutfit(
+        outfit.title,
+        this.lastGeneratedPrompt || this.buildOutfitQuery(),
+        outfit.explanation,
+        outfit.itemIds,
+        outfit.imageUrl || outfit.displayImageUrl || null);
       this.setProcessingStep(3);
       this.savedGeneratedOutfitKeys.add(key);
       void successFeedback();

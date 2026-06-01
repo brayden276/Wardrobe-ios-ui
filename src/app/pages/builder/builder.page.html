@@ -77,10 +77,7 @@
           </article>
           <h2 class="section-title" *ngIf="results.length">Outfit ideas</h2>
           <article class="outfit-card idea-card generated-outfit-card" *ngFor="let outfit of results">
-            <img class="outfit-hero-image" *ngIf="outfit.displayImageUrl" [appLazyImage]="outfit.displayImageUrl" [alt]="outfit.title" loading="lazy" decoding="async">
-            <div class="outfit-images generated-item-images" *ngIf="!outfit.displayImageUrl">
-              <img *ngFor="let id of outfit.itemIds" [appLazyImage]="imageFor(id)" [alt]="nameFor(id)" loading="lazy" decoding="async">
-            </div>
+            <img class="outfit-hero-image" [appLazyImage]="outfit.displayImageUrl || outfit.imageUrl" [alt]="outfit.title" loading="lazy" decoding="async">
             <div class="outfit-copy">
               <h3>{{ outfit.title }}</h3>
               <p class="muted">{{ outfit.explanation }}</p>
