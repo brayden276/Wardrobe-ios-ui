@@ -1,7 +1,7 @@
-import { Component, ElementRef, OnDestroy, ViewChild, inject } from '@angular/core';
+import { AfterViewChecked, AfterViewInit, Component, ElementRef, HostListener, NgZone, OnDestroy, ViewChild, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController, IonContent } from '@ionic/angular';
-import { ImageGenerationStreamUpdate, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
+import { ImageGenerationStreamUpdate, LookupOptionDto, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
 import { ImageGenerationStatusStream, WardrobeApiService } from '../../wardrobe-api.service';
 import {
   confirmAction,
@@ -15,19 +15,35 @@ import {
   warningFeedback
 } from '../page-helpers';
 
+interface WardrobeItemCard {
+  item: WardrobeItemDto;
+  imageUrl: string;
+  label: string;
+  colours: string[];
+  statusMessage: string | null;
+  isStatusInProgress: boolean;
+  isPriorityImage: boolean;
+  isSelected: boolean;
+}
+
 @Component({
   selector: 'app-wardrobe',
   standalone: false,
   templateUrl: './wardrobe.page.html',
   styleUrls: ['./wardrobe.page.scss']
 })
-export class WardrobePage implements OnDestroy {
+export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy {
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
   private readonly alertController = inject(AlertController);
+  private readonly zone = inject(NgZone);
   @ViewChild(IonContent) private readonly content?: IonContent;
+  @ViewChild(IonContent, { read: ElementRef }) private readonly contentElement?: ElementRef<HTMLElement>;
   @ViewChild('wardrobeGrid') private readonly wardrobeGrid?: ElementRef<HTMLElement>;
+  readonly skeletonPlaceholders = [0, 1, 2, 3];
   items: WardrobeItemDto[] = [];
+  visibleItems: WardrobeItemDto[] = [];
+  visibleItemCards: WardrobeItemCard[] = [];
   lookups: WardrobeLookupsDto | null = null;
   categoryId: string | null = null;
   subcategoryId: string | null = null;
@@ -50,7 +66,17 @@ export class WardrobePage implements OnDestroy {
   selectedItemIds = new Set<string>();
   virtualStartIndex = 0;
   virtualEndIndex = 0;
+  virtualTopSpacerHeight = 0;
+  virtualBottomSpacerHeight = 0;
+  activeFilterSummary = 'No filters selected.';
+  hasFilters = false;
+  subcategoryOptions: LookupOptionDto[] = [];
+  isLoadingMore = false;
+  canLoadMore = false;
   private loadDebounceHandle: ReturnType<typeof setTimeout> | null = null;
+  private virtualMetricsHandle: ReturnType<typeof requestAnimationFrame> | null = null;
+  private wardrobeScrollHandle: ReturnType<typeof requestAnimationFrame> | null = null;
+  private removeWardrobeScrollListener: (() => void) | null = null;
   private readonly loadDebounceMs = 250;
   private virtualColumns = 2;
   private virtualRowHeight = 258;
@@ -58,9 +84,12 @@ export class WardrobePage implements OnDestroy {
   private readonly firstPreloadItemCount = 2;
   private readonly wardrobePageSize = 60;
   private viewportHeight = 900;
+  private wardrobeScrollTop = 0;
+  private pendingVirtualMetricsSync = true;
   private activeLoad: Promise<void> | null = null;
   private hasPendingLoad = false;
   private hasPendingForceRefresh = false;
+  private hasPendingResetScroll = false;
   private imageGenerationStatusStream: ImageGenerationStatusStream | null = null;
   private readonly itemImageGenerationPollingIntervalMs = 1800;
   private itemImageGenerationPollTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -68,51 +97,6 @@ export class WardrobePage implements OnDestroy {
   private itemLongPressHandle: ReturnType<typeof setTimeout> | null = null;
   private suppressNextItemClick = false;
   private readonly selectionLongPressMs = 450;
-  isLoadingMore = false;
-  canLoadMore = false;
-
-  get activeFilterSummary(): string {
-    const filters: string[] = [];
-
-    if (this.categoryId) {
-      const category = this.lookups?.categories.find((option) => option.id === this.categoryId)?.label ?? this.categoryId;
-      filters.push(`Category: ${category}`);
-    }
-
-    if (this.subcategoryId) {
-      const current = this.subcategoryOptions.find((option) => option.id === this.subcategoryId);
-      filters.push(`Subcategory: ${current?.label ?? this.subcategoryId}`);
-    }
-
-    if (this.colourId) {
-      const colour = this.lookups?.colours.find((option) => option.id === this.colourId)?.label ?? this.colourId;
-      filters.push(`Colour: ${colour}`);
-    }
-
-    if (this.patternId) {
-      const pattern = this.lookups?.patterns.find((option) => option.id === this.patternId)?.label ?? this.patternId;
-      filters.push(`Pattern: ${pattern}`);
-    }
-
-    if (this.includeArchived) {
-      filters.push('Include archived');
-    }
-
-    const search = this.search.trim();
-    if (search) {
-      filters.push(`Search: ${search}`);
-    }
-
-    if (!filters.length) {
-      return 'No filters selected.';
-    }
-
-    return filters.join(' · ');
-  }
-
-  get visibleItems(): WardrobeItemDto[] {
-    return this.items.slice(this.virtualStartIndex, this.virtualEndIndex);
-  }
 
   get loadingMessage(): string {
     return this.items.length ? 'Refreshing wardrobe...' : 'Loading wardrobe...';
@@ -141,92 +125,89 @@ export class WardrobePage implements OnDestroy {
     return this.messageKind === 'error' || this.messageKind === 'offline';
   }
 
-  get virtualTopSpacerHeight(): number {
-    return Math.floor(this.virtualStartIndex / this.virtualColumns) * this.virtualRowHeight;
-  }
-
-  get virtualBottomSpacerHeight(): number {
-    const totalRows = Math.ceil(this.items.length / this.virtualColumns);
-    const renderedEndRow = Math.ceil(this.virtualEndIndex / this.virtualColumns);
-    return Math.max(0, (totalRows - renderedEndRow) * this.virtualRowHeight);
-  }
-
-  toggleFilters(): void {
-    this.filtersExpanded = !this.filtersExpanded;
-    void lightImpact();
-  }
-
-  get hasFilters(): boolean {
-    return !!(
-      this.categoryId
-      || this.subcategoryId
-      || this.colourId
-      || this.patternId
-      || this.visibleMaterialId
-      || this.necklineId
-      || this.sleeveLengthId
-      || this.fitId
-      || this.lengthId
-      || this.bottomShapeId
-      || this.riseId
-      || this.search.trim()
-      || this.includeArchived
-    );
-  }
-
-  get subcategoryOptions(): { id: string; label: string }[] {
-    if (!this.lookups) {
-      return [];
-    }
-
-    if (!this.categoryId) {
-      return this.lookups.categories.reduce<{ id: string; label: string }[]>(
-        (options, category) => options.concat(category.subcategories),
-        []);
-    }
-
-    return this.lookups.categories.find((category) => category.id === this.categoryId)?.subcategories ?? [];
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    this.scheduleVirtualMetricsSync();
   }
 
   async ionViewWillEnter(): Promise<void> {
     await this.load();
   }
 
+  ngAfterViewInit(): void {
+    this.zone.runOutsideAngular(() => {
+      const element = this.contentElement?.nativeElement;
+      if (!element) {
+        return;
+      }
+
+      const listener = (event: Event): void => {
+        this.queueWardrobeScroll((event as CustomEvent<{ scrollTop: number }>).detail.scrollTop);
+      };
+      element.addEventListener('ionScroll', listener);
+      this.removeWardrobeScrollListener = () => element.removeEventListener('ionScroll', listener);
+    });
+  }
+
+  ngAfterViewChecked(): void {
+    if (this.pendingVirtualMetricsSync) {
+      this.scheduleVirtualMetricsSync();
+    }
+  }
+
   ngOnDestroy(): void {
     if (this.loadDebounceHandle) {
       clearTimeout(this.loadDebounceHandle);
     }
+    if (this.virtualMetricsHandle !== null) {
+      cancelAnimationFrame(this.virtualMetricsHandle);
+    }
+    if (this.wardrobeScrollHandle !== null) {
+      cancelAnimationFrame(this.wardrobeScrollHandle);
+    }
+    this.removeWardrobeScrollListener?.();
     this.clearItemLongPress();
     this.stopItemImageGenerationStreaming();
     this.stopItemImageGenerationPolling();
   }
 
-  async load(forceRefresh = false): Promise<void> {
+  toggleFilters(): void {
+    this.filtersExpanded = !this.filtersExpanded;
+    this.scheduleVirtualMetricsSync();
+    void lightImpact();
+  }
+
+  async load(forceRefresh = false, resetScroll = false): Promise<void> {
     if (this.activeLoad) {
       this.hasPendingLoad = true;
       this.hasPendingForceRefresh = this.hasPendingForceRefresh || forceRefresh;
+      this.hasPendingResetScroll = this.hasPendingResetScroll || resetScroll;
       return this.activeLoad;
     }
 
     do {
       forceRefresh = forceRefresh || this.hasPendingForceRefresh;
+      resetScroll = resetScroll || this.hasPendingResetScroll;
       this.hasPendingLoad = false;
       this.hasPendingForceRefresh = false;
-      this.activeLoad = this.loadCore(forceRefresh);
+      this.hasPendingResetScroll = false;
+      this.activeLoad = this.loadCore(forceRefresh, resetScroll);
       try {
         await this.activeLoad;
       } finally {
         this.activeLoad = null;
       }
       forceRefresh = false;
+      resetScroll = false;
     } while (this.hasPendingLoad);
   }
 
-  private async loadCore(forceRefresh: boolean): Promise<void> {
+  private async loadCore(forceRefresh: boolean, resetScroll: boolean): Promise<void> {
     this.stopItemImageGenerationStreaming();
     this.stopItemImageGenerationPolling();
     this.isLoading = true;
     this.message = '';
+    const hadLoadedItems = this.items.length > 0;
     try {
       const [lookups, items] = await Promise.all([
         this.lookups ? Promise.resolve(this.lookups) : this.api.getLookups(),
@@ -235,12 +216,17 @@ export class WardrobePage implements OnDestroy {
       this.lookups = lookups;
       this.items = items;
       this.canLoadMore = items.length === this.wardrobePageSize;
+      this.updateFilterDerivedState();
       this.pruneSelectedItems();
-      this.resetVirtualWindow();
-      await this.content?.scrollToTop(0);
+      if (resetScroll || !hadLoadedItems) {
+        this.resetVirtualWindow();
+        await this.content?.scrollToTop(0);
+        this.wardrobeScrollTop = 0;
+      } else {
+        this.updateVirtualWindow(this.wardrobeScrollTop, true);
+      }
       this.startImageGenerationStreaming();
     } catch (error) {
-      const hadLoadedItems = this.items.length > 0;
       this.message = hadLoadedItems
         ? `${readMessage(error, 'Could not refresh wardrobe. Please try again.')} Showing last loaded wardrobe items.`
         : readMessage(error, 'Could not load wardrobe. Please try again.');
@@ -251,24 +237,54 @@ export class WardrobePage implements OnDestroy {
       }
     } finally {
       this.isLoading = false;
+      this.scheduleVirtualMetricsSync();
     }
   }
 
-  onWardrobeScroll(event: CustomEvent<{ scrollTop: number }>): void {
-    this.syncVirtualMetrics();
-    this.updateVirtualWindow(event.detail.scrollTop);
+  private queueWardrobeScroll(scrollTop: number): void {
+    this.wardrobeScrollTop = scrollTop;
+    if (this.wardrobeScrollHandle !== null) {
+      return;
+    }
+
+    this.wardrobeScrollHandle = requestAnimationFrame(() => {
+      this.wardrobeScrollHandle = null;
+      if (!this.hasVirtualWindowChange(this.wardrobeScrollTop)) {
+        return;
+      }
+
+      this.zone.run(() => {
+        this.updateVirtualWindow(this.wardrobeScrollTop);
+      });
+    });
   }
 
   private resetVirtualWindow(): void {
-    this.syncVirtualMetrics();
+    this.pendingVirtualMetricsSync = true;
     this.virtualStartIndex = 0;
     this.virtualEndIndex = Math.min(this.items.length, this.virtualColumns * (Math.ceil(this.viewportHeight / this.virtualRowHeight) + this.virtualOverscanRows));
+    this.updateVirtualSpacerHeights();
+    this.updateVisibleItemCards();
+  }
+
+  private scheduleVirtualMetricsSync(): void {
+    this.pendingVirtualMetricsSync = true;
+    if (this.virtualMetricsHandle !== null) {
+      return;
+    }
+
+    this.virtualMetricsHandle = requestAnimationFrame(() => {
+      this.virtualMetricsHandle = null;
+      this.syncVirtualMetrics();
+      this.pendingVirtualMetricsSync = false;
+    });
   }
 
   private syncVirtualMetrics(): void {
     this.viewportHeight = Math.max(1, window.innerHeight || this.viewportHeight);
     const grid = this.wardrobeGrid?.nativeElement;
     if (!grid) {
+      this.updateVirtualWindow(this.wardrobeScrollTop);
       return;
     }
 
@@ -282,21 +298,23 @@ export class WardrobePage implements OnDestroy {
     }
 
     const firstCard = grid.querySelector<HTMLElement>('.item-card');
-    if (!firstCard) {
-      return;
+    if (firstCard) {
+      const rowGap = Number.parseFloat(styles.rowGap || '0') || 0;
+      const cardHeight = firstCard.getBoundingClientRect().height;
+      if (cardHeight > 0) {
+        this.virtualRowHeight = Math.max(1, Math.ceil(cardHeight + rowGap));
+      }
     }
 
-    const rowGap = Number.parseFloat(styles.rowGap || '0') || 0;
-    const cardHeight = firstCard.getBoundingClientRect().height;
-    if (cardHeight > 0) {
-      this.virtualRowHeight = Math.max(1, Math.ceil(cardHeight + rowGap));
-    }
+    this.updateVirtualWindow(this.wardrobeScrollTop);
   }
 
-  private updateVirtualWindow(scrollTop: number): void {
+  private updateVirtualWindow(scrollTop: number, force = false): void {
     if (!this.items.length) {
       this.virtualStartIndex = 0;
       this.virtualEndIndex = 0;
+      this.updateVirtualSpacerHeights();
+      this.updateVisibleItemCards();
       return;
     }
 
@@ -306,27 +324,75 @@ export class WardrobePage implements OnDestroy {
     const startRow = Math.max(0, Math.floor(relativeScrollTop / this.virtualRowHeight) - this.virtualOverscanRows);
     const visibleRows = Math.ceil(this.viewportHeight / this.virtualRowHeight) + this.virtualOverscanRows * 2;
     const endRow = Math.min(totalRows, startRow + visibleRows);
+    const nextStartIndex = startRow * this.virtualColumns;
+    const nextEndIndex = Math.min(this.items.length, endRow * this.virtualColumns);
 
-    this.virtualStartIndex = startRow * this.virtualColumns;
-    this.virtualEndIndex = Math.min(this.items.length, endRow * this.virtualColumns);
+    if (!force && this.virtualStartIndex === nextStartIndex && this.virtualEndIndex === nextEndIndex) {
+      return;
+    }
+
+    this.virtualStartIndex = nextStartIndex;
+    this.virtualEndIndex = nextEndIndex;
+    this.updateVirtualSpacerHeights();
+    this.updateVisibleItemCards();
+  }
+
+  private hasVirtualWindowChange(scrollTop: number): boolean {
+    if (!this.items.length) {
+      return this.virtualStartIndex !== 0 || this.virtualEndIndex !== 0;
+    }
+
+    const gridOffsetTop = this.wardrobeGrid?.nativeElement.offsetTop ?? 0;
+    const relativeScrollTop = Math.max(0, scrollTop - gridOffsetTop);
+    const totalRows = Math.ceil(this.items.length / this.virtualColumns);
+    const startRow = Math.max(0, Math.floor(relativeScrollTop / this.virtualRowHeight) - this.virtualOverscanRows);
+    const visibleRows = Math.ceil(this.viewportHeight / this.virtualRowHeight) + this.virtualOverscanRows * 2;
+    const endRow = Math.min(totalRows, startRow + visibleRows);
+    const nextStartIndex = startRow * this.virtualColumns;
+    const nextEndIndex = Math.min(this.items.length, endRow * this.virtualColumns);
+    return this.virtualStartIndex !== nextStartIndex || this.virtualEndIndex !== nextEndIndex;
+  }
+
+  private updateVirtualSpacerHeights(): void {
+    this.virtualTopSpacerHeight = Math.floor(this.virtualStartIndex / this.virtualColumns) * this.virtualRowHeight;
+    const totalRows = Math.ceil(this.items.length / this.virtualColumns);
+    const renderedEndRow = Math.ceil(this.virtualEndIndex / this.virtualColumns);
+    this.virtualBottomSpacerHeight = Math.max(0, (totalRows - renderedEndRow) * this.virtualRowHeight);
+  }
+
+  private updateVisibleItemCards(): void {
+    this.visibleItems = this.items.slice(this.virtualStartIndex, this.virtualEndIndex);
+    this.visibleItemCards = this.visibleItems.map((item, index) => {
+      const statusMessage = this.imageGenerationMessage(item);
+      return {
+        item,
+        imageUrl: this.wardrobeImageUrl(item),
+        label: this.label(item.subcategoryId),
+        colours: this.coloursFor(item),
+        statusMessage,
+        isStatusInProgress: this.isImageGenerationInProgress(item.imageGenerationStatus),
+        isPriorityImage: this.virtualStartIndex + index < this.firstPreloadItemCount,
+        isSelected: this.selectedItemIds.has(item.id)
+      };
+    });
   }
 
   private buildItemFilterParams(): Record<string, string | boolean> {
     return {
-        categoryId: this.categoryId ?? '',
-        subcategoryId: this.subcategoryId ?? '',
-        colourId: this.colourId ?? '',
-        patternId: this.patternId ?? '',
-        visibleMaterialId: this.visibleMaterialId ?? '',
-        necklineId: this.necklineId ?? '',
-        sleeveLengthId: this.sleeveLengthId ?? '',
-        fitId: this.fitId ?? '',
-        lengthId: this.lengthId ?? '',
-        bottomShapeId: this.bottomShapeId ?? '',
-        riseId: this.riseId ?? '',
-        search: this.search.trim(),
-        includeArchived: this.includeArchived
-      };
+      categoryId: this.categoryId ?? '',
+      subcategoryId: this.subcategoryId ?? '',
+      colourId: this.colourId ?? '',
+      patternId: this.patternId ?? '',
+      visibleMaterialId: this.visibleMaterialId ?? '',
+      necklineId: this.necklineId ?? '',
+      sleeveLengthId: this.sleeveLengthId ?? '',
+      fitId: this.fitId ?? '',
+      lengthId: this.lengthId ?? '',
+      bottomShapeId: this.bottomShapeId ?? '',
+      riseId: this.riseId ?? '',
+      search: this.search.trim(),
+      includeArchived: this.includeArchived
+    };
   }
 
   private buildPagedItemFilterParams(offset: number): Record<string, string | number | boolean> {
@@ -345,11 +411,11 @@ export class WardrobePage implements OnDestroy {
 
     this.isLoadingMore = true;
     try {
-      const nextItems = await this.api.getItems(this.buildPagedItemFilterParams(this.items.length), { forceRefresh: true });
+      const nextItems = await this.api.getItems(this.buildPagedItemFilterParams(this.items.length));
       this.items = [...this.items, ...nextItems];
       this.canLoadMore = nextItems.length === this.wardrobePageSize;
       this.pruneSelectedItems();
-      this.resetVirtualWindow();
+      this.updateVirtualWindow(this.wardrobeScrollTop, true);
       this.startImageGenerationStreaming();
     } catch (error) {
       this.message = readMessage(error, 'Could not load more wardrobe items.');
@@ -357,6 +423,7 @@ export class WardrobePage implements OnDestroy {
     } finally {
       this.isLoadingMore = false;
       this.completeInfiniteScroll(event);
+      this.scheduleVirtualMetricsSync();
     }
   }
 
@@ -407,6 +474,7 @@ export class WardrobePage implements OnDestroy {
 
       return { ...item, imageGenerationStatus: update.status };
     });
+    this.updateVisibleItemCards();
 
     if (!this.hasItemImageGenerationInProgress()) {
       this.stopItemImageGenerationStreaming();
@@ -416,7 +484,10 @@ export class WardrobePage implements OnDestroy {
 
   private async refreshWardrobeItemsAfterImageGeneration(): Promise<void> {
     try {
-      this.items = await this.api.getItems(this.buildItemFilterParams(), { forceRefresh: true });
+      this.items = await this.api.getItems(this.buildPagedItemFilterParams(0), { forceRefresh: true });
+      this.canLoadMore = this.items.length === this.wardrobePageSize;
+      this.pruneSelectedItems();
+      this.resetVirtualWindow();
     } catch {
       // Ignore temporary network issues after image generation completes.
     }
@@ -451,7 +522,10 @@ export class WardrobePage implements OnDestroy {
 
     this.isRefreshingImageGeneration = true;
     try {
-      this.items = await this.api.getItems(this.buildItemFilterParams(), { forceRefresh: true });
+      this.items = await this.api.getItems(this.buildPagedItemFilterParams(0), { forceRefresh: true });
+      this.canLoadMore = this.items.length === this.wardrobePageSize;
+      this.pruneSelectedItems();
+      this.resetVirtualWindow();
     } catch {
       // Ignore temporary network issues while polling for image-generation states.
     } finally {
@@ -475,26 +549,31 @@ export class WardrobePage implements OnDestroy {
   setCategory(categoryId: string | null): void {
     this.categoryId = categoryId;
     this.subcategoryId = null;
+    this.updateFilterDerivedState();
     this.scheduleLoad();
   }
 
   setSubcategory(subcategoryId: string | null): void {
     this.subcategoryId = subcategoryId;
+    this.updateFilterDerivedState();
     this.scheduleLoad();
   }
 
   setColour(colourId: string | null): void {
     this.colourId = colourId;
+    this.updateFilterDerivedState();
     this.scheduleLoad();
   }
 
   setPattern(patternId: string | null): void {
     this.patternId = patternId;
+    this.updateFilterDerivedState();
     this.scheduleLoad();
   }
 
   setIncludeArchived(includeArchived: boolean): void {
     this.includeArchived = includeArchived;
+    this.updateFilterDerivedState();
     this.scheduleLoad();
   }
 
@@ -513,6 +592,13 @@ export class WardrobePage implements OnDestroy {
     this.includeArchived = false;
     this.search = '';
     this.filtersExpanded = false;
+    this.updateFilterDerivedState();
+    this.scheduleVirtualMetricsSync();
+    this.scheduleLoad();
+  }
+
+  onAdvancedFilterChanged(): void {
+    this.updateFilterDerivedState();
     this.scheduleLoad();
   }
 
@@ -533,9 +619,22 @@ export class WardrobePage implements OnDestroy {
     return item.id;
   }
 
+  trackByCardId(_: number, card: WardrobeItemCard): string {
+    return card.item.id;
+  }
+
+  trackByOptionId(_: number, option: LookupOptionDto): string {
+    return option.id;
+  }
+
+  trackByValue(_: number, value: string | number): string | number {
+    return value;
+  }
+
   enterSelectionMode(): void {
     this.isSelectionMode = true;
     this.message = '';
+    this.updateVisibleItemCards();
     void lightImpact();
   }
 
@@ -544,21 +643,20 @@ export class WardrobePage implements OnDestroy {
     this.isSelectionMode = false;
     this.selectedItemIds.clear();
     this.message = '';
+    this.updateVisibleItemCards();
     void lightImpact();
   }
 
   clearSelection(): void {
     this.selectedItemIds.clear();
+    this.updateVisibleItemCards();
   }
 
   selectVisibleItems(): void {
     for (const item of this.visibleItems) {
       this.selectedItemIds.add(item.id);
     }
-  }
-
-  isItemSelected(itemId: string): boolean {
-    return this.selectedItemIds.has(itemId);
+    this.updateVisibleItemCards();
   }
 
   onItemCardClick(item: WardrobeItemDto): void {
@@ -579,11 +677,13 @@ export class WardrobePage implements OnDestroy {
   toggleItemSelection(itemId: string): void {
     if (this.selectedItemIds.has(itemId)) {
       this.selectedItemIds.delete(itemId);
+      this.updateVisibleItemCards();
       void lightImpact();
       return;
     }
 
     this.selectedItemIds.add(itemId);
+    this.updateVisibleItemCards();
     void lightImpact();
   }
 
@@ -598,6 +698,7 @@ export class WardrobePage implements OnDestroy {
       this.suppressNextItemClick = true;
       this.enterSelectionMode();
       this.selectedItemIds.add(item.id);
+      this.updateVisibleItemCards();
     }, this.selectionLongPressMs);
   }
 
@@ -639,7 +740,7 @@ export class WardrobePage implements OnDestroy {
       const result = await this.api.deleteItems(ids);
       this.selectedItemIds.clear();
       this.isSelectionMode = false;
-      await this.load(true);
+      await this.load(true, true);
       this.message = result.deletedCount === 1
         ? 'Deleted 1 wardrobe item.'
         : `Deleted ${result.deletedCount} wardrobe items.`;
@@ -649,15 +750,12 @@ export class WardrobePage implements OnDestroy {
       void warningFeedback();
     } finally {
       this.isDeletingSelected = false;
+      this.updateVisibleItemCards();
     }
   }
 
   wardrobeImageUrl(item: WardrobeItemDto): string {
     return item.image.thumbnailUrl || item.image.displayUrl;
-  }
-
-  shouldPrioritiseImage(index: number): boolean {
-    return this.virtualStartIndex + index < this.firstPreloadItemCount;
   }
 
   imageGenerationMessage(item: WardrobeItemDto): string | null {
@@ -678,14 +776,84 @@ export class WardrobePage implements OnDestroy {
   }
 
   scheduleLoad(): void {
+    this.updateFilterDerivedState();
     if (this.loadDebounceHandle) {
       clearTimeout(this.loadDebounceHandle);
     }
 
     this.loadDebounceHandle = setTimeout(() => {
       this.loadDebounceHandle = null;
-      void this.load();
+      void this.load(false, true);
     }, this.loadDebounceMs);
+  }
+
+  private updateFilterDerivedState(): void {
+    this.subcategoryOptions = this.resolveSubcategoryOptions();
+    this.hasFilters = !!(
+      this.categoryId
+      || this.subcategoryId
+      || this.colourId
+      || this.patternId
+      || this.visibleMaterialId
+      || this.necklineId
+      || this.sleeveLengthId
+      || this.fitId
+      || this.lengthId
+      || this.bottomShapeId
+      || this.riseId
+      || this.search.trim()
+      || this.includeArchived
+    );
+    this.activeFilterSummary = this.buildActiveFilterSummary();
+  }
+
+  private resolveSubcategoryOptions(): LookupOptionDto[] {
+    if (!this.lookups) {
+      return [];
+    }
+
+    if (!this.categoryId) {
+      return this.lookups.categories.reduce<LookupOptionDto[]>(
+        (options, category) => options.concat(category.subcategories),
+        []);
+    }
+
+    return this.lookups.categories.find((category) => category.id === this.categoryId)?.subcategories ?? [];
+  }
+
+  private buildActiveFilterSummary(): string {
+    const filters: string[] = [];
+
+    if (this.categoryId) {
+      const category = this.lookups?.categories.find((option) => option.id === this.categoryId)?.label ?? this.categoryId;
+      filters.push(`Category: ${category}`);
+    }
+
+    if (this.subcategoryId) {
+      const current = this.subcategoryOptions.find((option) => option.id === this.subcategoryId);
+      filters.push(`Subcategory: ${current?.label ?? this.subcategoryId}`);
+    }
+
+    if (this.colourId) {
+      const colour = this.lookups?.colours.find((option) => option.id === this.colourId)?.label ?? this.colourId;
+      filters.push(`Colour: ${colour}`);
+    }
+
+    if (this.patternId) {
+      const pattern = this.lookups?.patterns.find((option) => option.id === this.patternId)?.label ?? this.patternId;
+      filters.push(`Pattern: ${pattern}`);
+    }
+
+    if (this.includeArchived) {
+      filters.push('Include archived');
+    }
+
+    const search = this.search.trim();
+    if (search) {
+      filters.push(`Search: ${search}`);
+    }
+
+    return filters.length ? filters.join(' · ') : 'No filters selected.';
   }
 
   private pruneSelectedItems(): void {
@@ -698,6 +866,7 @@ export class WardrobePage implements OnDestroy {
     if (this.isSelectionMode && !this.selectedItemIds.size) {
       this.isSelectionMode = false;
     }
+    this.updateVisibleItemCards();
   }
 
   private clearItemLongPress(): void {

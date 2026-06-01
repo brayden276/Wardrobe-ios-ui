@@ -16,6 +16,7 @@
         </header>
         <article class="panel state-panel state-panel--error" aria-live="polite">
           <p class="muted">{{ message || 'Could not load item.' }}</p>
+          <ion-button class="secondary-button" fill="outline" size="small" (click)="retryLoadItem()" [disabled]="isLoading">Try again</ion-button>
         </article>
       </section>
         <section class="screen detail-screen page-workspace" [class.editing-mode]="editing" *ngIf="!isLoading && item">

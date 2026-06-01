@@ -1,4 +1,4 @@
-    <ion-content class="app-content" [scrollEvents]="true" (ionScroll)="onWardrobeScroll($event)">
+    <ion-content class="app-content" [scrollEvents]="true">
       <section class="screen processing-screen" *ngIf="isDeletingSelected; else wardrobeContent" aria-live="polite" aria-busy="true">
         <header class="nav-header">
           <span></span>
@@ -66,7 +66,7 @@
             <span class="filter-label">Category</span>
             <div class="chip-row">
               <button type="button" class="chip" [class.active]="!categoryId" (click)="setCategory(null)">All</button>
-              <button type="button" class="chip" *ngFor="let category of lookups?.categories || []" [class.active]="categoryId === category.id" (click)="setCategory(category.id)">{{ category.label }}</button>
+              <button type="button" class="chip" *ngFor="let category of lookups?.categories || []; trackBy: trackByOptionId" [class.active]="categoryId === category.id" (click)="setCategory(category.id)">{{ category.label }}</button>
             </div>
           </div>
           <details class="advanced-filter">
@@ -78,71 +78,71 @@
               <span class="filter-label">Subcategory</span>
               <div class="chip-row">
                 <button type="button" class="chip" [class.active]="!subcategoryId" (click)="setSubcategory(null)">Any</button>
-                <button type="button" class="chip" *ngFor="let option of subcategoryOptions" [class.active]="subcategoryId === option.id" (click)="setSubcategory(option.id)">{{ option.label }}</button>
+                <button type="button" class="chip" *ngFor="let option of subcategoryOptions; trackBy: trackByOptionId" [class.active]="subcategoryId === option.id" (click)="setSubcategory(option.id)">{{ option.label }}</button>
               </div>
             </div>
             <div class="filter-group">
               <span class="filter-label">Colour</span>
               <div class="chip-row">
                 <button type="button" class="chip" [class.active]="!colourId" (click)="setColour(null)">Any</button>
-                <button type="button" class="chip" *ngFor="let option of lookups?.colours || []" [class.active]="colourId === option.id" (click)="setColour(option.id)">{{ option.label }}</button>
+                <button type="button" class="chip" *ngFor="let option of lookups?.colours || []; trackBy: trackByOptionId" [class.active]="colourId === option.id" (click)="setColour(option.id)">{{ option.label }}</button>
               </div>
             </div>
             <div class="filter-group">
               <span class="filter-label">Pattern</span>
               <div class="chip-row">
                 <button type="button" class="chip" [class.active]="!patternId" (click)="setPattern(null)">Any</button>
-                <button type="button" class="chip" *ngFor="let option of lookups?.patterns || []" [class.active]="patternId === option.id" (click)="setPattern(option.id)">{{ option.label }}</button>
+                <button type="button" class="chip" *ngFor="let option of lookups?.patterns || []; trackBy: trackByOptionId" [class.active]="patternId === option.id" (click)="setPattern(option.id)">{{ option.label }}</button>
               </div>
             </div>
             <div class="filter-select-grid">
               <label>
                 Material
-                <ion-select class="field" [(ngModel)]="visibleMaterialId" name="visibleMaterialId" (ionChange)="scheduleLoad()">
+                <ion-select class="field" [(ngModel)]="visibleMaterialId" name="visibleMaterialId" (ionChange)="onAdvancedFilterChanged()">
                   <ion-select-option [value]="null">Any</ion-select-option>
-                  <ion-select-option *ngFor="let option of lookups?.visibleMaterials || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.visibleMaterials || []; trackBy: trackByOptionId" [value]="option.id">{{ option.label }}</ion-select-option>
                 </ion-select>
               </label>
               <label>
                 Neckline
-                <ion-select class="field" [(ngModel)]="necklineId" name="necklineId" (ionChange)="scheduleLoad()">
+                <ion-select class="field" [(ngModel)]="necklineId" name="necklineId" (ionChange)="onAdvancedFilterChanged()">
                   <ion-select-option [value]="null">Any</ion-select-option>
-                  <ion-select-option *ngFor="let option of lookups?.necklines || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.necklines || []; trackBy: trackByOptionId" [value]="option.id">{{ option.label }}</ion-select-option>
                 </ion-select>
               </label>
               <label>
                 Sleeve
-                <ion-select class="field" [(ngModel)]="sleeveLengthId" name="sleeveLengthId" (ionChange)="scheduleLoad()">
+                <ion-select class="field" [(ngModel)]="sleeveLengthId" name="sleeveLengthId" (ionChange)="onAdvancedFilterChanged()">
                   <ion-select-option [value]="null">Any</ion-select-option>
-                  <ion-select-option *ngFor="let option of lookups?.sleeveLengths || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.sleeveLengths || []; trackBy: trackByOptionId" [value]="option.id">{{ option.label }}</ion-select-option>
                 </ion-select>
               </label>
               <label>
                 Fit
-                <ion-select class="field" [(ngModel)]="fitId" name="fitId" (ionChange)="scheduleLoad()">
+                <ion-select class="field" [(ngModel)]="fitId" name="fitId" (ionChange)="onAdvancedFilterChanged()">
                   <ion-select-option [value]="null">Any</ion-select-option>
-                  <ion-select-option *ngFor="let option of lookups?.fits || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.fits || []; trackBy: trackByOptionId" [value]="option.id">{{ option.label }}</ion-select-option>
                 </ion-select>
               </label>
               <label>
                 Length
-                <ion-select class="field" [(ngModel)]="lengthId" name="lengthId" (ionChange)="scheduleLoad()">
+                <ion-select class="field" [(ngModel)]="lengthId" name="lengthId" (ionChange)="onAdvancedFilterChanged()">
                   <ion-select-option [value]="null">Any</ion-select-option>
-                  <ion-select-option *ngFor="let option of lookups?.garmentLengths || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.garmentLengths || []; trackBy: trackByOptionId" [value]="option.id">{{ option.label }}</ion-select-option>
                 </ion-select>
               </label>
               <label>
                 Shape
-                <ion-select class="field" [(ngModel)]="bottomShapeId" name="bottomShapeId" (ionChange)="scheduleLoad()">
+                <ion-select class="field" [(ngModel)]="bottomShapeId" name="bottomShapeId" (ionChange)="onAdvancedFilterChanged()">
                   <ion-select-option [value]="null">Any</ion-select-option>
-                  <ion-select-option *ngFor="let option of lookups?.bottomShapes || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.bottomShapes || []; trackBy: trackByOptionId" [value]="option.id">{{ option.label }}</ion-select-option>
                 </ion-select>
               </label>
               <label>
                 Rise
-                <ion-select class="field" [(ngModel)]="riseId" name="riseId" (ionChange)="scheduleLoad()">
+                <ion-select class="field" [(ngModel)]="riseId" name="riseId" (ionChange)="onAdvancedFilterChanged()">
                   <ion-select-option [value]="null">Any</ion-select-option>
-                  <ion-select-option *ngFor="let option of lookups?.rises || []" [value]="option.id">{{ option.label }}</ion-select-option>
+                  <ion-select-option *ngFor="let option of lookups?.rises || []; trackBy: trackByOptionId" [value]="option.id">{{ option.label }}</ion-select-option>
                 </ion-select>
               </label>
             </div>
@@ -153,8 +153,8 @@
           </details>
           <ion-button class="secondary-button" fill="outline" expand="block" (click)="clearFilters()" [disabled]="!hasFilters">Clear filters</ion-button>
         </article>
-        <div class="skeleton-list wardrobe-skeleton" *ngIf="isLoading" aria-label="Loading wardrobe items" aria-busy="true">
-          <article class="skeleton-card" *ngFor="let placeholder of [0, 1, 2, 3]">
+        <div class="skeleton-list wardrobe-skeleton" *ngIf="isLoading && !items.length" aria-label="Loading wardrobe items" aria-busy="true">
+          <article class="skeleton-card" *ngFor="let placeholder of skeletonPlaceholders; trackBy: trackByValue">
             <div class="skeleton-image"></div>
             <div class="skeleton-line"></div>
             <div class="skeleton-line short"></div>
@@ -165,24 +165,24 @@
           <ion-button class="secondary-button" fill="outline" size="small" (click)="load(true)">Try again</ion-button>
         </article>
         <p class="status-note" *ngIf="!isLoading && message && !canRetryMessage" [class.status-note--success]="messageKind === 'success'" aria-live="polite">{{ message }}</p>
-        <div #wardrobeGrid class="wardrobe-grid wardrobe-grid--virtual" *ngIf="!isLoading && items.length; else emptyWardrobe">
+        <div #wardrobeGrid class="wardrobe-grid wardrobe-grid--virtual" *ngIf="items.length; else emptyWardrobe">
           <div class="wardrobe-grid__spacer" [style.height.px]="virtualTopSpacerHeight"></div>
-          <button type="button" class="item-card" *ngFor="let item of visibleItems; let index = index; trackBy: trackById" [class.selection-mode]="isSelectionMode" [class.selected]="isItemSelected(item.id)" [attr.aria-pressed]="isSelectionMode ? isItemSelected(item.id) : null" (pointerdown)="beginItemPress(item)" (pointerup)="endItemPress()" (pointerleave)="cancelItemPress()" (pointercancel)="cancelItemPress()" (contextmenu)="suppressContextMenu($event)" (click)="onItemCardClick(item)">
+          <button type="button" class="item-card" *ngFor="let card of visibleItemCards; trackBy: trackByCardId" [class.selection-mode]="isSelectionMode" [class.selected]="card.isSelected" [attr.aria-pressed]="isSelectionMode ? card.isSelected : null" (pointerdown)="beginItemPress(card.item)" (pointerup)="endItemPress()" (pointerleave)="cancelItemPress()" (pointercancel)="cancelItemPress()" (contextmenu)="suppressContextMenu($event)" (click)="onItemCardClick(card.item)">
             <div class="item-card__image-wrap">
-              <img [appLazyImage]="wardrobeImageUrl(item)" [appLazyImagePriority]="shouldPrioritiseImage(index)" [alt]="item.name" loading="lazy" decoding="async">
+              <img [appLazyImage]="card.imageUrl" [appLazyImagePriority]="card.isPriorityImage" [alt]="card.item.name" [attr.loading]="card.isPriorityImage ? 'eager' : null" [attr.fetchpriority]="card.isPriorityImage ? 'high' : null" decoding="async">
               <span class="selection-marker" *ngIf="isSelectionMode">
-                <ion-icon [name]="isItemSelected(item.id) ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+                <ion-icon [name]="card.isSelected ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
               </span>
-              <div class="image-generation-overlay" *ngIf="imageGenerationMessage(item) as status" [class.failed]="!isImageGenerationInProgress(item.imageGenerationStatus)">
-                <ion-spinner *ngIf="isImageGenerationInProgress(item.imageGenerationStatus)" name="crescent"></ion-spinner>
+              <div class="image-generation-overlay" *ngIf="card.statusMessage as status" [class.failed]="!card.isStatusInProgress">
+                <ion-spinner *ngIf="card.isStatusInProgress" name="crescent"></ion-spinner>
                 <span>{{ status }}</span>
               </div>
             </div>
             <div class="item-card__body">
-              <h3>{{ item.name }}</h3>
-              <div class="meta-line"><span>{{ label(item.subcategoryId) }}</span></div>
+              <h3>{{ card.item.name }}</h3>
+              <div class="meta-line"><span>{{ card.label }}</span></div>
               <div class="colour-dots" aria-label="Item colours">
-                <span class="colour-dot" *ngFor="let colour of coloursFor(item)" [style.background]="colourSwatch(colour)"></span>
+                <span class="colour-dot" *ngFor="let colour of card.colours; trackBy: trackByValue" [style.background]="colourSwatch(colour)"></span>
               </div>
             </div>
           </button>

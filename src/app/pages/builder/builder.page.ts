@@ -20,6 +20,28 @@ type BuilderMode = 'generate' | 'manual';
 type GeneratedOutfitSaveState = 'idle' | 'saving' | 'saved' | 'failed';
 type BuilderProcessingKind = 'loadingWardrobe' | 'buildingOutfits' | 'savingGeneratedOutfit' | 'savingManualOutfit';
 
+interface BuilderItemCard {
+  item: WardrobeItemDto;
+  imageUrl: string;
+  label: string;
+  colours: string[];
+  isRequired: boolean;
+  isManualSelected: boolean;
+}
+
+interface GeneratedOutfitCard {
+  outfit: GeneratedOutfitDto;
+  key: string;
+  imageUrl: string | null;
+  isPriority: boolean;
+  saveState: GeneratedOutfitSaveState;
+  saveLabel: string;
+  saveStatusMessage: string;
+  missingCategorySummary: string;
+  relaxedConstraintSummary: string;
+  itemNames: string[];
+}
+
 @Component({
   selector: 'app-builder',
   standalone: false,
@@ -43,6 +65,8 @@ export class BuilderPage {
   requiredItemId: string | null = null;
   manualName = 'Manual outfit';
   manualItemIds: string[] = [];
+  manualCanSave = false;
+  manualHint = '';
   message = '';
   hasGeneratedSearchRun = false;
   isLoadingWardrobe = true;
@@ -57,6 +81,12 @@ export class BuilderPage {
   private readonly builderItemRenderIncrement = 60;
   private readonly generatedOutfitImagePreloadLimit = 4;
   visibleBuilderItemCount = this.builderItemRenderIncrement;
+  includeItems: BuilderItemCard[] = [];
+  manualItems: BuilderItemCard[] = [];
+  resultCards: GeneratedOutfitCard[] = [];
+  private itemById = new Map<string, WardrobeItemDto>();
+  private itemNameById = new Map<string, string>();
+  private manualItemIdSet = new Set<string>();
   private readonly processingStepsByKind: Record<BuilderProcessingKind, string[]> = {
     loadingWardrobe: ['Loading wardrobe items', 'Loading outfit options', 'Preparing builder'],
     buildingOutfits: ['Reading request', 'Matching wardrobe items', 'Building outfit combinations', 'Loading outfit images', 'Preparing suggestions'],
@@ -71,35 +101,13 @@ export class BuilderPage {
       || this.savingGeneratedOutfitKeys.size > 0;
   }
 
-  get includeItems(): WardrobeItemDto[] {
-    const visibleItems = this.items.slice(0, this.visibleBuilderItemCount);
-    if (!this.requiredItemId || visibleItems.some((item) => item.id === this.requiredItemId)) {
-      return visibleItems;
-    }
-
-    const requiredItem = this.items.find((item) => item.id === this.requiredItemId);
-    return requiredItem ? [requiredItem, ...visibleItems] : visibleItems;
-  }
-
-  get manualItems(): WardrobeItemDto[] {
-    const visibleItems = this.items.slice(0, this.visibleBuilderItemCount);
-    if (!this.manualItemIds.length) {
-      return visibleItems;
-    }
-
-    const visibleIds = new Set(visibleItems.map((item) => item.id));
-    const selectedOutsideVisibleRange = this.selectedManualItems()
-      .filter((item) => !visibleIds.has(item.id))
-      .slice(0, 20);
-    return [...selectedOutsideVisibleRange, ...visibleItems];
-  }
-
   get canShowMoreBuilderItems(): boolean {
     return this.visibleBuilderItemCount < this.items.length;
   }
 
   showMoreBuilderItems(): void {
     this.visibleBuilderItemCount = Math.min(this.items.length, this.visibleBuilderItemCount + this.builderItemRenderIncrement);
+    this.updateBuilderItemViews();
   }
 
   get canGenerate(): boolean {
@@ -108,7 +116,7 @@ export class BuilderPage {
 
   get loadingStatus(): string {
     if (this.requiredItemId) {
-      return `Matching outfits with ${this.nameFor(this.requiredItemId)}...`;
+      return `Matching outfits with ${this.itemNameById.get(this.requiredItemId) ?? 'Wardrobe item'}...`;
     }
 
     return 'Building outfit suggestions...';
@@ -179,10 +187,9 @@ export class BuilderPage {
       this.setProcessingStep(2);
       this.lookups = lookups;
       this.items = items;
-      this.manualItemIds = this.manualItemIds.filter((id) => this.items.some((item) => item.id === id));
-      if (this.requiredItemId && !this.items.some((item) => item.id === this.requiredItemId)) {
-        this.requiredItemId = null;
-      }
+      this.rebuildItemIndexes();
+      this.pruneBuilderSelections();
+      this.updateBuilderItemViews();
     } catch (error) {
       this.message = readMessage(error, 'Could not load wardrobe items.');
     } finally {
@@ -230,30 +237,40 @@ export class BuilderPage {
 
   selectRequiredItem(id: string | null): void {
     this.requiredItemId = id;
+    this.updateBuilderItemViews();
     void lightImpact();
   }
 
   clearRequiredItem(): void {
     this.requiredItemId = null;
+    this.updateBuilderItemViews();
   }
 
   toggleManualItem(id: string): void {
-    if (this.manualItemIds.includes(id)) {
+    if (this.manualItemIdSet.has(id)) {
       this.manualItemIds = this.manualItemIds.filter((value) => value !== id);
+      this.manualItemIdSet.delete(id);
+      this.updateBuilderItemViews();
       void lightImpact();
       return;
     }
 
     this.manualItemIds = [...this.manualItemIds, id];
+    this.manualItemIdSet.add(id);
+    this.updateBuilderItemViews();
     void lightImpact();
   }
 
   clearManualSelection(): void {
     this.manualItemIds = [];
+    this.manualItemIdSet.clear();
+    this.updateBuilderItemViews();
   }
 
   selectAllItems(): void {
     this.manualItemIds = this.items.map((item) => item.id);
+    this.manualItemIdSet = new Set(this.manualItemIds);
+    this.updateBuilderItemViews();
   }
 
   async search(): Promise<void> {
@@ -271,6 +288,7 @@ export class BuilderPage {
     this.message = '';
     this.hasGeneratedSearchRun = true;
     this.results = [];
+    this.resultCards = [];
     this.savedGeneratedOutfitKeys.clear();
     this.failedGeneratedOutfitKeys.clear();
     try {
@@ -281,6 +299,9 @@ export class BuilderPage {
       this.setProcessingStep(1);
       this.lookups = lookups;
       this.items = items;
+      this.rebuildItemIndexes();
+      this.pruneBuilderSelections();
+      this.updateBuilderItemViews();
       const prompt = this.buildOutfitQuery();
       this.lastGeneratedPrompt = prompt;
       this.setProcessingStep(2);
@@ -288,10 +309,11 @@ export class BuilderPage {
       const readyOutfits = generatedOutfits.filter((outfit) => !!outfit.displayImageUrl || !!outfit.imageUrl);
       if (readyOutfits.length) {
         this.setProcessingStep(3);
-        await this.preloadGeneratedOutfitImages(readyOutfits);
+        void this.preloadGeneratedOutfitImages(readyOutfits);
       }
       this.setProcessingStep(4);
       this.results = readyOutfits;
+      this.updateGeneratedOutfitCards();
       if (!this.results.length) {
         this.message = generatedOutfits.length
           ? 'Could not generate outfit previews for that request. Try again with a different outfit brief.'
@@ -300,6 +322,7 @@ export class BuilderPage {
       void lightImpact();
     } catch (error) {
       this.results = [];
+      this.resultCards = [];
       this.message = readMessage(error, 'Could not build an outfit from the current wardrobe.');
       void warningFeedback();
     } finally {
@@ -344,9 +367,11 @@ export class BuilderPage {
     }
 
     this.savingGeneratedOutfitKeys.add(key);
+    this.updateGeneratedOutfitCards();
     this.startProcessing('savingGeneratedOutfit');
     this.savedGeneratedOutfitKeys.delete(key);
     this.failedGeneratedOutfitKeys.delete(key);
+    this.updateGeneratedOutfitCards();
     this.message = '';
     try {
       this.setProcessingStep(1);
@@ -359,13 +384,16 @@ export class BuilderPage {
         outfit.imageUrl || outfit.displayImageUrl || null);
       this.setProcessingStep(3);
       this.savedGeneratedOutfitKeys.add(key);
+      this.updateGeneratedOutfitCards();
       void successFeedback();
     } catch (error) {
       this.failedGeneratedOutfitKeys.add(key);
+      this.updateGeneratedOutfitCards();
       this.message = readMessage(error, 'Could not save outfit.');
       void warningFeedback();
     } finally {
       this.savingGeneratedOutfitKeys.delete(key);
+      this.updateGeneratedOutfitCards();
       this.stopProcessing('savingGeneratedOutfit');
     }
   }
@@ -380,7 +408,7 @@ export class BuilderPage {
   }
 
   nameFor(id: string): string {
-    return this.items.find((x) => x.id === id)?.name ?? 'Wardrobe item';
+    return this.itemNameById.get(id) ?? 'Wardrobe item';
   }
 
   label(id: string | null): string {
@@ -397,14 +425,10 @@ export class BuilderPage {
   }
 
   isManualSelected(id: string): boolean {
-    return this.manualItemIds.includes(id);
+    return this.manualItemIdSet.has(id);
   }
 
-  get manualCanSave(): boolean {
-    return this.manualItemIds.length > 0;
-  }
-
-  get manualHint(): string {
+  private buildManualHint(): string {
     const selected = this.selectedManualItems();
     if (!selected.length) {
       return '';
@@ -423,7 +447,7 @@ export class BuilderPage {
 
   private selectedManualItems(): WardrobeItemDto[] {
     return this.manualItemIds
-      .map((id) => this.items.find((item) => item.id === id))
+      .map((id) => this.itemById.get(id))
       .filter((item): item is WardrobeItemDto => !!item);
   }
 
@@ -450,6 +474,18 @@ export class BuilderPage {
 
   trackById(_: number, item: WardrobeItemDto): string {
     return item.id;
+  }
+
+  trackByItemCardId(_: number, card: BuilderItemCard): string {
+    return card.item.id;
+  }
+
+  trackByGeneratedOutfitKey(_: number, card: GeneratedOutfitCard): string {
+    return card.key;
+  }
+
+  trackByValue(_: number, value: string): string {
+    return value;
   }
 
   isSavingGeneratedOutfit(outfit: GeneratedOutfitDto): boolean {
@@ -596,6 +632,93 @@ export class BuilderPage {
 
   private generatedOutfitKey(outfit: GeneratedOutfitDto): string {
     return `${outfit.title}::${outfit.itemIds.join(',')}::${outfit.imageUrl ?? ''}`;
+  }
+
+  private rebuildItemIndexes(): void {
+    this.itemById = new Map(this.items.map((item) => [item.id, item]));
+    this.itemNameById = new Map(this.items.map((item) => [item.id, item.name]));
+  }
+
+  private pruneBuilderSelections(): void {
+    this.manualItemIds = this.manualItemIds.filter((id) => this.itemById.has(id));
+    this.manualItemIdSet = new Set(this.manualItemIds);
+    if (this.requiredItemId && !this.itemById.has(this.requiredItemId)) {
+      this.requiredItemId = null;
+    }
+  }
+
+  private updateBuilderItemViews(): void {
+    const visibleItems = this.items.slice(0, this.visibleBuilderItemCount);
+    const includeItems = this.requiredItemId && !visibleItems.some((item) => item.id === this.requiredItemId)
+      ? [this.itemById.get(this.requiredItemId), ...visibleItems].filter((item): item is WardrobeItemDto => !!item)
+      : visibleItems;
+
+    const visibleIds = new Set(visibleItems.map((item) => item.id));
+    const selectedOutsideVisibleRange = this.manualItemIds
+      .map((id) => this.itemById.get(id))
+      .filter((item): item is WardrobeItemDto => !!item && !visibleIds.has(item.id))
+      .slice(0, 20);
+    const manualItems = this.manualItemIds.length
+      ? [...selectedOutsideVisibleRange, ...visibleItems]
+      : visibleItems;
+
+    this.includeItems = includeItems.map((item) => this.toBuilderItemCard(item));
+    this.manualItems = manualItems.map((item) => this.toBuilderItemCard(item));
+    this.manualCanSave = this.manualItemIds.length > 0;
+    this.manualHint = this.buildManualHint();
+  }
+
+  private toBuilderItemCard(item: WardrobeItemDto): BuilderItemCard {
+    return {
+      item,
+      imageUrl: this.itemImageUrl(item),
+      label: this.label(item.subcategoryId),
+      colours: this.coloursFor(item),
+      isRequired: this.requiredItemId === item.id,
+      isManualSelected: this.manualItemIdSet.has(item.id)
+    };
+  }
+
+  private updateGeneratedOutfitCards(): void {
+    this.resultCards = this.results.map((outfit, index) => {
+      const saveState = this.generatedSaveState(outfit);
+      return {
+        outfit,
+        key: this.generatedOutfitKey(outfit),
+        imageUrl: outfit.displayImageUrl || outfit.imageUrl,
+        isPriority: index < this.generatedOutfitImagePreloadLimit,
+        saveState,
+        saveLabel: this.generatedSaveLabelForState(outfit, saveState),
+        saveStatusMessage: this.generatedSaveStatusMessageForState(outfit, saveState),
+        missingCategorySummary: this.missingCategorySummary(outfit),
+        relaxedConstraintSummary: this.relaxedConstraintSummary(outfit),
+        itemNames: outfit.itemIds.map((id) => this.nameFor(id))
+      };
+    });
+  }
+
+  private generatedSaveLabelForState(outfit: GeneratedOutfitDto, saveState: GeneratedOutfitSaveState): string {
+    switch (saveState) {
+      case 'saving':
+        return 'Generating...';
+      case 'saved':
+        return 'Saved';
+      default:
+        return outfit.isComplete ? 'Save outfit' : 'Save anyway';
+    }
+  }
+
+  private generatedSaveStatusMessageForState(outfit: GeneratedOutfitDto, saveState: GeneratedOutfitSaveState): string {
+    switch (saveState) {
+      case 'saving':
+        return `Generating image for "${outfit.title}"...`;
+      case 'saved':
+        return 'Saved to outfits.';
+      case 'failed':
+        return 'Could not save.';
+      default:
+        return '';
+    }
   }
 
   private startProcessing(kind: BuilderProcessingKind): void {

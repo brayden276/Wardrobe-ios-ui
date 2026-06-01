@@ -21,6 +21,8 @@ export class LazyImageDirective implements AfterViewInit, OnChanges, OnDestroy {
   private isVisible = false;
   private loadToken = 0;
   private currentImageKey: string | null = null;
+  private pendingImageKey: string | null = null;
+  private loadedImageKey: string | null = null;
 
   ngAfterViewInit(): void {
     if (this.appLazyImagePriority) {
@@ -44,6 +46,8 @@ export class LazyImageDirective implements AfterViewInit, OnChanges, OnDestroy {
 
     this.currentImageKey = nextImageKey;
     this.loadToken++;
+    this.pendingImageKey = null;
+    this.loadedImageKey = null;
     this.isLoaded = false;
     this.hasFailed = false;
     this.renderer.removeAttribute(this.element.nativeElement, 'src');
@@ -84,26 +88,34 @@ export class LazyImageDirective implements AfterViewInit, OnChanges, OnDestroy {
 
   private loadVisibleImage(): void {
     const sourceUrl = this.appLazyImage;
-    if (!sourceUrl) {
+    const sourceKey = this.currentImageKey ?? this.imageKey(sourceUrl);
+    if (!sourceUrl || !sourceKey || this.pendingImageKey === sourceKey || this.loadedImageKey === sourceKey) {
       return;
     }
 
     const token = this.loadToken;
+    this.pendingImageKey = sourceKey;
     const task = async (): Promise<void> => {
-      const resolvedUrl = await this.imageCache.resolve(sourceUrl);
-      if (!resolvedUrl || token !== this.loadToken) {
-        return;
-      }
+      try {
+        const resolvedUrl = await this.imageCache.resolve(sourceUrl);
+        if (!resolvedUrl || token !== this.loadToken) {
+          return;
+        }
 
-      await this.setImageSource(resolvedUrl, token);
+        await this.setImageSource(resolvedUrl, token, sourceKey);
+      } finally {
+        if (this.pendingImageKey === sourceKey) {
+          this.pendingImageKey = null;
+        }
+      }
     };
 
     if (this.appLazyImagePriority) {
-      void task();
+      void this.zone.runOutsideAngular(task);
       return;
     }
 
-    void this.queue.enqueue(task);
+    void this.queue.enqueue(() => this.zone.runOutsideAngular(task));
   }
 
   private imageKey(value: string | null): string | null {
@@ -119,15 +131,18 @@ export class LazyImageDirective implements AfterViewInit, OnChanges, OnDestroy {
     }
   }
 
-  private setImageSource(url: string, token: number): Promise<void> {
+  private setImageSource(url: string, token: number, imageKey: string): Promise<void> {
     return new Promise((resolve) => {
       const image = this.element.nativeElement;
       const finish = (loaded: boolean): void => {
         image.removeEventListener('load', onLoad);
         image.removeEventListener('error', onError);
         if (token === this.loadToken) {
-          this.isLoaded = loaded;
-          this.hasFailed = !loaded;
+          this.zone.run(() => {
+            this.isLoaded = loaded;
+            this.hasFailed = !loaded;
+            this.loadedImageKey = loaded ? imageKey : null;
+          });
         }
         resolve();
       };

@@ -3,6 +3,27 @@ export interface AuthUserDto {
   email: string;
   displayName: string;
   provider?: string;
+  personalDetails?: UserPersonalDetailsDto | null;
+}
+
+export type PersonalDetailsGender = 'male' | 'female';
+export type PersonalDetailsFitPreference = 'tailored' | 'balanced' | 'relaxed';
+export type PersonalDetailsStylePreference = 'minimal' | 'classic' | 'polished' | 'casual' | 'creative';
+export type PersonalDetailsDailyContext = 'work' | 'weekend' | 'evening' | 'active';
+
+export interface UserPersonalDetailsDto {
+  gender: PersonalDetailsGender;
+  fitPreference: PersonalDetailsFitPreference;
+  stylePreference: PersonalDetailsStylePreference;
+  dailyContext: PersonalDetailsDailyContext;
+  completedAt: string;
+}
+
+export interface UpdatePersonalDetailsRequest {
+  gender: PersonalDetailsGender;
+  fitPreference: PersonalDetailsFitPreference;
+  stylePreference: PersonalDetailsStylePreference;
+  dailyContext: PersonalDetailsDailyContext;
 }
 
 export interface AuthResponse {

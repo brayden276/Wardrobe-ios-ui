@@ -4,6 +4,15 @@ import { OutfitDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import { confirmAction, lightImpact, noticeKind, NoticeKind, readMessage, successFeedback, warningFeedback } from '../page-helpers';
 
+interface OutfitCard {
+  outfit: OutfitDto;
+  imageUrl: string | null;
+  isSelected: boolean;
+  isMarking: boolean;
+  isRemoving: boolean;
+  actionMessage: string;
+}
+
 @Component({
   selector: 'app-outfits',
   standalone: false,
@@ -26,11 +35,12 @@ export class OutfitsPage {
   private outfitLongPressHandle: ReturnType<typeof setTimeout> | null = null;
   private suppressNextOutfitClick = false;
   private readonly selectionLongPressMs = 450;
+  private activeLoad: Promise<void> | null = null;
+  private hasPendingLoad = false;
+  private hasPendingForceRefresh = false;
+  readonly skeletonPlaceholders = [0, 1, 2];
   visibleOutfitCount = this.outfitRenderIncrement;
-
-  get visibleOutfits(): OutfitDto[] {
-    return this.outfits.slice(0, this.visibleOutfitCount);
-  }
+  visibleOutfits: OutfitCard[] = [];
 
   get canShowMoreOutfits(): boolean {
     return this.visibleOutfitCount < this.outfits.length;
@@ -60,6 +70,7 @@ export class OutfitsPage {
 
   showMoreOutfits(): void {
     this.visibleOutfitCount = Math.min(this.outfits.length, this.visibleOutfitCount + this.outfitRenderIncrement);
+    this.updateVisibleOutfits();
   }
 
   async ionViewWillEnter(): Promise<void> {
@@ -67,17 +78,43 @@ export class OutfitsPage {
   }
 
   async load(forceRefresh = false): Promise<void> {
+    if (this.activeLoad) {
+      this.hasPendingLoad = true;
+      this.hasPendingForceRefresh = this.hasPendingForceRefresh || forceRefresh;
+      return this.activeLoad;
+    }
+
+    do {
+      forceRefresh = forceRefresh || this.hasPendingForceRefresh;
+      this.hasPendingLoad = false;
+      this.hasPendingForceRefresh = false;
+      this.activeLoad = this.loadCore(forceRefresh);
+      try {
+        await this.activeLoad;
+      } finally {
+        this.activeLoad = null;
+      }
+      forceRefresh = false;
+    } while (this.hasPendingLoad);
+  }
+
+  private async loadCore(forceRefresh: boolean): Promise<void> {
     this.isLoading = true;
     this.message = '';
+    const hadLoadedOutfits = this.outfits.length > 0;
     try {
       this.outfits = await this.api.getOutfits({ forceRefresh });
       this.pruneSelectedOutfits();
       if (this.selectedOutfit) {
         this.selectedOutfit = this.outfits.find((outfit) => outfit.id === this.selectedOutfit?.id) ?? null;
       }
+      this.updateVisibleOutfits();
     } catch (error) {
       this.message = readMessage(error, 'Could not load outfits.');
-      this.outfits = [];
+      if (!hadLoadedOutfits) {
+        this.outfits = [];
+        this.updateVisibleOutfits();
+      }
     } finally {
       this.isLoading = false;
     }
@@ -112,6 +149,7 @@ export class OutfitsPage {
   async markWorn(outfit: OutfitDto): Promise<void> {
     if (this.markingOutfitIds.has(outfit.id)) return;
     this.markingOutfitIds.add(outfit.id);
+    this.updateVisibleOutfits();
     this.message = `Marking "${outfit.name}" as worn...`;
     try {
       await this.api.markWorn(outfit.id);
@@ -120,6 +158,7 @@ export class OutfitsPage {
         const selectedOutfitId = this.selectedOutfit?.id ?? null;
         this.outfits = outfits;
         this.selectedOutfit = selectedOutfitId ? outfits.find((candidate) => candidate.id === selectedOutfitId) ?? null : null;
+        this.updateVisibleOutfits();
       } catch {
         this.updateOutfitAfterWear(outfit.id);
       }
@@ -130,6 +169,7 @@ export class OutfitsPage {
       void warningFeedback();
     } finally {
       this.markingOutfitIds.delete(outfit.id);
+      this.updateVisibleOutfits();
     }
   }
 
@@ -149,6 +189,7 @@ export class OutfitsPage {
     }
 
     this.deletingOutfitIds.add(outfit.id);
+    this.updateVisibleOutfits();
     this.message = `Deleting "${outfit.name}"...`;
     try {
       await this.api.deleteOutfit(outfit.id);
@@ -162,6 +203,7 @@ export class OutfitsPage {
       void warningFeedback();
     } finally {
       this.deletingOutfitIds.delete(outfit.id);
+      this.updateVisibleOutfits();
     }
   }
 
@@ -169,6 +211,7 @@ export class OutfitsPage {
     this.isSelectionMode = true;
     this.selectedOutfit = null;
     this.message = '';
+    this.updateVisibleOutfits();
     void lightImpact();
   }
 
@@ -177,31 +220,32 @@ export class OutfitsPage {
     this.isSelectionMode = false;
     this.selectedOutfitIds.clear();
     this.message = '';
+    this.updateVisibleOutfits();
     void lightImpact();
   }
 
   clearSelection(): void {
     this.selectedOutfitIds.clear();
+    this.updateVisibleOutfits();
   }
 
   selectVisibleOutfits(): void {
-    for (const outfit of this.visibleOutfits) {
-      this.selectedOutfitIds.add(outfit.id);
+    for (const card of this.visibleOutfits) {
+      this.selectedOutfitIds.add(card.outfit.id);
     }
-  }
-
-  isOutfitSelected(outfitId: string): boolean {
-    return this.selectedOutfitIds.has(outfitId);
+    this.updateVisibleOutfits();
   }
 
   toggleOutfitSelection(outfitId: string): void {
     if (this.selectedOutfitIds.has(outfitId)) {
       this.selectedOutfitIds.delete(outfitId);
+      this.updateVisibleOutfits();
       void lightImpact();
       return;
     }
 
     this.selectedOutfitIds.add(outfitId);
+    this.updateVisibleOutfits();
     void lightImpact();
   }
 
@@ -216,6 +260,7 @@ export class OutfitsPage {
       this.suppressNextOutfitClick = true;
       this.enterSelectionMode();
       this.selectedOutfitIds.add(outfit.id);
+      this.updateVisibleOutfits();
     }, this.selectionLongPressMs);
   }
 
@@ -267,31 +312,24 @@ export class OutfitsPage {
       void warningFeedback();
     } finally {
       this.isDeletingSelected = false;
+      this.updateVisibleOutfits();
     }
-  }
-
-  isMarkingOutfit(outfitId: string): boolean {
-    return this.markingOutfitIds.has(outfitId);
-  }
-
-  isRemovingOutfit(outfitId: string): boolean {
-    return this.deletingOutfitIds.has(outfitId);
-  }
-
-  outfitActionMessage(outfit: OutfitDto): string {
-    if (this.isMarkingOutfit(outfit.id)) {
-      return `Marking "${outfit.name}" as worn...`;
-    }
-
-    if (this.isRemovingOutfit(outfit.id)) {
-      return `Deleting "${outfit.name}"...`;
-    }
-
-    return '';
   }
 
   trackById(_: number, outfit: OutfitDto): string {
     return outfit.id;
+  }
+
+  trackByCardId(_: number, card: OutfitCard): string {
+    return card.outfit.id;
+  }
+
+  trackByOutfitItemId(_: number, item: OutfitDto['items'][number]): string {
+    return item.id;
+  }
+
+  trackByValue(_: number, value: string | number): string | number {
+    return value;
   }
 
   outfitItemImageUrl(item: OutfitDto['items'][number]): string {
@@ -311,6 +349,7 @@ export class OutfitsPage {
     if (this.selectedOutfit?.id === outfitId) {
       this.selectedOutfit = this.outfits.find((candidate) => candidate.id === outfitId) ?? null;
     }
+    this.updateVisibleOutfits();
   }
 
   private pruneSelectedOutfits(): void {
@@ -323,6 +362,26 @@ export class OutfitsPage {
     if (this.isSelectionMode && !this.selectedOutfitIds.size) {
       this.isSelectionMode = false;
     }
+    this.updateVisibleOutfits();
+  }
+
+  private updateVisibleOutfits(): void {
+    this.visibleOutfits = this.outfits.slice(0, this.visibleOutfitCount).map((outfit) => {
+      const isMarking = this.markingOutfitIds.has(outfit.id);
+      const isRemoving = this.deletingOutfitIds.has(outfit.id);
+      return {
+        outfit,
+        imageUrl: outfit.thumbnailUrl || outfit.imageUrl,
+        isSelected: this.selectedOutfitIds.has(outfit.id),
+        isMarking,
+        isRemoving,
+        actionMessage: isMarking
+          ? `Marking "${outfit.name}" as worn...`
+          : isRemoving
+            ? `Deleting "${outfit.name}"...`
+            : ''
+      };
+    });
   }
 
   private clearOutfitLongPress(): void {

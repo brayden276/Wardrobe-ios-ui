@@ -2,7 +2,7 @@ import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController } from '@ionic/angular';
 import { AuthService } from '../../auth.service';
-import { AiUsageCostSummaryDto } from '../../models';
+import { AiUsageCostSummaryDto, UserPersonalDetailsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import {
   AI_DISCLOSURE_TEXT,
@@ -37,6 +37,30 @@ export class SettingsPage {
   readonly termsUrl = TERMS_OF_USE_URL;
   readonly supportUrl = SUPPORT_URL;
   readonly aiDisclosure = AI_DISCLOSURE_TEXT;
+  private readonly personalDetailLabels: Record<string, Record<string, string>> = {
+    gender: {
+      male: 'Male',
+      female: 'Female'
+    },
+    fitPreference: {
+      tailored: 'Tailored',
+      balanced: 'Balanced',
+      relaxed: 'Relaxed'
+    },
+    stylePreference: {
+      minimal: 'Minimal',
+      classic: 'Classic',
+      polished: 'Polished',
+      casual: 'Casual',
+      creative: 'Creative'
+    },
+    dailyContext: {
+      work: 'Work',
+      weekend: 'Weekend',
+      evening: 'Evening',
+      active: 'Active'
+    }
+  };
   aiConsentAccepted = false;
   aiUsage: AiUsageCostSummaryDto | null = null;
   aiUsageLoadMessage = '';
@@ -84,6 +108,10 @@ export class SettingsPage {
     return value.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 });
   }
 
+  get personalDetails(): UserPersonalDetailsDto | null {
+    return this.auth.session?.user?.personalDetails ?? null;
+  }
+
   get settingsStatusMessage(): string {
     if (this.busyMessage) {
       return this.busyMessage;
@@ -102,6 +130,10 @@ export class SettingsPage {
 
   get aiUsageLoadKind(): NoticeKind {
     return noticeKind(this.aiUsageLoadMessage);
+  }
+
+  personalDetailLabel(group: string, value: string): string {
+    return this.personalDetailLabels[group]?.[value] ?? value;
   }
 
   setSettingsMode(mode: SettingsMode): void {

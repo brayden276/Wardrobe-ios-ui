@@ -3,7 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Preferences } from '@capacitor/preferences';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { apiBaseUrl } from './api-url';
-import { AuthProviderDto, AuthResponse, AuthUserDto } from './models';
+import { AuthProviderDto, AuthResponse, AuthUserDto, UpdatePersonalDetailsRequest } from './models';
 
 interface Session {
   accessToken: string;
@@ -28,6 +28,10 @@ export class AuthService {
 
   get token(): string | null {
     return this.session?.accessToken ?? null;
+  }
+
+  get hasCompletedPersonalDetails(): boolean {
+    return !!this.session?.user?.personalDetails;
   }
 
   async restore(): Promise<void> {
@@ -103,6 +107,24 @@ export class AuthService {
   async loginExternal(provider: string, identityToken: string): Promise<void> {
     const response = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/api/auth/external`, { provider, identityToken }));
     await this.setSession(response);
+  }
+
+  async updatePersonalDetails(request: UpdatePersonalDetailsRequest): Promise<AuthUserDto> {
+    const token = this.token;
+    if (!token) {
+      throw new Error('Sign in before saving personal details.');
+    }
+
+    const user = await firstValueFrom(this.http.put<AuthUserDto>(`${this.apiBaseUrl}/api/auth/personal-details`, request, {
+      headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
+    }));
+
+    const session = this.session;
+    if (session) {
+      await this.storeSession({ ...session, user });
+    }
+
+    return user;
   }
 
   async logout(): Promise<void> {

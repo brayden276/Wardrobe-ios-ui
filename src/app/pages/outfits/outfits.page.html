@@ -43,8 +43,8 @@
             <button type="button" class="text-link" (click)="clearSelection()" [disabled]="!selectedCount">Clear</button>
           </div>
         </article>
-        <div class="skeleton-list outfit-skeleton" *ngIf="isLoading" aria-label="Loading saved outfits" aria-busy="true">
-          <article class="skeleton-card" *ngFor="let placeholder of [0, 1, 2]">
+        <div class="skeleton-list outfit-skeleton" *ngIf="isLoading && !outfits.length" aria-label="Loading saved outfits" aria-busy="true">
+          <article class="skeleton-card" *ngFor="let placeholder of skeletonPlaceholders; trackBy: trackByValue">
             <div class="skeleton-image"></div>
             <div class="skeleton-line"></div>
             <div class="skeleton-line short"></div>
@@ -56,32 +56,32 @@
         </article>
         <p class="status-note" *ngIf="!isLoading && message && !canRetryMessage" [class.status-note--success]="messageKind === 'success'" aria-live="polite">{{ message }}</p>
         <ng-container>
-          <article class="outfit-card" *ngFor="let outfit of visibleOutfits; trackBy: trackById" [class.selection-mode]="isSelectionMode" [class.selected]="isOutfitSelected(outfit.id)">
-            <button type="button" class="outfit-open" [attr.aria-pressed]="isSelectionMode ? isOutfitSelected(outfit.id) : null" (pointerdown)="beginOutfitPress(outfit)" (pointerup)="endOutfitPress()" (pointerleave)="cancelOutfitPress()" (pointercancel)="cancelOutfitPress()" (contextmenu)="suppressContextMenu($event)" (click)="open(outfit, $event)">
-              <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [appLazyImage]="outfit.thumbnailUrl || outfit.imageUrl" [alt]="outfit.name" loading="lazy" decoding="async">
+          <article class="outfit-card" *ngFor="let card of visibleOutfits; trackBy: trackByCardId" [class.selection-mode]="isSelectionMode" [class.selected]="card.isSelected">
+            <button type="button" class="outfit-open" [attr.aria-pressed]="isSelectionMode ? card.isSelected : null" (pointerdown)="beginOutfitPress(card.outfit)" (pointerup)="endOutfitPress()" (pointerleave)="cancelOutfitPress()" (pointercancel)="cancelOutfitPress()" (contextmenu)="suppressContextMenu($event)" (click)="open(card.outfit, $event)">
+              <img class="outfit-hero-image" *ngIf="card.imageUrl" [appLazyImage]="card.imageUrl" [alt]="card.outfit.name" decoding="async">
               <span class="selection-marker" *ngIf="isSelectionMode">
-                <ion-icon [name]="isOutfitSelected(outfit.id) ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+                <ion-icon [name]="card.isSelected ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
               </span>
             </button>
-            <div class="outfit-copy" (pointerdown)="beginOutfitPress(outfit)" (pointerup)="endOutfitPress()" (pointerleave)="cancelOutfitPress()" (pointercancel)="cancelOutfitPress()" (contextmenu)="suppressContextMenu($event)" (click)="open(outfit, $event)">
-              <h3>{{ outfit.name }}</h3>
-              <p class="muted">{{ outfit.explanation || 'Saved from your wardrobe.' }}</p>
+            <div class="outfit-copy" (pointerdown)="beginOutfitPress(card.outfit)" (pointerup)="endOutfitPress()" (pointerleave)="cancelOutfitPress()" (pointercancel)="cancelOutfitPress()" (contextmenu)="suppressContextMenu($event)" (click)="open(card.outfit, $event)">
+              <h3>{{ card.outfit.name }}</h3>
+              <p class="muted">{{ card.outfit.explanation || 'Saved from your wardrobe.' }}</p>
               <div class="outfit-item-list">
-                <span *ngFor="let item of outfit.items">{{ item.name }}</span>
+                <span *ngFor="let item of card.outfit.items; trackBy: trackByOutfitItemId">{{ item.name }}</span>
               </div>
             </div>
             <div class="outfit-actions" *ngIf="!isSelectionMode">
-              <ion-button class="secondary-button compact-button" fill="outline" (click)="open(outfit, $event)">Open</ion-button>
-              <ion-button class="secondary-button compact-button" fill="outline" (click)="markWorn(outfit)"
-                [disabled]="isMarkingOutfit(outfit.id) || isRemovingOutfit(outfit.id)">
-                {{ isMarkingOutfit(outfit.id) ? 'Marking...' : 'Mark worn' }}
+              <ion-button class="secondary-button compact-button" fill="outline" (click)="open(card.outfit, $event)">Open</ion-button>
+              <ion-button class="secondary-button compact-button" fill="outline" (click)="markWorn(card.outfit)"
+                [disabled]="card.isMarking || card.isRemoving">
+                {{ card.isMarking ? 'Marking...' : 'Mark worn' }}
               </ion-button>
-              <ion-button class="quiet-button compact-button" fill="clear" (click)="remove(outfit)"
-                [disabled]="isRemovingOutfit(outfit.id) || isMarkingOutfit(outfit.id)">
-                {{ isRemovingOutfit(outfit.id) ? 'Deleting...' : 'Delete' }}
+              <ion-button class="quiet-button compact-button" fill="clear" (click)="remove(card.outfit)"
+                [disabled]="card.isRemoving || card.isMarking">
+                {{ card.isRemoving ? 'Deleting...' : 'Delete' }}
               </ion-button>
             </div>
-            <div class="status-line" *ngIf="outfitActionMessage(outfit) as status">
+            <div class="status-line" *ngIf="card.actionMessage as status">
               <ion-spinner name="crescent"></ion-spinner>
               <span>{{ status }}</span>
             </div>
@@ -91,6 +91,7 @@
         <article class="panel" *ngIf="!isLoading && !canRetryMessage && !outfits.length">
           <h2 class="plain-title">No saved outfits</h2>
           <p class="muted">Build an outfit and save the ones worth repeating.</p>
+          <ion-button class="primary-button" expand="block" routerLink="/tabs/builder" fill="outline">Build one now</ion-button>
         </article>
         </div>
         <button type="button" class="sheet-backdrop" *ngIf="selectedOutfit" aria-label="Close outfit details" (click)="close()"></button>
@@ -103,8 +104,8 @@
           </div>
           <img class="outfit-detail-image" *ngIf="selectedOutfit.imageUrl" [appLazyImage]="selectedOutfit.imageUrl" [appLazyImagePriority]="true" [alt]="selectedOutfit.name" loading="eager" decoding="async">
           <div class="outfit-detail-items">
-            <div class="outfit-detail-item" *ngFor="let item of selectedOutfit.items">
-              <img [appLazyImage]="outfitItemImageUrl(item)" [alt]="item.name" loading="lazy" decoding="async">
+            <div class="outfit-detail-item" *ngFor="let item of selectedOutfit.items; trackBy: trackByOutfitItemId">
+              <img [appLazyImage]="outfitItemImageUrl(item)" [alt]="item.name" decoding="async">
               <div>
                 <strong>{{ item.name }}</strong>
                 <span>{{ item.subcategoryId }}</span>

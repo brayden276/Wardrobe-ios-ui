@@ -16,13 +16,23 @@ export class AppComponent implements OnInit, OnDestroy {
   async ngOnInit(): Promise<void> {
     await this.auth.restore();
     this.sessionSubscription = this.auth.session$.subscribe((session) => {
-      if (!session && this.router.url.startsWith('/tabs')) {
+      if (!session && (this.router.url.startsWith('/tabs') || this.router.url.startsWith('/onboarding'))) {
         void this.router.navigateByUrl('/login');
+        return;
+      }
+
+      if (session && !this.auth.hasCompletedPersonalDetails && this.router.url.startsWith('/tabs')) {
+        void this.router.navigateByUrl('/onboarding');
       }
     });
 
     if (!this.auth.session) {
       await this.router.navigateByUrl('/login');
+      return;
+    }
+
+    if (!this.auth.hasCompletedPersonalDetails && this.router.url.startsWith('/tabs')) {
+      await this.router.navigateByUrl('/onboarding');
     }
   }
 

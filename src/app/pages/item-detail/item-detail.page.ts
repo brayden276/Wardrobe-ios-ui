@@ -73,6 +73,10 @@ export class ItemDetailPage implements OnDestroy {
     await this.loadItem();
   }
 
+  retryLoadItem(): void {
+    void this.loadItem();
+  }
+
   ngOnDestroy(): void {
     this.stopImageGenerationStreaming();
     this.stopImageGenerationPolling();

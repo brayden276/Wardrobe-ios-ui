@@ -122,7 +122,7 @@ export class LoginPage {
         await this.auth.register(email, this.password, this.displayName.trim());
       }
       void successFeedback();
-      await this.router.navigateByUrl('/tabs/wardrobe');
+      await this.router.navigateByUrl(this.auth.hasCompletedPersonalDetails ? '/tabs/wardrobe' : '/onboarding');
     } catch (error) {
       this.message = readMessage(error, 'Could not sign in. Try again.');
       void warningFeedback();

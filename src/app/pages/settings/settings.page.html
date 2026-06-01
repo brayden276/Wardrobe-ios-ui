@@ -17,6 +17,29 @@
           <p class="muted">{{ auth.session?.user?.email }}</p>
         </article>
         <article class="intent-surface settings-card" *ngIf="settingsMode === 'account'">
+          <h2 class="section-title">Personal details</h2>
+          <div class="personal-detail-list" *ngIf="personalDetails as details">
+            <div>
+              <span>Wardrobe direction</span>
+              <strong>{{ personalDetailLabel('gender', details.gender) }}</strong>
+            </div>
+            <div>
+              <span>Fit</span>
+              <strong>{{ personalDetailLabel('fitPreference', details.fitPreference) }}</strong>
+            </div>
+            <div>
+              <span>Style</span>
+              <strong>{{ personalDetailLabel('stylePreference', details.stylePreference) }}</strong>
+            </div>
+            <div>
+              <span>Context</span>
+              <strong>{{ personalDetailLabel('dailyContext', details.dailyContext) }}</strong>
+            </div>
+          </div>
+          <p class="muted" *ngIf="!personalDetails">Complete your personal details to tune outfit generation.</p>
+          <ion-button class="secondary-button" fill="outline" routerLink="/onboarding" [queryParams]="{ returnUrl: '/tabs/settings' }">{{ personalDetails ? 'Update details' : 'Add details' }}</ion-button>
+        </article>
+        <article class="intent-surface settings-card" *ngIf="settingsMode === 'account'">
           <h2 class="section-title">Device session</h2>
           <p class="muted">This device stores your Wardrobe AI session in local app preferences until you sign out or delete your account.</p>
           <p class="muted" *ngIf="sessionExpiresAtLabel">Current session expires {{ sessionExpiresAtLabel }}.</p>

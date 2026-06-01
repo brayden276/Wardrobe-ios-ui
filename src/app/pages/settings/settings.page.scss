@@ -1,0 +1,23 @@
+.personal-detail-list {
+  display: grid;
+  gap: 8px;
+}
+
+.personal-detail-list div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.personal-detail-list span {
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.personal-detail-list strong {
+  color: var(--app-ink);
+  font-size: 14px;
+  font-weight: 650;
+  text-align: right;
+}

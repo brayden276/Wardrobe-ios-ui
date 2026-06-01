@@ -1,0 +1,48 @@
+.onboarding-screen {
+  justify-content: center;
+}
+
+.onboarding-progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: rgba(61, 49, 40, 0.1);
+}
+
+.onboarding-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--app-olive);
+  transition: width 160ms ease;
+}
+
+.onboarding-card {
+  gap: 14px;
+}
+
+.personal-option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.personal-option {
+  min-height: 48px;
+  padding: 0 12px;
+  text-align: center;
+  font-weight: 650;
+}
+
+.onboarding-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+  gap: 8px;
+}
+
+@media (max-width: 360px) {
+  .personal-option-grid,
+  .onboarding-actions {
+    grid-template-columns: 1fr;
+  }
+}

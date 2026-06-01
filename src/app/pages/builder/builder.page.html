@@ -58,9 +58,9 @@
               </div>
               <div class="include-strip">
                 <button type="button" class="include-item include-any" [class.selected]="!requiredItemId" (click)="selectRequiredItem(null)">Any item</button>
-                <button type="button" class="include-item" *ngFor="let item of includeItems; trackBy: trackById" [class.selected]="requiredItemId === item.id" (click)="selectRequiredItem(item.id)">
-                  <img [appLazyImage]="itemImageUrl(item)" [alt]="item.name" loading="lazy" decoding="async">
-                  <span>{{ item.name }}</span>
+                <button type="button" class="include-item" *ngFor="let card of includeItems; trackBy: trackByItemCardId" [class.selected]="card.isRequired" (click)="selectRequiredItem(card.item.id)">
+                  <img [appLazyImage]="card.imageUrl" [alt]="card.item.name" decoding="async">
+                  <span>{{ card.item.name }}</span>
                 </button>
               </div>
               <ion-button class="quiet-button compact-button" fill="clear" size="small" *ngIf="canShowMoreBuilderItems" (click)="showMoreBuilderItems()">Show more items</ion-button>
@@ -75,31 +75,31 @@
             <ion-button class="primary-button" expand="block" (click)="search()" [disabled]="isBusy || !canGenerate">{{ isBuildingOutfits ? 'Building...' : 'Build outfits' }}</ion-button>
             <p class="muted consent-note">Wardrobe AI sends your outfit request and wardrobe item details to Google Gemini to generate outfit suggestions.</p>
           </article>
-          <h2 class="section-title" *ngIf="results.length">Outfit ideas</h2>
-          <article class="outfit-card idea-card generated-outfit-card" *ngFor="let outfit of results; let index = index">
-            <img class="outfit-hero-image" [appLazyImage]="outfit.displayImageUrl || outfit.imageUrl" [appLazyImagePriority]="shouldPrioritiseGeneratedOutfit(index)" [alt]="outfit.title" [attr.loading]="shouldPrioritiseGeneratedOutfit(index) ? 'eager' : 'lazy'" [attr.fetchpriority]="shouldPrioritiseGeneratedOutfit(index) ? 'high' : null" decoding="async">
+          <h2 class="section-title" *ngIf="resultCards.length">Outfit ideas</h2>
+          <article class="outfit-card idea-card generated-outfit-card" *ngFor="let card of resultCards; trackBy: trackByGeneratedOutfitKey">
+            <img class="outfit-hero-image" [appLazyImage]="card.imageUrl" [appLazyImagePriority]="card.isPriority" [alt]="card.outfit.title" [attr.loading]="card.isPriority ? 'eager' : null" [attr.fetchpriority]="card.isPriority ? 'high' : null" decoding="async">
             <div class="outfit-copy">
-              <h3>{{ outfit.title }}</h3>
-              <p class="muted">{{ outfit.explanation }}</p>
-              <p class="fit-note" *ngIf="!outfit.isComplete && missingCategorySummary(outfit)">
-                Missing: {{ missingCategorySummary(outfit) }}
+              <h3>{{ card.outfit.title }}</h3>
+              <p class="muted">{{ card.outfit.explanation }}</p>
+              <p class="fit-note" *ngIf="!card.outfit.isComplete && card.missingCategorySummary">
+                Missing: {{ card.missingCategorySummary }}
               </p>
-              <p class="fit-note" *ngIf="relaxedConstraintSummary(outfit)">
-                {{ relaxedConstraintSummary(outfit) }}
+              <p class="fit-note" *ngIf="card.relaxedConstraintSummary">
+                {{ card.relaxedConstraintSummary }}
               </p>
               <div class="outfit-item-list">
-                <span *ngFor="let id of outfit.itemIds">{{ nameFor(id) }}</span>
+                <span *ngFor="let name of card.itemNames; trackBy: trackByValue">{{ name }}</span>
               </div>
               <div class="generated-actions">
-                <ion-button class="primary-button small-action" (click)="save(outfit)" [disabled]="generatedSaveState(outfit) === 'saving' || generatedSaveState(outfit) === 'saved'">
-                  {{ generatedSaveLabel(outfit) }}
+                <ion-button class="primary-button small-action" (click)="save(card.outfit)" [disabled]="card.saveState === 'saving' || card.saveState === 'saved'">
+                  {{ card.saveLabel }}
                 </ion-button>
-                <div class="status-line" *ngIf="generatedSaveState(outfit) === 'saving'" aria-live="polite">
+                <div class="status-line" *ngIf="card.saveState === 'saving'" aria-live="polite">
                   <ion-spinner name="crescent"></ion-spinner>
-                  <span>{{ generatedSaveStatusMessage(outfit) }}</span>
+                  <span>{{ card.saveStatusMessage }}</span>
                 </div>
-                <span class="save-state" *ngIf="generatedSaveState(outfit) === 'saved'">{{ generatedSaveStatusMessage(outfit) }}</span>
-                <span class="save-state failed" *ngIf="generatedSaveState(outfit) === 'failed'">{{ generatedSaveStatusMessage(outfit) }}</span>
+                <span class="save-state" *ngIf="card.saveState === 'saved'">{{ card.saveStatusMessage }}</span>
+                <span class="save-state failed" *ngIf="card.saveState === 'failed'">{{ card.saveStatusMessage }}</span>
               </div>
             </div>
           </article>
@@ -129,18 +129,18 @@
             <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="selectAllItems()" [disabled]="!items.length || isBusy">Select all</ion-button>
           </div>
           <div class="manual-grid" *ngIf="items.length">
-            <button type="button" class="item-card manual-item" *ngFor="let item of manualItems; trackBy: trackById" [class.selected]="isManualSelected(item.id)" [attr.aria-pressed]="isManualSelected(item.id)" (click)="toggleManualItem(item.id)">
+            <button type="button" class="item-card manual-item" *ngFor="let card of manualItems; trackBy: trackByItemCardId" [class.selected]="card.isManualSelected" [attr.aria-pressed]="card.isManualSelected" (click)="toggleManualItem(card.item.id)">
               <div class="item-card__image-wrap manual-item__image-wrap">
-                <img [appLazyImage]="itemImageUrl(item)" [alt]="item.name" loading="lazy" decoding="async">
+                <img [appLazyImage]="card.imageUrl" [alt]="card.item.name" decoding="async">
                 <span class="manual-item__check">
-                  <ion-icon [name]="isManualSelected(item.id) ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+                  <ion-icon [name]="card.isManualSelected ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
                 </span>
               </div>
               <div class="item-card__body">
-                <h3>{{ item.name }}</h3>
-                <div class="meta-line"><span>{{ label(item.subcategoryId) }}</span></div>
+                <h3>{{ card.item.name }}</h3>
+                <div class="meta-line"><span>{{ card.label }}</span></div>
                 <div class="colour-dots" aria-label="Item colours">
-                  <span class="colour-dot" *ngFor="let colour of coloursFor(item)" [style.background]="colourSwatch(colour)"></span>
+                  <span class="colour-dot" *ngFor="let colour of card.colours; trackBy: trackByValue" [style.background]="colourSwatch(colour)"></span>
                 </div>
               </div>
             </button>

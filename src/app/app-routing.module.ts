@@ -7,6 +7,7 @@ import {
   BuilderPage,
   ItemDetailPage,
   LoginPage,
+  OnboardingPage,
   OutfitsPage,
   SettingsPage,
   TabsPage,
@@ -20,12 +21,24 @@ const requireSession: CanActivateFn = async () => {
   return auth.session ? true : router.parseUrl('/login');
 };
 
+const requireCompletedPersonalDetails: CanActivateFn = async () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  await auth.restore();
+  if (!auth.session) {
+    return router.parseUrl('/login');
+  }
+
+  return auth.hasCompletedPersonalDetails ? true : router.parseUrl('/onboarding');
+};
+
 const routes: Routes = [
   { path: 'login', component: LoginPage },
+  { path: 'onboarding', component: OnboardingPage, canActivate: [requireSession] },
   {
     path: 'tabs',
     component: TabsPage,
-    canActivate: [requireSession],
+    canActivate: [requireCompletedPersonalDetails],
     children: [
       {
         path: 'wardrobe',

@@ -1,0 +1,48 @@
+<ion-content class="app-content">
+  <section class="screen onboarding-screen">
+    <header class="nav-header">
+      <button type="button" class="nav-button" *ngIf="canLeave; else headerSpacer" aria-label="Back" (click)="close()" [disabled]="isBusy">
+        <ion-icon name="chevron-back-outline"></ion-icon>
+      </button>
+      <ng-template #headerSpacer><span></span></ng-template>
+      <h1>Personal details</h1>
+      <span></span>
+    </header>
+
+    <div class="onboarding-progress" aria-hidden="true">
+      <span [style.width.%]="progressPercent"></span>
+    </div>
+
+    <form class="intent-surface form-stack onboarding-card" (ngSubmit)="advance()">
+      <p class="page-meta">Step {{ stepIndex + 1 }} of {{ steps.length }}</p>
+      <h2 class="section-title">{{ currentStep.title }}</h2>
+
+      <div class="personal-option-grid">
+        <button
+          type="button"
+          class="option-button personal-option"
+          *ngFor="let option of currentStep.options"
+          [class.active]="selectedValue(currentStep.key) === option.value"
+          [attr.aria-pressed]="selectedValue(currentStep.key) === option.value"
+          (click)="choose(currentStep.key, option.value)">
+          {{ option.label }}
+        </button>
+      </div>
+
+      <p
+        class="status-note"
+        *ngIf="message"
+        [class.status-note--success]="messageKind === 'success'"
+        [class.status-note--error]="messageKind === 'error'"
+        [class.status-note--offline]="messageKind === 'offline'"
+        aria-live="polite">
+        {{ message }}
+      </p>
+
+      <div class="onboarding-actions">
+        <ion-button class="secondary-button" fill="outline" type="button" (click)="previous()" [disabled]="stepIndex === 0 || isBusy">Back</ion-button>
+        <ion-button class="primary-button" expand="block" type="submit" [disabled]="!canContinue">{{ submitLabel }}</ion-button>
+      </div>
+    </form>
+  </section>
+</ion-content>
