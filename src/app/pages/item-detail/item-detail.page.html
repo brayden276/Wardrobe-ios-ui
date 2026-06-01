@@ -1,5 +1,5 @@
     <ion-content class="app-content">
-      <section class="screen" *ngIf="isLoading">
+      <section class="screen" *ngIf="isLoading" aria-label="Loading item details" aria-busy="true">
         <article class="skeleton-card">
           <div class="skeleton-image"></div>
           <div class="skeleton-line"></div>
@@ -14,7 +14,7 @@
           <h1>Item</h1>
           <span></span>
         </header>
-        <article class="panel state-panel">
+        <article class="panel state-panel state-panel--error" aria-live="polite">
           <p class="muted">{{ message || 'Could not load item.' }}</p>
         </article>
       </section>
@@ -40,7 +40,7 @@
           </div>
           <div class="detail-action-zone" *ngIf="!editing">
             <ion-button class="taupe-button" expand="block" (click)="markWorn()" [disabled]="isMarkingWorn">{{ isMarkingWorn ? 'Marking worn...' : 'Mark worn' }}</ion-button>
-            <div class="status-line" *ngIf="processingMessage">
+            <div class="status-line" *ngIf="processingMessage" aria-live="polite">
               <ion-spinner name="crescent"></ion-spinner>
               <span>{{ processingMessage }}</span>
             </div>
@@ -49,7 +49,7 @@
             </div>
             <button type="button" class="text-link original-image-link" *ngIf="item.image?.originalUrl" (click)="openOriginalImage()">View original</button>
           </div>
-        <p class="muted center-message" *ngIf="message && !editing">{{ message }}</p>
+        <p class="status-note center-message" *ngIf="message && !editing" [class.status-note--success]="messageKind === 'success'" [class.status-note--error]="messageKind === 'error'" [class.status-note--offline]="messageKind === 'offline'" aria-live="polite">{{ message }}</p>
         <form class="inline-sheet form-stack editor-panel" *ngIf="editing" (ngSubmit)="save()">
           <label>Name<ion-input class="field" [(ngModel)]="form.name" name="name"></ion-input></label>
           <label>
@@ -142,7 +142,7 @@
             </ion-button>
             <ion-button class="secondary-button" fill="clear" expand="block" type="button" (click)="cancelEdit()">Cancel</ion-button>
           </div>
-          <p class="muted" *ngIf="message">{{ message }}</p>
+          <p class="status-note" *ngIf="message" [class.status-note--success]="messageKind === 'success'" [class.status-note--error]="messageKind === 'error'" [class.status-note--offline]="messageKind === 'offline'" aria-live="polite">{{ message }}</p>
         </form>
       </section>
       <ion-modal class="original-image-modal" [isOpen]="isOriginalImageOpen" (didDismiss)="closeOriginalImage()">

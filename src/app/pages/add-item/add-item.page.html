@@ -36,12 +36,12 @@
             <p class="muted consent-note">Wardrobe AI sends uploaded wardrobe photos to Google Gemini to classify items and generate cleaned display images.</p>
             <p class="muted consent-note">Only upload clothing photos you are comfortable sharing with that provider.</p>
           </div>
-          <div class="processing-line" *ngIf="isPreparing || isSaving || isBatchSaving">
+          <div class="processing-line" *ngIf="isPreparing || isSaving || isBatchSaving" aria-live="polite">
             <ion-spinner name="crescent"></ion-spinner>
             <span>{{ progressLabel }}</span>
           </div>
-          <p class="muted" *ngIf="statusMessage && !isSaving && !isBatchSaving">{{ statusMessage }}</p>
-          <p class="muted" *ngIf="message">{{ message }}</p>
+          <p class="status-note" *ngIf="statusMessage && !isSaving && !isBatchSaving" [class.status-note--success]="statusKind === 'success'" aria-live="polite">{{ statusMessage }}</p>
+          <p class="status-note status-note--multiline" *ngIf="message" [class.status-note--success]="messageKind === 'success'" [class.status-note--error]="messageKind === 'error'" [class.status-note--offline]="messageKind === 'offline'" aria-live="polite">{{ message }}</p>
           <ion-button class="primary-button" expand="block" (click)="uploadSelectedPhotos()" [disabled]="isSaving || isBatchSaving || !batchFiles.length || isPreparing">{{ uploadButtonLabel }}</ion-button>
         </article>
       </section>

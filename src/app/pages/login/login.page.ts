@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../auth.service';
-import { EMAIL_PATTERN, lightImpact, readMessage, successFeedback, warningFeedback } from '../page-helpers';
+import { EMAIL_PATTERN, lightImpact, noticeKind, NoticeKind, readMessage, successFeedback, warningFeedback } from '../page-helpers';
 
 @Component({
   selector: 'app-login',
@@ -18,6 +18,7 @@ export class LoginPage {
   displayName = '';
   message = '';
   isBusy = false;
+  hasSubmitted = false;
 
   get emailValidationMessage(): string {
     if (!this.email.trim()) {
@@ -60,6 +61,18 @@ export class LoginPage {
     );
   }
 
+  get showEmailValidationMessage(): boolean {
+    return this.hasSubmitted || !!this.email.trim();
+  }
+
+  get showPasswordValidationMessage(): boolean {
+    return this.hasSubmitted || !!this.password;
+  }
+
+  get showDisplayNameValidationMessage(): boolean {
+    return this.mode === 'register' && (this.hasSubmitted || !!this.displayName.trim());
+  }
+
   setAuthMode(mode: 'login' | 'register'): void {
     if (this.mode === mode) {
       return;
@@ -67,6 +80,7 @@ export class LoginPage {
 
     this.mode = mode;
     this.message = '';
+    this.hasSubmitted = false;
     void lightImpact();
   }
 
@@ -86,7 +100,12 @@ export class LoginPage {
     return this.mode === 'login' ? 'Sign in to review your wardrobe.' : 'Create your account to get started.';
   }
 
+  get messageKind(): NoticeKind {
+    return noticeKind(this.message);
+  }
+
   async submit(): Promise<void> {
+    this.hasSubmitted = true;
     if (!this.canSubmit) {
       this.message = this.emailValidationMessage || this.passwordValidationMessage || this.displayNameValidationMessage || 'Please complete all required fields.';
       return;

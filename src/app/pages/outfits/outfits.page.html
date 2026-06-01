@@ -1,5 +1,5 @@
     <ion-content class="app-content">
-      <section class="screen processing-screen" *ngIf="isDeletingSelected; else outfitsContent">
+      <section class="screen processing-screen" *ngIf="isDeletingSelected; else outfitsContent" aria-live="polite" aria-busy="true">
         <header class="nav-header">
           <span></span>
           <h1>Deleting outfits</h1>
@@ -28,6 +28,9 @@
             <button type="button" class="icon-button" *ngIf="!isSelectionMode" aria-label="Refresh outfits" (click)="load(true)" [disabled]="isLoading">
               <ion-icon name="refresh-outline"></ion-icon>
             </button>
+            <button type="button" class="icon-button" *ngIf="!isSelectionMode" aria-label="Select outfits" (click)="enterSelectionMode()" [disabled]="isLoading || !outfits.length">
+              <ion-icon name="checkmark-circle-outline"></ion-icon>
+            </button>
             <button type="button" class="icon-button" *ngIf="isSelectionMode" aria-label="Cancel selection" (click)="cancelSelectionMode()">
               <ion-icon name="close-outline"></ion-icon>
             </button>
@@ -40,19 +43,21 @@
             <button type="button" class="text-link" (click)="clearSelection()" [disabled]="!selectedCount">Clear</button>
           </div>
         </article>
-        <div class="skeleton-list outfit-skeleton" *ngIf="isLoading" aria-label="Loading saved outfits">
+        <div class="skeleton-list outfit-skeleton" *ngIf="isLoading" aria-label="Loading saved outfits" aria-busy="true">
           <article class="skeleton-card" *ngFor="let placeholder of [0, 1, 2]">
             <div class="skeleton-image"></div>
             <div class="skeleton-line"></div>
             <div class="skeleton-line short"></div>
           </article>
         </div>
-        <article class="panel state-panel" *ngIf="!isLoading && message">
+        <article class="panel state-panel" *ngIf="!isLoading && message && canRetryMessage" [class.state-panel--error]="messageKind === 'error'" [class.state-panel--offline]="messageKind === 'offline'" aria-live="polite">
           <p class="muted">{{ message }}</p>
+          <ion-button class="secondary-button" fill="outline" size="small" (click)="load(true)" *ngIf="!selectedOutfit && !isSelectionMode">Try again</ion-button>
         </article>
+        <p class="status-note" *ngIf="!isLoading && message && !canRetryMessage" [class.status-note--success]="messageKind === 'success'" aria-live="polite">{{ message }}</p>
         <ng-container>
-          <article class="outfit-card" *ngFor="let outfit of visibleOutfits; trackBy: trackById" [class.selection-mode]="isSelectionMode" [class.selected]="isOutfitSelected(outfit.id)" [attr.aria-selected]="isSelectionMode ? isOutfitSelected(outfit.id) : null">
-            <button type="button" class="outfit-open" (pointerdown)="beginOutfitPress(outfit)" (pointerup)="endOutfitPress()" (pointerleave)="cancelOutfitPress()" (pointercancel)="cancelOutfitPress()" (contextmenu)="suppressContextMenu($event)" (click)="open(outfit, $event)">
+          <article class="outfit-card" *ngFor="let outfit of visibleOutfits; trackBy: trackById" [class.selection-mode]="isSelectionMode" [class.selected]="isOutfitSelected(outfit.id)">
+            <button type="button" class="outfit-open" [attr.aria-pressed]="isSelectionMode ? isOutfitSelected(outfit.id) : null" (pointerdown)="beginOutfitPress(outfit)" (pointerup)="endOutfitPress()" (pointerleave)="cancelOutfitPress()" (pointercancel)="cancelOutfitPress()" (contextmenu)="suppressContextMenu($event)" (click)="open(outfit, $event)">
               <img class="outfit-hero-image" *ngIf="outfit.imageUrl" [appLazyImage]="outfit.thumbnailUrl || outfit.imageUrl" [alt]="outfit.name" loading="lazy" decoding="async">
               <span class="selection-marker" *ngIf="isSelectionMode">
                 <ion-icon [name]="isOutfitSelected(outfit.id) ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
@@ -83,7 +88,7 @@
           </article>
           <ion-button class="secondary-button" fill="outline" expand="block" *ngIf="canShowMoreOutfits" (click)="showMoreOutfits()">Show more outfits</ion-button>
         </ng-container>
-        <article class="panel" *ngIf="!isLoading && !message && !outfits.length">
+        <article class="panel" *ngIf="!isLoading && !canRetryMessage && !outfits.length">
           <h2 class="plain-title">No saved outfits</h2>
           <p class="muted">Build an outfit and save the ones worth repeating.</p>
         </article>

@@ -14,23 +14,23 @@
           Email
           <ion-input class="field" type="email" [(ngModel)]="email" name="email"></ion-input>
         </label>
-          <p class="muted field-error" *ngIf="emailValidationMessage">{{ emailValidationMessage }}</p>
+          <p class="muted field-error" *ngIf="showEmailValidationMessage && emailValidationMessage">{{ emailValidationMessage }}</p>
           <label>
             Password
             <ion-input class="field" type="password" [(ngModel)]="password" name="password"></ion-input>
           </label>
-          <p class="muted field-error" *ngIf="passwordValidationMessage">{{ passwordValidationMessage }}</p>
+          <p class="muted field-error" *ngIf="showPasswordValidationMessage && passwordValidationMessage">{{ passwordValidationMessage }}</p>
         <label *ngIf="mode === 'register'">
           Name
           <ion-input class="field" [(ngModel)]="displayName" name="displayName"></ion-input>
         </label>
-        <p class="muted field-error" *ngIf="mode === 'register' && displayNameValidationMessage">{{ displayNameValidationMessage }}</p>
+        <p class="muted field-error" *ngIf="showDisplayNameValidationMessage && displayNameValidationMessage">{{ displayNameValidationMessage }}</p>
         <ion-button class="primary-button" expand="block" type="submit" [disabled]="isBusy || !canSubmit">{{ authSubmitLabel }}</ion-button>
-        <div class="status-line" *ngIf="isBusy">
+        <div class="status-line" *ngIf="isBusy" aria-live="polite">
           <ion-spinner name="crescent"></ion-spinner>
           <span>{{ authStatusMessage }}</span>
         </div>
-        <p class="muted" *ngIf="message">{{ message }}</p>
+        <p class="status-note" *ngIf="message" [class.status-note--success]="messageKind === 'success'" [class.status-note--error]="messageKind === 'error'" [class.status-note--offline]="messageKind === 'offline'" aria-live="polite">{{ message }}</p>
       </form>
     </section>
   </ion-content>

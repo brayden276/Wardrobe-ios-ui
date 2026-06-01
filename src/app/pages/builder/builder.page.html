@@ -1,5 +1,5 @@
     <ion-content class="app-content">
-      <section class="screen processing-screen" *ngIf="isFullPageProcessing; else builderContent">
+      <section class="screen processing-screen" *ngIf="isFullPageProcessing; else builderContent" aria-live="polite" aria-busy="true">
         <header class="nav-header">
           <button type="button" class="nav-button" routerLink="/tabs/wardrobe" aria-label="Back to wardrobe" [disabled]="isBusy">
             <ion-icon name="chevron-back-outline"></ion-icon>
@@ -97,7 +97,7 @@
                 <ion-button class="primary-button small-action" (click)="save(outfit)" [disabled]="generatedSaveState(outfit) === 'saving' || generatedSaveState(outfit) === 'saved'">
                   {{ generatedSaveLabel(outfit) }}
                 </ion-button>
-                <div class="status-line" *ngIf="generatedSaveState(outfit) === 'saving'">
+                <div class="status-line" *ngIf="generatedSaveState(outfit) === 'saving'" aria-live="polite">
                   <ion-spinner name="crescent"></ion-spinner>
                   <span>{{ generatedSaveStatusMessage(outfit) }}</span>
                 </div>
@@ -132,7 +132,7 @@
             <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="selectAllItems()" [disabled]="!items.length || isBusy">Select all</ion-button>
           </div>
           <div class="manual-grid" *ngIf="items.length">
-            <button type="button" class="item-card manual-item" *ngFor="let item of manualItems; trackBy: trackById" [class.selected]="isManualSelected(item.id)" (click)="toggleManualItem(item.id)">
+            <button type="button" class="item-card manual-item" *ngFor="let item of manualItems; trackBy: trackById" [class.selected]="isManualSelected(item.id)" [attr.aria-pressed]="isManualSelected(item.id)" (click)="toggleManualItem(item.id)">
               <div class="item-card__image-wrap manual-item__image-wrap">
                 <img [appLazyImage]="itemImageUrl(item)" [alt]="item.name" loading="lazy" decoding="async">
                 <span class="manual-item__check">
@@ -153,7 +153,7 @@
           <p class="muted" *ngIf="manualItemIds.length && manualHint">{{ manualHint }}</p>
           <ion-button class="primary-button" expand="block" *ngIf="manualItemIds.length" (click)="saveManual()" [disabled]="isBusy">{{ isSavingManualOutfit ? 'Saving...' : 'Save outfit' }}</ion-button>
         </article>
-        <p class="muted" *ngIf="message">{{ message }}</p>
+        <p class="status-note" *ngIf="message" [class.status-note--success]="messageKind === 'success'" [class.status-note--error]="messageKind === 'error'" [class.status-note--offline]="messageKind === 'offline'" aria-live="polite">{{ message }}</p>
       </section>
       </ng-template>
     </ion-content>

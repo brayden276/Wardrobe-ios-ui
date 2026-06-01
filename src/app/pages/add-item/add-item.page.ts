@@ -2,7 +2,7 @@ import { Component, ElementRef, ViewChild, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { ActionSheetController } from '@ionic/angular';
+import { ActionSheetController, AlertController } from '@ionic/angular';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import {
   IMAGE_COMPRESSION_MAX_SIDES,
@@ -12,8 +12,10 @@ import {
   MAX_BATCH_UPLOAD_COUNT,
   MAX_UPLOAD_FILE_BYTES,
   MIME_IMAGE_OUTPUT_EXTENSION,
-  ensureAiConsent,
+  ensureAiConsentWithAlert,
   lightImpact,
+  noticeKind,
+  NoticeKind,
   readMessage,
   successFeedback,
   warningFeedback
@@ -36,6 +38,7 @@ export class AddItemPage {
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
   private readonly actionSheet = inject(ActionSheetController);
+  private readonly alertController = inject(AlertController);
   @ViewChild('cameraInput') private readonly cameraInput?: ElementRef<HTMLInputElement>;
   @ViewChild('batchInput') private readonly batchInput?: ElementRef<HTMLInputElement>;
   readonly CameraSource = CameraSource;
@@ -82,6 +85,14 @@ export class AddItemPage {
     }
 
     return this.batchFiles.length === 1 ? 'Upload photo' : 'Upload photos';
+  }
+
+  get messageKind(): NoticeKind {
+    return noticeKind(this.message, this.uploadError);
+  }
+
+  get statusKind(): NoticeKind {
+    return noticeKind(this.statusMessage);
   }
 
   async openAddPhotoOptions(): Promise<void> {
@@ -167,7 +178,8 @@ export class AddItemPage {
       return;
     }
 
-    if (!await ensureAiConsent(
+    if (!await ensureAiConsentWithAlert(
+      this.alertController,
       'Wardrobe AI uses Google Gemini to classify wardrobe photos and generate cleaned display images. Do you want to continue with AI processing for this device?'))
     {
       this.message = 'Gemini consent is required before you can upload wardrobe photos.';

@@ -1,13 +1,16 @@
 import { Component, inject } from '@angular/core';
+import { AlertController } from '@ionic/angular';
 import { GeneratedOutfitDto, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import {
   colourSwatch,
-  ensureAiConsent,
+  ensureAiConsentWithAlert,
   isActivewearBottomSubcategory,
   isActivewearTopSubcategory,
   lightImpact,
   lookupLabel,
+  noticeKind,
+  NoticeKind,
   readMessage,
   successFeedback,
   warningFeedback
@@ -25,6 +28,7 @@ type BuilderProcessingKind = 'loadingWardrobe' | 'buildingOutfits' | 'savingGene
 })
 export class BuilderPage {
   private readonly api = inject(WardrobeApiService);
+  private readonly alertController = inject(AlertController);
   builderMode: BuilderMode = 'generate';
   query = '';
   readonly occasionOptions = ['Work', 'Dinner', 'Brunch', 'Weekend'];
@@ -146,6 +150,10 @@ export class BuilderPage {
     return this.processingKind ? this.processingStepsByKind[this.processingKind] : [];
   }
 
+  get messageKind(): NoticeKind {
+    return noticeKind(this.message);
+  }
+
   processingStepState(index: number): string {
     if (!this.processingKind) {
       return '';
@@ -248,7 +256,8 @@ export class BuilderPage {
   }
 
   async search(): Promise<void> {
-    if (!await ensureAiConsent(
+    if (!await ensureAiConsentWithAlert(
+      this.alertController,
       'Wardrobe AI uses Google Gemini to interpret your outfit request and generate outfit suggestions from your wardrobe. Do you want to continue with AI processing for this device?'))
     {
       this.message = 'Gemini consent is required before Wardrobe AI can build outfit suggestions.';

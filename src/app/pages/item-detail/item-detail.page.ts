@@ -1,11 +1,15 @@
 import { Component, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { AlertController } from '@ionic/angular';
 import { ImageGenerationStreamUpdate, UpdateWardrobeItemRequest, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
 import { ImageGenerationStatusStream, WardrobeApiService } from '../../wardrobe-api.service';
 import {
+  confirmAction,
   emptyItemForm,
   lightImpact,
   lookupLabel,
+  noticeKind,
+  NoticeKind,
   readMessage,
   successFeedback,
   warningFeedback
@@ -23,6 +27,7 @@ export class ItemDetailPage implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
+  private readonly alertController = inject(AlertController);
   item: WardrobeItemDto | null = null;
   lookups: WardrobeLookupsDto | null = null;
   form: UpdateWardrobeItemRequest = emptyItemForm();
@@ -58,6 +63,10 @@ export class ItemDetailPage implements OnDestroy {
       this.item.riseId
     ];
     return Array.from(new Set(tags.map((id) => lookupLabel(this.lookups!, id)).filter(Boolean))).slice(0, 8);
+  }
+
+  get messageKind(): NoticeKind {
+    return noticeKind(this.message);
   }
 
   async ionViewWillEnter(): Promise<void> {
@@ -323,7 +332,12 @@ export class ItemDetailPage implements OnDestroy {
 
   async deleteItem(): Promise<void> {
     if (!this.item || this.isArchiving) return;
-    const confirmed = window.confirm(`Archive "${this.item.name}"? This removes it from your wardrobe.`);
+    const confirmed = await confirmAction(this.alertController, {
+      title: 'Archive item?',
+      message: `"${this.item.name}" will be removed from your wardrobe and outfit builder.`,
+      confirmLabel: 'Archive item',
+      destructive: true
+    });
     if (!confirmed) {
       return;
     }

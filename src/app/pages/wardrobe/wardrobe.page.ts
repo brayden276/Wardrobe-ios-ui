@@ -1,11 +1,15 @@
 import { Component, ElementRef, OnDestroy, ViewChild, inject } from '@angular/core';
-import { IonContent } from '@ionic/angular';
+import { Router } from '@angular/router';
+import { AlertController, IonContent } from '@ionic/angular';
 import { ImageGenerationStreamUpdate, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
 import { ImageGenerationStatusStream, WardrobeApiService } from '../../wardrobe-api.service';
 import {
+  confirmAction,
   colourSwatch,
   lightImpact,
   lookupLabel,
+  noticeKind,
+  NoticeKind,
   readMessage,
   successFeedback,
   warningFeedback
@@ -19,6 +23,8 @@ import {
 })
 export class WardrobePage implements OnDestroy {
   private readonly api = inject(WardrobeApiService);
+  private readonly router = inject(Router);
+  private readonly alertController = inject(AlertController);
   @ViewChild(IonContent) private readonly content?: IonContent;
   @ViewChild('wardrobeGrid') private readonly wardrobeGrid?: ElementRef<HTMLElement>;
   items: WardrobeItemDto[] = [];
@@ -127,6 +133,14 @@ export class WardrobePage implements OnDestroy {
       : `Deleting ${count} wardrobe items. They will no longer appear in your wardrobe or outfit builder.`;
   }
 
+  get messageKind(): NoticeKind {
+    return noticeKind(this.message);
+  }
+
+  get canRetryMessage(): boolean {
+    return this.messageKind === 'error' || this.messageKind === 'offline';
+  }
+
   get virtualTopSpacerHeight(): number {
     return Math.floor(this.virtualStartIndex / this.virtualColumns) * this.virtualRowHeight;
   }
@@ -226,10 +240,15 @@ export class WardrobePage implements OnDestroy {
       await this.content?.scrollToTop(0);
       this.startImageGenerationStreaming();
     } catch (error) {
-      this.message = readMessage(error, 'Could not load wardrobe. Please try again.');
-      this.items = [];
+      const hadLoadedItems = this.items.length > 0;
+      this.message = hadLoadedItems
+        ? `${readMessage(error, 'Could not refresh wardrobe. Please try again.')} Showing last loaded wardrobe items.`
+        : readMessage(error, 'Could not load wardrobe. Please try again.');
       this.canLoadMore = false;
-      this.resetVirtualWindow();
+      if (!hadLoadedItems) {
+        this.items = [];
+        this.resetVirtualWindow();
+      }
     } finally {
       this.isLoading = false;
     }
@@ -319,7 +338,7 @@ export class WardrobePage implements OnDestroy {
   }
 
   async loadMore(event?: Event): Promise<void> {
-    if (this.isLoadingMore || this.isLoading || !this.canLoadMore || this.message) {
+    if (this.isLoadingMore || this.isLoading || !this.canLoadMore || this.canRetryMessage) {
       this.completeInfiniteScroll(event);
       return;
     }
@@ -542,22 +561,19 @@ export class WardrobePage implements OnDestroy {
     return this.selectedItemIds.has(itemId);
   }
 
-  onItemCardClick(event: Event, item: WardrobeItemDto): void {
+  onItemCardClick(item: WardrobeItemDto): void {
     this.clearItemLongPress();
     if (this.suppressNextItemClick) {
-      event.preventDefault();
-      event.stopPropagation();
       this.suppressNextItemClick = false;
       return;
     }
 
-    if (!this.isSelectionMode) {
+    if (this.isSelectionMode) {
+      this.toggleItemSelection(item.id);
       return;
     }
 
-    event.preventDefault();
-    event.stopPropagation();
-    this.toggleItemSelection(item.id);
+    void this.router.navigate(['/tabs/wardrobe', item.id]);
   }
 
   toggleItemSelection(itemId: string): void {
@@ -605,9 +621,14 @@ export class WardrobePage implements OnDestroy {
     }
 
     const ids = Array.from(this.selectedItemIds);
-    const confirmed = window.confirm(ids.length === 1
-      ? 'Delete 1 selected wardrobe item?'
-      : `Delete ${ids.length} selected wardrobe items?`);
+    const confirmed = await confirmAction(this.alertController, {
+      title: ids.length === 1 ? 'Delete selected item?' : 'Delete selected items?',
+      message: ids.length === 1
+        ? 'This removes the selected item from wardrobe results and outfit generation.'
+        : `This removes ${ids.length} selected items from wardrobe results and outfit generation.`,
+      confirmLabel: ids.length === 1 ? 'Delete item' : 'Delete items',
+      destructive: true
+    });
     if (!confirmed) {
       return;
     }

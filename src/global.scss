@@ -108,12 +108,11 @@ ion-tab-button[aria-selected="true"] ion-icon {
 .content-layer {
   display: grid;
   gap: 16px;
-  transition: opacity 180ms ease, transform 180ms ease;
+  transition: opacity 160ms ease;
 }
 
 .sheet-active .content-layer {
-  opacity: 0.58;
-  transform: scale(0.97);
+  opacity: 0.72;
 }
 
 .page-header,
@@ -296,6 +295,21 @@ ion-searchbar.wardrobe-search {
   justify-items: start;
 }
 
+.state-panel--success {
+  border-color: rgba(91, 96, 64, 0.24);
+  background: rgba(245, 250, 237, 0.92);
+}
+
+.state-panel--error,
+.state-panel--offline {
+  border-color: rgba(138, 48, 42, 0.24);
+  background: var(--app-danger-bg);
+}
+
+.state-panel--offline {
+  border-style: dashed;
+}
+
 .skeleton-list,
 .skeleton-card {
   display: grid;
@@ -305,7 +319,7 @@ ion-searchbar.wardrobe-search {
 .skeleton-card {
   border: 1px solid var(--app-border);
   border-radius: 12px;
-  background: rgba(255, 250, 243, 0.9);
+  background: rgba(255, 250, 243, 0.86);
   padding: 12px;
 }
 
@@ -313,9 +327,9 @@ ion-searchbar.wardrobe-search {
 .skeleton-line {
   overflow: hidden;
   border-radius: 8px;
-  background: linear-gradient(90deg, rgba(185, 170, 150, 0.16), rgba(255, 250, 243, 0.86), rgba(185, 170, 150, 0.16));
+  background: linear-gradient(90deg, rgba(185, 170, 150, 0.13), rgba(255, 250, 243, 0.92), rgba(185, 170, 150, 0.13));
   background-size: 200% 100%;
-  animation: skeleton-sweep 1.2s ease-in-out infinite;
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
 }
 
 .skeleton-image {
@@ -429,7 +443,7 @@ ion-searchbar.wardrobe-search {
 .inline-sheet {
   box-shadow: var(--app-shadow);
   transform-origin: top center;
-  animation: sheet-rise 180ms ease both;
+  animation: sheet-rise 160ms ease both;
 }
 
 .intent-banner {
@@ -464,12 +478,12 @@ ion-searchbar.wardrobe-search {
 @keyframes sheet-rise {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.99);
+    transform: translateY(8px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
@@ -636,13 +650,26 @@ ion-searchbar.wardrobe-search {
 }
 
 .item-card {
+  appearance: none;
+  display: block;
+  width: 100%;
   border: 1px solid rgba(61, 49, 40, 0.08);
   border-radius: 12px;
   background: rgba(255, 250, 243, 0.9);
   color: inherit;
+  font: inherit;
   overflow: hidden;
+  padding: 0;
+  text-align: left;
   text-decoration: none;
   transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+
+.item-card:focus-visible,
+.outfit-open:focus-visible,
+.outfit-copy:focus-visible {
+  outline: 2px solid rgba(91, 96, 64, 0.42);
+  outline-offset: 3px;
 }
 
 .item-card__image-wrap {
@@ -651,6 +678,25 @@ ion-searchbar.wardrobe-search {
   aspect-ratio: 1 / 1.08;
   place-items: center;
   background: #fff;
+}
+
+.item-card__image-wrap:has(img.image-failed)::after,
+.manual-item__image-wrap:has(img.image-failed)::after,
+.outfit-open:has(img.image-failed)::after,
+.product-stage:has(img.image-failed)::after {
+  position: absolute;
+  inset: 10px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(61, 49, 40, 0.1);
+  border-radius: 8px;
+  background: #fffaf3;
+  color: var(--app-muted);
+  content: 'Image unavailable';
+  font-size: 12px;
+  line-height: 1.25;
+  padding: 8px;
+  text-align: center;
 }
 
 .item-card img {
@@ -725,6 +771,25 @@ ion-searchbar.wardrobe-search {
   width: 17px;
   height: 17px;
   --color: var(--app-olive);
+}
+
+.status-note {
+  margin: 0;
+  color: var(--app-muted);
+  line-height: 1.35;
+}
+
+.status-note--success {
+  color: #4d5b37;
+}
+
+.status-note--error,
+.status-note--offline {
+  color: var(--app-danger);
+}
+
+.status-note--multiline {
+  white-space: pre-line;
 }
 
 .image-generation-overlay,
@@ -1381,6 +1446,11 @@ ion-textarea.outfit-query {
   width: 100%;
 }
 
+.destructive-alert-button {
+  color: var(--app-danger) !important;
+  font-weight: 700;
+}
+
 .outfit-hero-image,
 .outfit-detail-image {
   display: block;
@@ -1575,6 +1645,11 @@ ion-select.field {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .skeleton-image,
+  .skeleton-line {
+    background-position: 0 0;
+  }
+
   *,
   *::before,
   *::after {

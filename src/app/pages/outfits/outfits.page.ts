@@ -1,7 +1,8 @@
 import { Component, inject } from '@angular/core';
+import { AlertController } from '@ionic/angular';
 import { OutfitDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
-import { lightImpact, readMessage, successFeedback, warningFeedback } from '../page-helpers';
+import { confirmAction, lightImpact, noticeKind, NoticeKind, readMessage, successFeedback, warningFeedback } from '../page-helpers';
 
 @Component({
   selector: 'app-outfits',
@@ -11,6 +12,7 @@ import { lightImpact, readMessage, successFeedback, warningFeedback } from '../p
 })
 export class OutfitsPage {
   private readonly api = inject(WardrobeApiService);
+  private readonly alertController = inject(AlertController);
   outfits: OutfitDto[] = [];
   selectedOutfit: OutfitDto | null = null;
   isLoading = true;
@@ -46,6 +48,14 @@ export class OutfitsPage {
     return this.selectedCount === 1
       ? 'Deleting 1 saved outfit. Wardrobe items stay available.'
       : `Deleting ${this.selectedCount} saved outfits. Wardrobe items stay available.`;
+  }
+
+  get messageKind(): NoticeKind {
+    return noticeKind(this.message);
+  }
+
+  get canRetryMessage(): boolean {
+    return this.messageKind === 'error' || this.messageKind === 'offline';
   }
 
   showMoreOutfits(): void {
@@ -128,7 +138,12 @@ export class OutfitsPage {
       return;
     }
 
-    const confirmed = window.confirm(`Delete outfit "${outfit.name}"?`);
+    const confirmed = await confirmAction(this.alertController, {
+      title: 'Delete outfit?',
+      message: `"${outfit.name}" will be removed from saved outfits. Wardrobe items stay available.`,
+      confirmLabel: 'Delete outfit',
+      destructive: true
+    });
     if (!confirmed) {
       return;
     }
@@ -224,9 +239,14 @@ export class OutfitsPage {
     }
 
     const ids = Array.from(this.selectedOutfitIds);
-    const confirmed = window.confirm(ids.length === 1
-      ? 'Delete 1 selected outfit?'
-      : `Delete ${ids.length} selected outfits?`);
+    const confirmed = await confirmAction(this.alertController, {
+      title: ids.length === 1 ? 'Delete selected outfit?' : 'Delete selected outfits?',
+      message: ids.length === 1
+        ? 'This removes 1 saved outfit. Wardrobe items stay available.'
+        : `This removes ${ids.length} saved outfits. Wardrobe items stay available.`,
+      confirmLabel: ids.length === 1 ? 'Delete outfit' : 'Delete outfits',
+      destructive: true
+    });
     if (!confirmed) {
       return;
     }

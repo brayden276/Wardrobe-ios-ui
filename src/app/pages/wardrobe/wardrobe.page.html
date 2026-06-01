@@ -1,5 +1,5 @@
     <ion-content class="app-content" [scrollEvents]="true" (ionScroll)="onWardrobeScroll($event)">
-      <section class="screen processing-screen" *ngIf="isDeletingSelected; else wardrobeContent">
+      <section class="screen processing-screen" *ngIf="isDeletingSelected; else wardrobeContent" aria-live="polite" aria-busy="true">
         <header class="nav-header">
           <span></span>
           <h1>{{ processingTitle }}</h1>
@@ -26,6 +26,9 @@
           <div class="header-actions">
             <button type="button" class="icon-button" *ngIf="!isSelectionMode" aria-label="Refresh wardrobe" (click)="load(true)" [disabled]="isLoading">
               <ion-icon name="refresh-outline"></ion-icon>
+            </button>
+            <button type="button" class="icon-button" *ngIf="!isSelectionMode" aria-label="Select wardrobe items" (click)="enterSelectionMode()" [disabled]="isLoading || !items.length">
+              <ion-icon name="checkmark-circle-outline"></ion-icon>
             </button>
             <button type="button" class="icon-button" *ngIf="isSelectionMode" aria-label="Cancel selection" (click)="cancelSelectionMode()">
               <ion-icon name="close-outline"></ion-icon>
@@ -150,20 +153,21 @@
           </details>
           <ion-button class="secondary-button" fill="outline" expand="block" (click)="clearFilters()" [disabled]="!hasFilters">Clear filters</ion-button>
         </article>
-        <div class="skeleton-list wardrobe-skeleton" *ngIf="isLoading" aria-label="Loading wardrobe items">
+        <div class="skeleton-list wardrobe-skeleton" *ngIf="isLoading" aria-label="Loading wardrobe items" aria-busy="true">
           <article class="skeleton-card" *ngFor="let placeholder of [0, 1, 2, 3]">
             <div class="skeleton-image"></div>
             <div class="skeleton-line"></div>
             <div class="skeleton-line short"></div>
           </article>
         </div>
-        <article class="panel state-panel" *ngIf="!isLoading && message">
+        <article class="panel state-panel" *ngIf="!isLoading && message && canRetryMessage" [class.state-panel--error]="messageKind === 'error'" [class.state-panel--offline]="messageKind === 'offline'" aria-live="polite">
           <p class="muted">{{ message }}</p>
           <ion-button class="secondary-button" fill="outline" size="small" (click)="load(true)">Try again</ion-button>
         </article>
-        <div #wardrobeGrid class="wardrobe-grid wardrobe-grid--virtual" *ngIf="!isLoading && !message && items.length; else emptyWardrobe">
+        <p class="status-note" *ngIf="!isLoading && message && !canRetryMessage" [class.status-note--success]="messageKind === 'success'" aria-live="polite">{{ message }}</p>
+        <div #wardrobeGrid class="wardrobe-grid wardrobe-grid--virtual" *ngIf="!isLoading && items.length; else emptyWardrobe">
           <div class="wardrobe-grid__spacer" [style.height.px]="virtualTopSpacerHeight"></div>
-          <a class="item-card" *ngFor="let item of visibleItems; let index = index; trackBy: trackById" [class.selection-mode]="isSelectionMode" [class.selected]="isItemSelected(item.id)" [attr.aria-selected]="isSelectionMode ? isItemSelected(item.id) : null" [routerLink]="['/tabs/wardrobe', item.id]" (pointerdown)="beginItemPress(item)" (pointerup)="endItemPress()" (pointerleave)="cancelItemPress()" (pointercancel)="cancelItemPress()" (contextmenu)="suppressContextMenu($event)" (click)="onItemCardClick($event, item)">
+          <button type="button" class="item-card" *ngFor="let item of visibleItems; let index = index; trackBy: trackById" [class.selection-mode]="isSelectionMode" [class.selected]="isItemSelected(item.id)" [attr.aria-pressed]="isSelectionMode ? isItemSelected(item.id) : null" (pointerdown)="beginItemPress(item)" (pointerup)="endItemPress()" (pointerleave)="cancelItemPress()" (pointercancel)="cancelItemPress()" (contextmenu)="suppressContextMenu($event)" (click)="onItemCardClick(item)">
             <div class="item-card__image-wrap">
               <img [appLazyImage]="wardrobeImageUrl(item)" [appLazyImagePriority]="shouldPrioritiseImage(index)" [alt]="item.name" loading="lazy" decoding="async">
               <span class="selection-marker" *ngIf="isSelectionMode">
@@ -181,14 +185,14 @@
                 <span class="colour-dot" *ngFor="let colour of coloursFor(item)" [style.background]="colourSwatch(colour)"></span>
               </div>
             </div>
-          </a>
+          </button>
           <div class="wardrobe-grid__spacer" [style.height.px]="virtualBottomSpacerHeight"></div>
         </div>
-        <ion-infinite-scroll threshold="280px" *ngIf="canLoadMore && !message" (ionInfinite)="loadMore($event)">
+        <ion-infinite-scroll threshold="280px" *ngIf="canLoadMore && !canRetryMessage" (ionInfinite)="loadMore($event)">
           <ion-infinite-scroll-content loadingSpinner="crescent" loadingText="Loading more wardrobe items..."></ion-infinite-scroll-content>
         </ion-infinite-scroll>
         <ng-template #emptyWardrobe>
-          <article class="panel" *ngIf="!isLoading && !message">
+          <article class="panel" *ngIf="!isLoading && !canRetryMessage">
             <h2 class="plain-title">{{ hasFilters ? 'No matching items found.' : 'Your wardrobe is empty.' }}</h2>
             <p class="muted">{{ hasFilters ? 'Clear filters to see more wardrobe items.' : 'Add your first item.' }}</p>
             <ion-button *ngIf="hasFilters" class="secondary-button" fill="outline" size="small" (click)="clearFilters()">Clear filters</ion-button>

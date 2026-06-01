@@ -20,28 +20,32 @@
           <h2 class="section-title">Device session</h2>
           <p class="muted">This device stores your Wardrobe AI session in local app preferences until you sign out or delete your account.</p>
           <p class="muted" *ngIf="sessionExpiresAtLabel">Current session expires {{ sessionExpiresAtLabel }}.</p>
-          <div class="status-line" *ngIf="isBusy && settingsMode === 'account'">
+          <div class="status-line" *ngIf="isBusy && settingsMode === 'account'" aria-live="polite">
             <ion-spinner name="crescent"></ion-spinner>
             <span>{{ settingsStatusMessage }}</span>
           </div>
           <ion-button class="secondary-button" fill="outline" (click)="logout()" [disabled]="isBusy">{{ isBusy ? 'Working...' : 'Sign out' }}</ion-button>
+          <p class="status-note" *ngIf="message" [class.status-note--success]="messageKind === 'success'" [class.status-note--error]="messageKind === 'error'" [class.status-note--offline]="messageKind === 'offline'" aria-live="polite">{{ message }}</p>
         </article>
         <article class="intent-surface settings-card" *ngIf="settingsMode === 'ai'">
           <h2 class="section-title">AI processing</h2>
-          <div class="status-line" *ngIf="isLoadingAiUsage || (isBusy && settingsMode === 'ai')">
+          <div class="status-line" *ngIf="isLoadingAiUsage || (isBusy && settingsMode === 'ai')" aria-live="polite">
             <ion-spinner name="crescent"></ion-spinner>
             <span>{{ settingsStatusMessage }}</span>
           </div>
-          <div class="usage-total" *ngIf="!isLoadingAiUsage">
+          <div class="usage-total" *ngIf="aiUsage && !isLoadingAiUsage">
             <span>Total estimated AI cost</span>
             <strong>{{ aiUsageTotalLabel }}</strong>
           </div>
-          <p class="muted" *ngIf="aiUsageLoadMessage && !isLoadingAiUsage">{{ aiUsageLoadMessage }}</p>
+          <article class="panel state-panel" *ngIf="aiUsageLoadMessage && !isLoadingAiUsage" [class.state-panel--offline]="aiUsageLoadKind === 'offline'" [class.state-panel--error]="aiUsageLoadKind === 'error'" aria-live="polite">
+            <p class="muted">{{ aiUsageLoadMessage }}</p>
+            <ion-button class="secondary-button" fill="outline" size="small" (click)="loadAiUsage()" [disabled]="isBusy">Try again</ion-button>
+          </article>
           <p class="muted" *ngIf="aiUsage">Based on {{ aiUsage.wardrobeItemClassifications }} item scans, {{ aiUsage.outfitSearches }} saved AI outfit searches, and {{ aiUsage.displayImages + aiUsage.outfitImages }} generated images.</p>
           <p class="muted">{{ aiConsentAccepted ? 'This device is allowed to send wardrobe photos and outfit requests to Google Gemini.' : 'This device has not granted Gemini processing consent yet.' }}</p>
           <p class="muted">{{ aiDisclosure }}</p>
           <ion-button class="secondary-button" fill="outline" (click)="resetAiConsent()" [disabled]="isBusy || !aiConsentAccepted">Require consent again</ion-button>
-          <p class="muted" *ngIf="message">{{ message }}</p>
+          <p class="status-note" *ngIf="message" [class.status-note--success]="messageKind === 'success'" [class.status-note--error]="messageKind === 'error'" [class.status-note--offline]="messageKind === 'offline'" aria-live="polite">{{ message }}</p>
         </article>
         <article class="intent-surface settings-card" *ngIf="settingsMode === 'legal'">
           <h2 class="section-title">Legal and support</h2>
@@ -52,12 +56,12 @@
         <article class="intent-surface settings-card danger-panel" *ngIf="settingsMode === 'danger'">
           <h2 class="section-title">Delete account</h2>
           <p class="muted">Deleting your account permanently removes your sign-in, wardrobe items, saved outfits, uploaded images, and related cloud data.</p>
-          <div class="status-line" *ngIf="isBusy && settingsMode === 'danger'">
+          <div class="status-line" *ngIf="isBusy && settingsMode === 'danger'" aria-live="polite">
             <ion-spinner name="crescent"></ion-spinner>
             <span>{{ settingsStatusMessage }}</span>
           </div>
           <ion-button class="secondary-button destructive-button" fill="outline" (click)="deleteAccount()" [disabled]="isBusy">{{ isBusy ? 'Deleting...' : 'Delete account' }}</ion-button>
-          <p class="muted" *ngIf="message">{{ message }}</p>
+          <p class="status-note" *ngIf="message" [class.status-note--success]="messageKind === 'success'" [class.status-note--error]="messageKind === 'error'" [class.status-note--offline]="messageKind === 'offline'" aria-live="polite">{{ message }}</p>
         </article>
       </section>
     </ion-content>

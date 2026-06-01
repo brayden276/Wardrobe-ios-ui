@@ -1,5 +1,6 @@
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { Preferences } from '@capacitor/preferences';
+import type { AlertController } from '@ionic/angular';
 import { ApiMessage, UpdateWardrobeItemRequest, WardrobeLookupsDto } from '../models';
 
 export function emptyItemForm(): UpdateWardrobeItemRequest {
@@ -143,12 +144,16 @@ export async function hasAiConsent(): Promise<boolean> {
   return stored.value === 'accepted';
 }
 
-export async function ensureAiConsent(prompt: string): Promise<boolean> {
+export async function ensureAiConsentWithAlert(alertController: AlertController, prompt: string): Promise<boolean> {
   if (await hasAiConsent()) {
     return true;
   }
 
-  const confirmed = window.confirm(prompt);
+  const confirmed = await confirmAction(alertController, {
+    title: 'Allow Gemini processing?',
+    message: prompt,
+    confirmLabel: 'Allow'
+  });
   if (!confirmed) {
     return false;
   }
@@ -159,6 +164,67 @@ export async function ensureAiConsent(prompt: string): Promise<boolean> {
 
 export async function clearAiConsent(): Promise<void> {
   await Preferences.remove({ key: AI_CONSENT_KEY });
+}
+
+export interface ConfirmActionOptions {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  destructive?: boolean;
+}
+
+export type NoticeKind = 'info' | 'success' | 'error' | 'offline';
+
+export async function confirmAction(alertController: AlertController, options: ConfirmActionOptions): Promise<boolean> {
+  let choice = false;
+
+  const alert = await alertController.create({
+    header: options.title,
+    message: options.message,
+    buttons: [
+      {
+        text: options.cancelLabel ?? 'Cancel',
+        role: 'cancel',
+        handler: () => {
+          choice = false;
+        }
+      },
+      {
+        text: options.confirmLabel,
+        role: options.destructive ? 'destructive' : undefined,
+        cssClass: options.destructive ? 'destructive-alert-button' : undefined,
+        handler: () => {
+          choice = true;
+        }
+      }
+    ]
+  });
+
+  await alert.present();
+  await alert.onDidDismiss();
+  return choice;
+}
+
+export function noticeKind(message: string, forceError = false): NoticeKind {
+  if (!message) {
+    return 'info';
+  }
+
+  const normalised = message.toLowerCase();
+  if (normalised.includes('could not reach') || normalised.includes('check your connection')) {
+    return 'offline';
+  }
+
+  if (forceError || /(could not|failed|required|not available|must be|no valid|timed out)/.test(normalised)) {
+    return 'error';
+  }
+
+  if (/(saved|deleted|marked|ready|added|cleared)/.test(normalised)) {
+    return 'success';
+  }
+
+  return 'info';
 }
 
 export async function lightImpact(): Promise<void> {

@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { AlertController } from '@ionic/angular';
 import { AuthService } from '../../auth.service';
 import { AiUsageCostSummaryDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
@@ -9,8 +10,11 @@ import {
   SUPPORT_URL,
   TERMS_OF_USE_URL,
   clearAiConsent,
+  confirmAction,
   hasAiConsent,
   lightImpact,
+  noticeKind,
+  NoticeKind,
   readMessage,
   successFeedback,
   warningFeedback
@@ -28,6 +32,7 @@ export class SettingsPage {
   readonly auth = inject(AuthService);
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
+  private readonly alertController = inject(AlertController);
   readonly privacyPolicyUrl = PRIVACY_POLICY_URL;
   readonly termsUrl = TERMS_OF_USE_URL;
   readonly supportUrl = SUPPORT_URL;
@@ -44,6 +49,10 @@ export class SettingsPage {
   async ionViewWillEnter(): Promise<void> {
     this.aiConsentAccepted = await hasAiConsent();
     this.message = '';
+    await this.loadAiUsage();
+  }
+
+  async loadAiUsage(): Promise<void> {
     this.aiUsageLoadMessage = '';
     this.isLoadingAiUsage = true;
     try {
@@ -87,6 +96,14 @@ export class SettingsPage {
     return '';
   }
 
+  get messageKind(): NoticeKind {
+    return noticeKind(this.message);
+  }
+
+  get aiUsageLoadKind(): NoticeKind {
+    return noticeKind(this.aiUsageLoadMessage);
+  }
+
   setSettingsMode(mode: SettingsMode): void {
     if (this.settingsMode === mode) {
       return;
@@ -102,9 +119,13 @@ export class SettingsPage {
   async logout(): Promise<void> {
     this.isBusy = true;
     this.busyMessage = 'Signing out...';
+    this.message = '';
     try {
       await this.auth.logout();
       await this.router.navigateByUrl('/login');
+    } catch (error) {
+      this.message = readMessage(error, 'Could not sign out. Check your connection and try again.');
+      void warningFeedback();
     } finally {
       this.isBusy = false;
       this.busyMessage = '';
@@ -112,7 +133,16 @@ export class SettingsPage {
   }
 
   async resetAiConsent(): Promise<void> {
-    if (!this.aiConsentAccepted || !window.confirm('Require consent again for Gemini wardrobe processing on this device?')) {
+    if (!this.aiConsentAccepted) {
+      return;
+    }
+
+    const confirmed = await confirmAction(this.alertController, {
+      title: 'Require consent again?',
+      message: 'This device will ask before sending wardrobe photos or outfit requests to Google Gemini again.',
+      confirmLabel: 'Require consent'
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -131,7 +161,16 @@ export class SettingsPage {
   }
 
   async deleteAccount(): Promise<void> {
-    const confirmed = window.confirm('Delete your Wardrobe AI account? This permanently removes your account, wardrobe items, saved outfits, uploaded images, and related cloud data.');
+    if (this.isBusy) {
+      return;
+    }
+
+    const confirmed = await confirmAction(this.alertController, {
+      title: 'Delete account?',
+      message: 'This permanently removes your account, wardrobe items, saved outfits, uploaded images, and related cloud data.',
+      confirmLabel: 'Delete account',
+      destructive: true
+    });
     if (!confirmed) {
       return;
     }
