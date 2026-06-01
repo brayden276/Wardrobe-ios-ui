@@ -32,7 +32,7 @@
           <button type="button" [class.active]="builderMode === 'manual'" [attr.aria-selected]="builderMode === 'manual'" (click)="setBuilderMode('manual')" role="tab">Manual</button>
         </div>
         <ng-container *ngIf="!isLoadingWardrobe && builderMode === 'generate'">
-          <article class="intent-surface form-stack generate-panel">
+          <article class="intent-surface form-stack generate-panel" *ngIf="!resultCards.length">
             <div class="intent-group">
               <span>Occasion</span>
               <div class="option-row">
