@@ -55,10 +55,11 @@ export class BuilderPage {
   private readonly savedGeneratedOutfitKeys = new Set<string>();
   private readonly failedGeneratedOutfitKeys = new Set<string>();
   private readonly builderItemRenderIncrement = 60;
+  private readonly generatedOutfitImagePreloadLimit = 4;
   visibleBuilderItemCount = this.builderItemRenderIncrement;
   private readonly processingStepsByKind: Record<BuilderProcessingKind, string[]> = {
     loadingWardrobe: ['Loading wardrobe items', 'Loading outfit options', 'Preparing builder'],
-    buildingOutfits: ['Reading request', 'Matching wardrobe items', 'Building outfit combinations', 'Preparing suggestions'],
+    buildingOutfits: ['Reading request', 'Matching wardrobe items', 'Building outfit combinations', 'Loading outfit images', 'Preparing suggestions'],
     savingGeneratedOutfit: ['Collecting selected item images', 'Composing outfit preview', 'Generating outfit image', 'Saving outfit'],
     savingManualOutfit: ['Collecting selected item images', 'Composing outfit preview', 'Generating outfit image', 'Saving outfit']
   };
@@ -284,8 +285,13 @@ export class BuilderPage {
       this.lastGeneratedPrompt = prompt;
       this.setProcessingStep(2);
       const generatedOutfits = await this.api.searchOutfits(prompt, this.requiredItemId);
-      this.results = generatedOutfits.filter((outfit) => !!outfit.displayImageUrl || !!outfit.imageUrl);
-      this.setProcessingStep(3);
+      const readyOutfits = generatedOutfits.filter((outfit) => !!outfit.displayImageUrl || !!outfit.imageUrl);
+      if (readyOutfits.length) {
+        this.setProcessingStep(3);
+        await this.preloadGeneratedOutfitImages(readyOutfits);
+      }
+      this.setProcessingStep(4);
+      this.results = readyOutfits;
       if (!this.results.length) {
         this.message = generatedOutfits.length
           ? 'Could not generate outfit previews for that request. Try again with a different outfit brief.'
@@ -491,6 +497,10 @@ export class BuilderPage {
     }
   }
 
+  shouldPrioritiseGeneratedOutfit(index: number): boolean {
+    return index < this.generatedOutfitImagePreloadLimit;
+  }
+
   missingCategorySummary(outfit: GeneratedOutfitDto): string {
     return outfit.missingCategories?.length ? outfit.missingCategories.join(', ') : '';
   }
@@ -506,6 +516,49 @@ export class BuilderPage {
       this.selectedAvoids.length ? `Avoid ${this.selectedAvoids.join(', ').toLowerCase()}` : '',
       this.query.trim()
     ].filter(Boolean).join('. ');
+  }
+
+  private async preloadGeneratedOutfitImages(outfits: GeneratedOutfitDto[]): Promise<void> {
+    const imageUrls = outfits
+      .map((outfit) => outfit.displayImageUrl || outfit.imageUrl)
+      .filter((url): url is string => !!url)
+      .slice(0, this.generatedOutfitImagePreloadLimit);
+
+    await Promise.all(imageUrls.map((url) => this.preloadImage(url)));
+  }
+
+  private preloadImage(url: string): Promise<void> {
+    return new Promise((resolve) => {
+      const image = new Image();
+      let isFinished = false;
+      let timeoutId = 0;
+      const finish = (): void => {
+        if (isFinished) {
+          return;
+        }
+
+        isFinished = true;
+        window.clearTimeout(timeoutId);
+        resolve();
+      };
+      const decodeThenFinish = (): void => {
+        if (typeof image.decode !== 'function') {
+          finish();
+          return;
+        }
+
+        image.decode().then(finish).catch(finish);
+      };
+
+      timeoutId = window.setTimeout(finish, 8000);
+      image.onload = decodeThenFinish;
+      image.onerror = finish;
+      image.src = url;
+
+      if (image.complete && image.naturalWidth > 0) {
+        decodeThenFinish();
+      }
+    });
   }
 
   private manualCategory(item: WardrobeItemDto): string | null {

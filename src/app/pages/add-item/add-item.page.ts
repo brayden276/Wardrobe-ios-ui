@@ -28,6 +28,8 @@ type PreparedUploadFile = {
   preparedBytes: number;
 };
 
+type AddItemProcessingKind = 'preparingPhotos' | 'uploadingSinglePhoto' | 'uploadingBatchPhotos';
+
 @Component({
   selector: 'app-add-item',
   standalone: false,
@@ -51,6 +53,13 @@ export class AddItemPage {
   batchFiles: PreparedUploadFile[] = [];
   batchPreviewUrls: string[] = [];
   isBatchSaving = false;
+  processingKind: AddItemProcessingKind | null = null;
+  processingStepIndex = 0;
+  private readonly processingStepsByKind: Record<AddItemProcessingKind, string[]> = {
+    preparingPhotos: ['Reading selected photos', 'Checking image quality', 'Optimising photos', 'Preparing upload queue'],
+    uploadingSinglePhoto: ['Uploading photo', 'Classifying clothing', 'Starting image cleanup', 'Opening wardrobe'],
+    uploadingBatchPhotos: ['Uploading photos', 'Classifying items', 'Starting image cleanup', 'Opening wardrobe']
+  };
 
   get batchSummary(): string {
     if (!this.batchFiles.length) {
@@ -67,18 +76,6 @@ export class AddItemPage {
     return `${this.batchFiles.length} photo${this.batchFiles.length === 1 ? '' : 's'} (${this.formatBytes(preparedBytes)} total, reduced from ${this.formatBytes(originalBytes)}).`;
   }
 
-  get progressLabel(): string {
-    if (this.isPreparing) {
-      return 'Preparing photos...';
-    }
-
-    if (this.isSaving || this.isBatchSaving) {
-      return 'Uploading photos...';
-    }
-
-    return '';
-  }
-
   get uploadButtonLabel(): string {
     if (this.isSaving || this.isBatchSaving) {
       return 'Uploading...';
@@ -93,6 +90,51 @@ export class AddItemPage {
 
   get statusKind(): NoticeKind {
     return noticeKind(this.statusMessage);
+  }
+
+  get isFullPageProcessing(): boolean {
+    return this.processingKind !== null;
+  }
+
+  get processingTitle(): string {
+    switch (this.processingKind) {
+      case 'preparingPhotos':
+        return 'Preparing photos';
+      case 'uploadingSinglePhoto':
+      case 'uploadingBatchPhotos':
+        return 'Adding clothing items';
+      default:
+        return '';
+    }
+  }
+
+  get processingDetail(): string {
+    switch (this.processingKind) {
+      case 'preparingPhotos':
+        return 'Checking and optimising the selected photos before upload.';
+      case 'uploadingSinglePhoto':
+        return 'Sending the photo to Wardrobe AI and creating the item.';
+      case 'uploadingBatchPhotos':
+        return 'Sending the selected photos to Wardrobe AI and creating the items.';
+      default:
+        return '';
+    }
+  }
+
+  get processingSteps(): string[] {
+    return this.processingKind ? this.processingStepsByKind[this.processingKind] : [];
+  }
+
+  processingStepState(index: number): string {
+    if (!this.processingKind) {
+      return '';
+    }
+
+    if (index < this.processingStepIndex) {
+      return 'complete';
+    }
+
+    return index === this.processingStepIndex ? 'active' : 'pending';
   }
 
   async openAddPhotoOptions(): Promise<void> {
@@ -257,6 +299,7 @@ export class AddItemPage {
     this.statusMessage = '';
     this.uploadError = false;
     this.isPreparing = true;
+    this.startProcessing('preparingPhotos');
 
     try {
       const remainingCount = this.maxBatchUploadCount - this.batchFiles.length;
@@ -270,7 +313,10 @@ export class AddItemPage {
         this.message = `You selected ${files.length} photos. Only ${remainingCount} more ${remainingCount === 1 ? 'was' : 'were'} kept.`;
       }
 
+      this.setProcessingStep(1);
+      this.setProcessingStep(2);
       const preparedFiles = await this.prepareBatchImages(files.slice(0, remainingCount));
+      this.setProcessingStep(3);
       if (!preparedFiles.length) {
         if (!this.message) {
           this.message = 'No valid images in selection.';
@@ -294,6 +340,7 @@ export class AddItemPage {
       void warningFeedback();
     } finally {
       this.isPreparing = false;
+      this.stopProcessing('preparingPhotos');
     }
   }
 
@@ -302,10 +349,14 @@ export class AddItemPage {
     this.message = '';
     this.statusMessage = 'Uploading photo...';
     this.uploadError = false;
+    this.startProcessing('uploadingSinglePhoto');
 
     try {
+      this.setProcessingStep(1);
       await this.api.createItem(photo.file, photo.name);
+      this.setProcessingStep(2);
       void successFeedback();
+      this.setProcessingStep(3);
       await this.router.navigateByUrl('/tabs/wardrobe');
     } catch (error) {
       this.message = readMessage(error, 'Could not upload photo. Try again.');
@@ -314,6 +365,7 @@ export class AddItemPage {
     } finally {
       this.isSaving = false;
       this.statusMessage = '';
+      this.stopProcessing('uploadingSinglePhoto');
     }
   }
 
@@ -322,12 +374,16 @@ export class AddItemPage {
     this.message = '';
     this.statusMessage = `Uploading ${this.batchFiles.length} photos...`;
     this.uploadError = false;
+    this.startProcessing('uploadingBatchPhotos');
     try {
+      this.setProcessingStep(1);
       const result = await this.api.createItems(this.batchFiles.map((entry) => entry.file));
+      this.setProcessingStep(2);
       const failures = result.results.filter((entry) => !entry.success);
       this.clearBatchSelection();
       if (!failures.length) {
         void successFeedback();
+        this.setProcessingStep(3);
         await this.router.navigateByUrl('/tabs/wardrobe');
         return;
       }
@@ -347,6 +403,7 @@ export class AddItemPage {
     } finally {
       this.isBatchSaving = false;
       this.statusMessage = '';
+      this.stopProcessing('uploadingBatchPhotos');
     }
   }
 
@@ -511,5 +568,27 @@ export class AddItemPage {
     }
 
     return `${(value / 1024).toFixed(0)} KB`;
+  }
+
+  private startProcessing(kind: AddItemProcessingKind): void {
+    this.processingKind = kind;
+    this.processingStepIndex = 0;
+  }
+
+  private setProcessingStep(index: number): void {
+    if (!this.processingKind) {
+      return;
+    }
+
+    this.processingStepIndex = Math.min(index, this.processingSteps.length - 1);
+  }
+
+  private stopProcessing(kind: AddItemProcessingKind): void {
+    if (this.processingKind !== kind) {
+      return;
+    }
+
+    this.processingKind = null;
+    this.processingStepIndex = 0;
   }
 }

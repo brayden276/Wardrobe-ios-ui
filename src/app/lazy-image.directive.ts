@@ -23,6 +23,12 @@ export class LazyImageDirective implements AfterViewInit, OnChanges, OnDestroy {
   private currentImageKey: string | null = null;
 
   ngAfterViewInit(): void {
+    if (this.appLazyImagePriority) {
+      this.isVisible = true;
+      this.loadVisibleImage();
+      return;
+    }
+
     this.observe();
   }
 
@@ -83,14 +89,21 @@ export class LazyImageDirective implements AfterViewInit, OnChanges, OnDestroy {
     }
 
     const token = this.loadToken;
-    void this.queue.enqueue(async () => {
+    const task = async (): Promise<void> => {
       const resolvedUrl = await this.imageCache.resolve(sourceUrl);
       if (!resolvedUrl || token !== this.loadToken) {
         return;
       }
 
       await this.setImageSource(resolvedUrl, token);
-    }, this.appLazyImagePriority);
+    };
+
+    if (this.appLazyImagePriority) {
+      void task();
+      return;
+    }
+
+    void this.queue.enqueue(task);
   }
 
   private imageKey(value: string | null): string | null {

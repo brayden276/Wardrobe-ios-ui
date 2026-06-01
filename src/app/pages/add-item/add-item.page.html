@@ -1,4 +1,23 @@
     <ion-content class="app-content">
+      <section class="screen processing-screen" *ngIf="isFullPageProcessing; else addItemContent" aria-live="polite" aria-busy="true">
+        <header class="nav-header">
+          <button type="button" class="nav-button" routerLink="/tabs/wardrobe" aria-label="Back to wardrobe" [disabled]="isFullPageProcessing">
+            <ion-icon name="chevron-back-outline"></ion-icon>
+          </button>
+          <h1>{{ processingTitle }}</h1>
+          <span></span>
+        </header>
+        <article class="panel processing-panel">
+          <ion-spinner name="crescent"></ion-spinner>
+          <p class="muted">{{ processingDetail }}</p>
+          <ol class="processing-steps">
+            <li *ngFor="let step of processingSteps; let index = index" [class]="processingStepState(index)">
+              <span></span>{{ step }}
+            </li>
+          </ol>
+        </article>
+      </section>
+      <ng-template #addItemContent>
       <section class="screen add-item-screen">
         <header class="nav-header">
           <button type="button" class="nav-button" routerLink="/tabs/wardrobe" aria-label="Back to wardrobe">
@@ -36,13 +55,10 @@
             <p class="muted consent-note">Wardrobe AI sends uploaded wardrobe photos to Google Gemini to classify items and generate cleaned display images.</p>
             <p class="muted consent-note">Only upload clothing photos you are comfortable sharing with that provider.</p>
           </div>
-          <div class="processing-line" *ngIf="isPreparing || isSaving || isBatchSaving" aria-live="polite">
-            <ion-spinner name="crescent"></ion-spinner>
-            <span>{{ progressLabel }}</span>
-          </div>
           <p class="status-note" *ngIf="statusMessage && !isSaving && !isBatchSaving" [class.status-note--success]="statusKind === 'success'" aria-live="polite">{{ statusMessage }}</p>
           <p class="status-note status-note--multiline" *ngIf="message" [class.status-note--success]="messageKind === 'success'" [class.status-note--error]="messageKind === 'error'" [class.status-note--offline]="messageKind === 'offline'" aria-live="polite">{{ message }}</p>
           <ion-button class="primary-button" expand="block" (click)="uploadSelectedPhotos()" [disabled]="isSaving || isBatchSaving || !batchFiles.length || isPreparing">{{ uploadButtonLabel }}</ion-button>
         </article>
       </section>
+      </ng-template>
     </ion-content>

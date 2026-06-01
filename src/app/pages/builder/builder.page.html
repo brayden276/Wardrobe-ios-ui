@@ -76,8 +76,8 @@
             <p class="muted consent-note">Wardrobe AI sends your outfit request and wardrobe item details to Google Gemini to generate outfit suggestions.</p>
           </article>
           <h2 class="section-title" *ngIf="results.length">Outfit ideas</h2>
-          <article class="outfit-card idea-card generated-outfit-card" *ngFor="let outfit of results">
-            <img class="outfit-hero-image" [appLazyImage]="outfit.displayImageUrl || outfit.imageUrl" [alt]="outfit.title" loading="lazy" decoding="async">
+          <article class="outfit-card idea-card generated-outfit-card" *ngFor="let outfit of results; let index = index">
+            <img class="outfit-hero-image" [appLazyImage]="outfit.displayImageUrl || outfit.imageUrl" [appLazyImagePriority]="shouldPrioritiseGeneratedOutfit(index)" [alt]="outfit.title" [attr.loading]="shouldPrioritiseGeneratedOutfit(index) ? 'eager' : 'lazy'" [attr.fetchpriority]="shouldPrioritiseGeneratedOutfit(index) ? 'high' : null" decoding="async">
             <div class="outfit-copy">
               <h3>{{ outfit.title }}</h3>
               <p class="muted">{{ outfit.explanation }}</p>
