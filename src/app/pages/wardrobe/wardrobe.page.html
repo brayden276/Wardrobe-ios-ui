@@ -1,4 +1,7 @@
     <ion-content class="app-content" [scrollEvents]="true">
+      <ion-refresher slot="fixed" (ionRefresh)="refreshWardrobe($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <section class="screen processing-screen" *ngIf="isDeletingSelected; else wardrobeContent" aria-live="polite" aria-busy="true">
         <header class="nav-header">
           <span></span>
@@ -65,8 +68,8 @@
           <div class="filter-group">
             <span class="filter-label">Category</span>
             <div class="chip-row">
-              <button type="button" class="chip" [class.active]="!categoryId" (click)="setCategory(null)">All</button>
-              <button type="button" class="chip" *ngFor="let category of lookups?.categories || []; trackBy: trackByOptionId" [class.active]="categoryId === category.id" (click)="setCategory(category.id)">{{ category.label }}</button>
+              <button type="button" class="chip" [class.active]="!categoryId" [attr.aria-pressed]="!categoryId" (click)="setCategory(null)">All</button>
+              <button type="button" class="chip" *ngFor="let category of lookups?.categories || []; trackBy: trackByOptionId" [class.active]="categoryId === category.id" [attr.aria-pressed]="categoryId === category.id" (click)="setCategory(category.id)">{{ category.label }}</button>
             </div>
           </div>
           <details class="advanced-filter">
@@ -77,22 +80,22 @@
             <div class="filter-group">
               <span class="filter-label">Subcategory</span>
               <div class="chip-row">
-                <button type="button" class="chip" [class.active]="!subcategoryId" (click)="setSubcategory(null)">Any</button>
-                <button type="button" class="chip" *ngFor="let option of subcategoryOptions; trackBy: trackByOptionId" [class.active]="subcategoryId === option.id" (click)="setSubcategory(option.id)">{{ option.label }}</button>
+                <button type="button" class="chip" [class.active]="!subcategoryId" [attr.aria-pressed]="!subcategoryId" (click)="setSubcategory(null)">Any</button>
+                <button type="button" class="chip" *ngFor="let option of subcategoryOptions; trackBy: trackByOptionId" [class.active]="subcategoryId === option.id" [attr.aria-pressed]="subcategoryId === option.id" (click)="setSubcategory(option.id)">{{ option.label }}</button>
               </div>
             </div>
             <div class="filter-group">
               <span class="filter-label">Colour</span>
               <div class="chip-row">
-                <button type="button" class="chip" [class.active]="!colourId" (click)="setColour(null)">Any</button>
-                <button type="button" class="chip" *ngFor="let option of lookups?.colours || []; trackBy: trackByOptionId" [class.active]="colourId === option.id" (click)="setColour(option.id)">{{ option.label }}</button>
+                <button type="button" class="chip" [class.active]="!colourId" [attr.aria-pressed]="!colourId" (click)="setColour(null)">Any</button>
+                <button type="button" class="chip" *ngFor="let option of lookups?.colours || []; trackBy: trackByOptionId" [class.active]="colourId === option.id" [attr.aria-pressed]="colourId === option.id" (click)="setColour(option.id)">{{ option.label }}</button>
               </div>
             </div>
             <div class="filter-group">
               <span class="filter-label">Pattern</span>
               <div class="chip-row">
-                <button type="button" class="chip" [class.active]="!patternId" (click)="setPattern(null)">Any</button>
-                <button type="button" class="chip" *ngFor="let option of lookups?.patterns || []; trackBy: trackByOptionId" [class.active]="patternId === option.id" (click)="setPattern(option.id)">{{ option.label }}</button>
+                <button type="button" class="chip" [class.active]="!patternId" [attr.aria-pressed]="!patternId" (click)="setPattern(null)">Any</button>
+                <button type="button" class="chip" *ngFor="let option of lookups?.patterns || []; trackBy: trackByOptionId" [class.active]="patternId === option.id" [attr.aria-pressed]="patternId === option.id" (click)="setPattern(option.id)">{{ option.label }}</button>
               </div>
             </div>
             <div class="filter-select-grid">
@@ -181,8 +184,8 @@
             <div class="item-card__body">
               <h3>{{ card.item.name }}</h3>
               <div class="meta-line"><span>{{ card.label }}</span></div>
-              <div class="colour-dots" aria-label="Item colours">
-                <span class="colour-dot" *ngFor="let colour of card.colours; trackBy: trackByValue" [style.background]="colourSwatch(colour)"></span>
+              <div class="colour-dots" [attr.aria-label]="'Item colours: ' + (card.colours.join(', ') || 'none')">
+                <span class="colour-dot" *ngFor="let colour of card.colours; trackBy: trackByValue" [style.background]="colourSwatch(colour)" [attr.aria-label]="label(colour) || colour"></span>
               </div>
             </div>
           </button>

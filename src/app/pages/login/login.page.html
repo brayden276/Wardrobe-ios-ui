@@ -12,19 +12,50 @@
       <form class="intent-surface form-stack" (ngSubmit)="submit()">
         <label>
           Email
-          <ion-input class="field" type="email" [(ngModel)]="email" name="email"></ion-input>
+          <ion-input
+            class="field"
+            type="email"
+            [(ngModel)]="email"
+            name="email"
+            autocomplete="email"
+            autocapitalize="none"
+            (ionBlur)="emailBlurred = true"
+            [attr.aria-describedby]="showEmailValidationMessage && emailValidationMessage ? 'email-error' : null"
+            [attr.aria-invalid]="showEmailValidationMessage && !!emailValidationMessage">
+          </ion-input>
         </label>
-          <p class="muted field-error" *ngIf="showEmailValidationMessage && emailValidationMessage">{{ emailValidationMessage }}</p>
-          <label>
-            Password
-            <ion-input class="field" type="password" [(ngModel)]="password" name="password"></ion-input>
-          </label>
-          <p class="muted field-error" *ngIf="showPasswordValidationMessage && passwordValidationMessage">{{ passwordValidationMessage }}</p>
+        <p id="email-error" class="muted field-error" *ngIf="showEmailValidationMessage && emailValidationMessage" role="alert">{{ emailValidationMessage }}</p>
+        <label>
+          Password
+          <div class="password-field-wrap">
+            <ion-input
+              class="field"
+              [type]="showPassword ? 'text' : 'password'"
+              [(ngModel)]="password"
+              name="password"
+              [autocomplete]="mode === 'login' ? 'current-password' : 'new-password'"
+              autocapitalize="none"
+              [attr.aria-describedby]="showPasswordValidationMessage && passwordValidationMessage ? 'password-error' : null"
+              [attr.aria-invalid]="showPasswordValidationMessage && !!passwordValidationMessage">
+            </ion-input>
+            <button type="button" class="password-toggle-button" (click)="toggleShowPassword()" [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'">
+              <ion-icon [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+            </button>
+          </div>
+        </label>
+        <p id="password-error" class="muted field-error" *ngIf="showPasswordValidationMessage && passwordValidationMessage" role="alert">{{ passwordValidationMessage }}</p>
         <label *ngIf="mode === 'register'">
           Name
-          <ion-input class="field" [(ngModel)]="displayName" name="displayName"></ion-input>
+          <ion-input
+            class="field"
+            [(ngModel)]="displayName"
+            name="displayName"
+            autocomplete="name"
+            [attr.aria-describedby]="showDisplayNameValidationMessage && displayNameValidationMessage ? 'display-name-error' : null"
+            [attr.aria-invalid]="showDisplayNameValidationMessage && !!displayNameValidationMessage">
+          </ion-input>
         </label>
-        <p class="muted field-error" *ngIf="showDisplayNameValidationMessage && displayNameValidationMessage">{{ displayNameValidationMessage }}</p>
+        <p id="display-name-error" class="muted field-error" *ngIf="showDisplayNameValidationMessage && displayNameValidationMessage" role="alert">{{ displayNameValidationMessage }}</p>
         <ion-button class="primary-button" expand="block" type="submit" [disabled]="isBusy || !canSubmit">{{ authSubmitLabel }}</ion-button>
         <div class="status-line" *ngIf="isBusy" aria-live="polite">
           <ion-spinner name="crescent"></ion-spinner>

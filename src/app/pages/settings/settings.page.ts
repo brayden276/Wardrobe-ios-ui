@@ -1,7 +1,8 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { AlertController } from '@ionic/angular';
+import { AlertController, ToastController } from '@ionic/angular';
 import { AuthService } from '../../auth.service';
+import { DeviceImageCacheService } from '../../device-image-cache.service';
 import { AiUsageCostSummaryDto, UserPersonalDetailsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import {
@@ -33,6 +34,8 @@ export class SettingsPage {
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
   private readonly alertController = inject(AlertController);
+  private readonly toastController = inject(ToastController);
+  private readonly deviceImageCache = inject(DeviceImageCacheService);
   readonly privacyPolicyUrl = PRIVACY_POLICY_URL;
   readonly termsUrl = TERMS_OF_USE_URL;
   readonly supportUrl = SUPPORT_URL;
@@ -149,6 +152,19 @@ export class SettingsPage {
   }
 
   async logout(): Promise<void> {
+    if (this.isBusy) {
+      return;
+    }
+
+    const confirmed = await confirmAction(this.alertController, {
+      title: 'Sign out?',
+      message: 'Are you sure you want to sign out?',
+      confirmLabel: 'Sign out'
+    });
+    if (!confirmed) {
+      return;
+    }
+
     this.isBusy = true;
     this.busyMessage = 'Signing out...';
     this.message = '';
@@ -157,6 +173,33 @@ export class SettingsPage {
       await this.router.navigateByUrl('/login');
     } catch (error) {
       this.message = readMessage(error, 'Could not sign out. Check your connection and try again.');
+      void warningFeedback();
+    } finally {
+      this.isBusy = false;
+      this.busyMessage = '';
+    }
+  }
+
+  async clearImageCache(): Promise<void> {
+    if (this.isBusy) {
+      return;
+    }
+
+    this.isBusy = true;
+    this.busyMessage = 'Clearing image cache...';
+    this.message = '';
+    try {
+      await this.deviceImageCache.clearCache();
+      void successFeedback();
+      const toast = await this.toastController.create({
+        message: 'Local image cache cleared.',
+        duration: 2000,
+        position: 'bottom'
+      });
+      await toast.present();
+      this.message = 'Local image cache cleared.';
+    } catch (error) {
+      this.message = readMessage(error, 'Could not clear image cache.');
       void warningFeedback();
     } finally {
       this.isBusy = false;

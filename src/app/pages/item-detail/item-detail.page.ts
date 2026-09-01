@@ -71,6 +71,19 @@ export class ItemDetailPage implements OnDestroy {
 
   async ionViewWillEnter(): Promise<void> {
     await this.loadItem();
+    if (this.shouldPollImageGeneration()) {
+      this.startImageGenerationStreaming();
+    }
+  }
+
+  ionViewWillLeave(): void {
+    this.stopImageGenerationStreaming();
+    this.stopImageGenerationPolling();
+  }
+
+  ionViewDidLeave(): void {
+    this.stopImageGenerationStreaming();
+    this.stopImageGenerationPolling();
   }
 
   retryLoadItem(): void {
@@ -196,7 +209,7 @@ export class ItemDetailPage implements OnDestroy {
 
   private startImageGenerationPolling(): void {
     this.stopImageGenerationPolling();
-    if (!this.shouldPollImageGeneration()) {
+    if (!this.api.isOnline || !this.shouldPollImageGeneration()) {
       return;
     }
 
@@ -207,6 +220,11 @@ export class ItemDetailPage implements OnDestroy {
   }
 
   private async pollImageGeneration(): Promise<void> {
+    if (!this.api.isOnline) {
+      this.isRefreshingImageGeneration = false;
+      return;
+    }
+
     if (!this.item || this.isRefreshingImageGeneration) {
       this.startImageGenerationPolling();
       return;

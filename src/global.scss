@@ -11,7 +11,7 @@
   --app-bg: #f7efe6;
   --app-surface: #fffaf3;
   --app-ink: #241f1a;
-  --app-muted: #766b5f;
+  --app-muted: #5c5246;
   --app-border: rgba(61, 49, 40, 0.13);
   --app-border-strong: rgba(61, 49, 40, 0.22);
   --app-surface-muted: #f1e7db;
@@ -25,9 +25,35 @@
   --app-heading-font: Optima, "Iowan Old Style", Georgia, serif;
 }
 
+:focus-visible {
+  outline: 2px solid var(--app-olive);
+  outline-offset: 2px;
+}
+
 html,
-body {
+body,
+ion-app {
   background: var(--app-bg);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+ion-input,
+ion-textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+input::placeholder,
+textarea::placeholder,
+.native-input::placeholder,
+.native-textarea::placeholder {
+  color: var(--app-muted);
+  opacity: 1;
 }
 
 ion-app,
@@ -243,8 +269,8 @@ ion-searchbar.wardrobe-search {
   --border-radius: 12px;
   --box-shadow: none;
   --color: var(--app-ink);
-  --icon-color: #75695d;
-  --placeholder-color: #81766b;
+  --icon-color: #5c5246;
+  --placeholder-color: #5c5246;
   --placeholder-opacity: 1;
 }
 
@@ -264,8 +290,10 @@ ion-searchbar.wardrobe-search {
   border-radius: 10px;
   background: rgba(255, 250, 243, 0.74);
   color: #4f4439;
-  min-height: 40px;
+  min-height: 44px;
   padding: 7px 11px;
+  display: inline-flex;
+  align-items: center;
   font: inherit;
   font-size: 13px;
   overflow-wrap: anywhere;
@@ -637,9 +665,13 @@ ion-searchbar.wardrobe-search {
   --color: #796a5c;
 }
 
-.small-action,
-.compact-button {
+.small-action {
   min-height: 34px;
+  font-size: 12px;
+}
+
+.compact-button {
+  min-height: 44px;
   font-size: 12px;
 }
 
@@ -1110,7 +1142,7 @@ button.text-link {
 }
 
 .mode-bar button {
-  min-height: 40px;
+  min-height: 44px;
   font-size: 14px;
   font-weight: 650;
 }
@@ -1138,8 +1170,11 @@ button.text-link {
 }
 
 .option-button {
-  min-height: 34px;
-  padding: 0 10px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
   background: rgba(255, 250, 243, 0.82);
   border-color: rgba(61, 49, 40, 0.1);
   font-size: 13px;
@@ -1637,6 +1672,34 @@ ion-select.field {
   padding-top: 4px;
 }
 
+.password-field-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-field-wrap .field {
+  width: 100%;
+  --padding-end: 44px;
+}
+
+.password-toggle-button {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-height: 44px;
+  background: transparent;
+  border: 0;
+  color: var(--app-muted);
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 2;
+}
+
 @media (min-width: 700px) {
   .screen {
     padding-right: 24px;
@@ -1658,3 +1721,57 @@ ion-select.field {
     transition-duration: 1ms !important;
   }
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --app-bg: #181512;
+    --app-surface: #24201b;
+    --app-ink: #f5ede4;
+    --app-muted: #a89d91;
+    --app-border: rgba(245, 237, 228, 0.14);
+    --app-border-strong: rgba(245, 237, 228, 0.25);
+    --app-surface-muted: #2c2722;
+    --app-surface-pressed: #352f29;
+    --app-danger: #e26f66;
+    --app-danger-bg: #321c1a;
+    --app-olive: #8ea06a;
+    --app-olive-pressed: #a5b880;
+    --app-taupe: #8a7c6c;
+    --app-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  }
+
+  ion-tab-bar {
+    --background: #24201b;
+  }
+
+  ion-tab-button {
+    --color: #a89d91;
+  }
+
+  .panel,
+  .outfit-card,
+  .intent-surface,
+  .inline-sheet {
+    background: rgba(36, 32, 27, 0.92);
+  }
+
+  .chip {
+    background: rgba(36, 32, 27, 0.8);
+    color: #f5ede4;
+  }
+
+  .icon-button,
+  .nav-button,
+  .filter-button,
+  .clear-button {
+    background: rgba(36, 32, 27, 0.85);
+  }
+
+  ion-searchbar.wardrobe-search {
+    --background: rgba(36, 32, 27, 0.85);
+    --icon-color: #a89d91;
+    --placeholder-color: #a89d91;
+  }
+}
+

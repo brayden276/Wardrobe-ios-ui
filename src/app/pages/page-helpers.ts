@@ -216,7 +216,7 @@ export function noticeKind(message: string, forceError = false): NoticeKind {
     return 'offline';
   }
 
-  if (forceError || /(could not|failed|required|not available|must be|no valid|timed out)/.test(normalised)) {
+  if (forceError || /(could not|failed|required|not available|must be|no valid|invalid|error|timed out)/.test(normalised)) {
     return 'error';
   }
 

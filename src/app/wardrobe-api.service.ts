@@ -43,6 +43,15 @@ export class WardrobeApiService {
   private readonly itemsCache = new Map<string, CachedApiResponse<WardrobeItemDto[]>>();
   private readonly outfitsCacheKey = 'all';
   private readonly outfitsCache = new Map<string, CachedApiResponse<OutfitDto[]>>();
+  private onlineStatus = typeof navigator !== 'undefined' ? navigator.onLine : true;
+
+  get isOnline(): boolean {
+    return typeof navigator !== 'undefined' ? navigator.onLine && this.onlineStatus : this.onlineStatus;
+  }
+
+  setOnlineStatus(online: boolean): void {
+    this.onlineStatus = online;
+  }
 
   async getLookups(): Promise<WardrobeLookupsDto> {
     this.lookupsPromise ??= this.authorized(() => firstValueFrom(this.http.get<WardrobeLookupsDto>(this.url('/api/lookups/wardrobe'), this.authOptions())))
@@ -159,7 +168,7 @@ export class WardrobeApiService {
     onUpdate: (updates: ImageGenerationStreamUpdate[]) => void,
     onError?: () => void
   ): ImageGenerationStatusStream | null {
-    if (itemIds.length === 0 && outfitIds.length === 0) {
+    if (!this.isOnline || (itemIds.length === 0 && outfitIds.length === 0)) {
       return null;
     }
 
@@ -340,10 +349,10 @@ export class WardrobeApiService {
           }
         }
 
+        await this.auth.handleUnauthorized(error);
         throw error;
       }
 
-      await this.auth.handleUnauthorized(error);
       throw error;
     }
   }
@@ -481,17 +490,19 @@ export class WardrobeApiService {
       return `${this.apiBaseUrl}${value}`;
     }
 
-    if (/^https?:/i.test(value)) {
+    if (/^https?:\/\//i.test(value)) {
       try {
-        const apiOrigin = new URL(this.apiBaseUrl).origin;
         const parsed = new URL(value);
-        return parsed.origin === apiOrigin ? parsed.toString() : null;
+        if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+          return parsed.toString();
+        }
+        return null;
       } catch {
         return null;
       }
     }
 
-    if (/^(data:|blob:)/i.test(value)) {
+    if (/^(data:|blob:|javascript:)/i.test(value)) {
       return null;
     }
 

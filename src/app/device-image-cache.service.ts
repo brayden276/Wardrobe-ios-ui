@@ -1,15 +1,23 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, Injector, inject } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
 export class DeviceImageCacheService {
-  private readonly auth = inject(AuthService);
+  private readonly injector = inject(Injector);
+  private authService?: AuthService;
   private readonly cacheDirectory = 'image-cache';
   private readonly inFlight = new Map<string, Promise<void>>();
   private readonly resolvedUrls = new Map<string, string>();
   private readonly maxResolvedUrlCount = 300;
+
+  private get auth(): AuthService {
+    if (!this.authService) {
+      this.authService = this.injector.get(AuthService);
+    }
+    return this.authService;
+  }
 
   async resolve(url: string | null): Promise<string | null> {
     if (!url || !/^https?:/i.test(url) || !Capacitor.isNativePlatform()) {
@@ -33,6 +41,24 @@ export class DeviceImageCacheService {
 
     this.primeNativeCache(url, cacheKey, path);
     return url;
+  }
+
+  async clearCache(): Promise<void> {
+    this.resolvedUrls.clear();
+    this.inFlight.clear();
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
+
+    try {
+      await Filesystem.rmdir({
+        path: this.cacheDirectory,
+        directory: Directory.Data,
+        recursive: true
+      });
+    } catch {
+      // Cache directory might not exist yet.
+    }
   }
 
   private rememberResolvedUrl(cacheKey: string, resolvedUrl: string): void {

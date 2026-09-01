@@ -1,8 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, HostListener, inject } from '@angular/core';
 import { AlertController } from '@ionic/angular';
-import { OutfitDto } from '../../models';
+import { OutfitDto, WardrobeLookupsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
-import { confirmAction, lightImpact, noticeKind, NoticeKind, readMessage, successFeedback, warningFeedback } from '../page-helpers';
+import { confirmAction, lightImpact, lookupLabel, noticeKind, NoticeKind, readMessage, successFeedback, warningFeedback } from '../page-helpers';
 
 interface OutfitCard {
   outfit: OutfitDto;
@@ -23,6 +23,7 @@ export class OutfitsPage {
   private readonly api = inject(WardrobeApiService);
   private readonly alertController = inject(AlertController);
   outfits: OutfitDto[] = [];
+  lookups: WardrobeLookupsDto | null = null;
   selectedOutfit: OutfitDto | null = null;
   isLoading = true;
   message = '';
@@ -68,6 +69,13 @@ export class OutfitsPage {
     return this.messageKind === 'error' || this.messageKind === 'offline';
   }
 
+  @HostListener('document:keydown.escape')
+  onEscapePress(): void {
+    if (this.selectedOutfit) {
+      this.close();
+    }
+  }
+
   showMoreOutfits(): void {
     this.visibleOutfitCount = Math.min(this.outfits.length, this.visibleOutfitCount + this.outfitRenderIncrement);
     this.updateVisibleOutfits();
@@ -75,6 +83,14 @@ export class OutfitsPage {
 
   async ionViewWillEnter(): Promise<void> {
     await this.load();
+  }
+
+  async refreshOutfits(event: Event): Promise<void> {
+    try {
+      await this.load(true);
+    } finally {
+      (event.target as { complete?: () => void } | null)?.complete?.();
+    }
   }
 
   async load(forceRefresh = false): Promise<void> {
@@ -103,7 +119,12 @@ export class OutfitsPage {
     this.message = '';
     const hadLoadedOutfits = this.outfits.length > 0;
     try {
-      this.outfits = await this.api.getOutfits({ forceRefresh });
+      const [lookups, outfits] = await Promise.all([
+        this.lookups ? Promise.resolve(this.lookups) : this.api.getLookups().catch(() => null),
+        this.api.getOutfits({ forceRefresh })
+      ]);
+      this.lookups = lookups;
+      this.outfits = outfits;
       this.pruneSelectedOutfits();
       if (this.selectedOutfit) {
         this.selectedOutfit = this.outfits.find((outfit) => outfit.id === this.selectedOutfit?.id) ?? null;
@@ -118,6 +139,14 @@ export class OutfitsPage {
     } finally {
       this.isLoading = false;
     }
+  }
+
+  formatSubcategory(subcategoryId: string | null): string {
+    if (!subcategoryId) return '';
+    if (this.lookups) {
+      return lookupLabel(this.lookups, subcategoryId);
+    }
+    return subcategoryId.replace(/_/g, ' ');
   }
 
   open(outfit: OutfitDto, event?: Event): void {

@@ -9,3 +9,16 @@
   --ion-color-medium: #786c60;
   --ion-color-light: #fffaf3;
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ion-background-color: #181512;
+    --ion-text-color: #f5ede4;
+    --ion-color-primary: #bfa791;
+    --ion-color-primary-contrast: #181512;
+    --ion-color-secondary: #8da484;
+    --ion-color-tertiary: #c8957e;
+    --ion-color-medium: #a89d91;
+    --ion-color-light: #26211c;
+  }
+}

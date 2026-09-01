@@ -1,7 +1,10 @@
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
 import { Subscription } from 'rxjs';
 import { AuthService } from './auth.service';
+import { WardrobeApiService } from './wardrobe-api.service';
 
 @Component({
   selector: 'app-root',
@@ -10,10 +13,26 @@ import { AuthService } from './auth.service';
 })
 export class AppComponent implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
+  private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
   private sessionSubscription: Subscription | null = null;
+  private readonly onlineListener = () => this.handleNetworkStatus(true);
+  private readonly offlineListener = () => this.handleNetworkStatus(false);
 
   async ngOnInit(): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await StatusBar.setStyle({ style: Style.Dark });
+        await StatusBar.setBackgroundColor({ color: '#f7efe6' });
+      } catch {
+        // Status bar configuration is best-effort.
+      }
+    }
+
+    window.addEventListener('online', this.onlineListener);
+    window.addEventListener('offline', this.offlineListener);
+    this.handleNetworkStatus(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
     await this.auth.restore();
     this.sessionSubscription = this.auth.session$.subscribe((session) => {
       if (!session && (this.router.url.startsWith('/tabs') || this.router.url.startsWith('/onboarding'))) {
@@ -37,6 +56,12 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    window.removeEventListener('online', this.onlineListener);
+    window.removeEventListener('offline', this.offlineListener);
     this.sessionSubscription?.unsubscribe();
+  }
+
+  private handleNetworkStatus(isOnline: boolean): void {
+    this.api.setOnlineStatus(isOnline);
   }
 }

@@ -19,6 +19,8 @@ export class LoginPage {
   message = '';
   isBusy = false;
   hasSubmitted = false;
+  emailBlurred = false;
+  showPassword = false;
 
   get emailValidationMessage(): string {
     if (!this.email.trim()) {
@@ -62,7 +64,7 @@ export class LoginPage {
   }
 
   get showEmailValidationMessage(): boolean {
-    return this.hasSubmitted || !!this.email.trim();
+    return this.hasSubmitted || (this.emailBlurred && !!this.email.trim());
   }
 
   get showPasswordValidationMessage(): boolean {
@@ -81,6 +83,12 @@ export class LoginPage {
     this.mode = mode;
     this.message = '';
     this.hasSubmitted = false;
+    this.emailBlurred = false;
+    void lightImpact();
+  }
+
+  toggleShowPassword(): void {
+    this.showPassword = !this.showPassword;
     void lightImpact();
   }
 

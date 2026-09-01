@@ -47,6 +47,7 @@
             <ion-spinner name="crescent"></ion-spinner>
             <span>{{ settingsStatusMessage }}</span>
           </div>
+          <ion-button class="secondary-button" fill="outline" (click)="clearImageCache()" [disabled]="isBusy">Clear Image Cache</ion-button>
           <ion-button class="secondary-button" fill="outline" (click)="logout()" [disabled]="isBusy">{{ isBusy ? 'Working...' : 'Sign out' }}</ion-button>
           <p class="status-note" *ngIf="message" [class.status-note--success]="messageKind === 'success'" [class.status-note--error]="messageKind === 'error'" [class.status-note--offline]="messageKind === 'offline'" aria-live="polite">{{ message }}</p>
         </article>

@@ -36,19 +36,19 @@
             <div class="intent-group">
               <span>Occasion</span>
               <div class="option-row">
-                <button type="button" class="option-button" *ngFor="let option of occasionOptions" [class.active]="occasion === option" (click)="setOccasion(option)">{{ option }}</button>
+                <button type="button" class="option-button" *ngFor="let option of occasionOptions" [class.active]="occasion === option" [attr.aria-pressed]="occasion === option" (click)="setOccasion(option)">{{ option }}</button>
               </div>
             </div>
             <div class="intent-group">
               <span>Dress code</span>
               <div class="option-row">
-                <button type="button" class="option-button" *ngFor="let option of dressCodeOptions" [class.active]="dressCode === option" (click)="setDressCode(option)">{{ option }}</button>
+                <button type="button" class="option-button" *ngFor="let option of dressCodeOptions" [class.active]="dressCode === option" [attr.aria-pressed]="dressCode === option" (click)="setDressCode(option)">{{ option }}</button>
               </div>
             </div>
             <div class="intent-group">
               <span>Avoid</span>
               <div class="option-row">
-                <button type="button" class="option-button" *ngFor="let option of avoidOptions" [class.active]="isAvoidSelected(option)" (click)="toggleAvoid(option)">{{ option }}</button>
+                <button type="button" class="option-button" *ngFor="let option of avoidOptions" [class.active]="isAvoidSelected(option)" [attr.aria-pressed]="isAvoidSelected(option)" (click)="toggleAvoid(option)">{{ option }}</button>
               </div>
             </div>
             <div class="must-include" *ngIf="items.length">
@@ -57,8 +57,8 @@
                 <button type="button" class="text-link" *ngIf="requiredItemId" (click)="clearRequiredItem()">Clear</button>
               </div>
               <div class="include-strip">
-                <button type="button" class="include-item include-any" [class.selected]="!requiredItemId" (click)="selectRequiredItem(null)">Any item</button>
-                <button type="button" class="include-item" *ngFor="let card of includeItems; trackBy: trackByItemCardId" [class.selected]="card.isRequired" (click)="selectRequiredItem(card.item.id)">
+                <button type="button" class="include-item include-any" [class.selected]="!requiredItemId" [attr.aria-pressed]="!requiredItemId" (click)="selectRequiredItem(null)">Any item</button>
+                <button type="button" class="include-item" *ngFor="let card of includeItems; trackBy: trackByItemCardId" [class.selected]="card.isRequired" [attr.aria-pressed]="card.isRequired" (click)="selectRequiredItem(card.item.id)">
                   <img [appLazyImage]="card.imageUrl" [alt]="card.item.name" decoding="async">
                   <span>{{ card.item.name }}</span>
                 </button>
@@ -139,8 +139,8 @@
               <div class="item-card__body">
                 <h3>{{ card.item.name }}</h3>
                 <div class="meta-line"><span>{{ card.label }}</span></div>
-                <div class="colour-dots" aria-label="Item colours">
-                  <span class="colour-dot" *ngFor="let colour of card.colours; trackBy: trackByValue" [style.background]="colourSwatch(colour)"></span>
+                <div class="colour-dots" [attr.aria-label]="'Item colours: ' + (card.colours.join(', ') || 'none')">
+                  <span class="colour-dot" *ngFor="let colour of card.colours; trackBy: trackByValue" [style.background]="colourSwatch(colour)" [attr.aria-label]="label(colour) || colour"></span>
                 </div>
               </div>
             </button>

@@ -3,6 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Preferences } from '@capacitor/preferences';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { apiBaseUrl } from './api-url';
+import { DeviceImageCacheService } from './device-image-cache.service';
 import { AuthProviderDto, AuthResponse, AuthUserDto, UpdatePersonalDetailsRequest } from './models';
 
 interface Session {
@@ -16,6 +17,7 @@ interface Session {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
+  private readonly deviceImageCache = inject(DeviceImageCacheService);
   private readonly apiBaseUrl = apiBaseUrl();
   private readonly sessionSubject = new BehaviorSubject<Session | null>(null);
   private restorePromise: Promise<void> | null = null;
@@ -128,20 +130,26 @@ export class AuthService {
   }
 
   async logout(): Promise<void> {
+    await this.deviceImageCache.clearCache();
     await this.clearSession();
   }
 
   async deleteAccount(): Promise<void> {
     const token = this.token;
     if (!token) {
+      await this.deviceImageCache.clearCache();
       await this.clearSession();
       return;
     }
 
-    await firstValueFrom(this.http.delete(`${this.apiBaseUrl}/api/auth/account`, {
-      headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
-    }));
-    await this.clearSession();
+    try {
+      await firstValueFrom(this.http.delete(`${this.apiBaseUrl}/api/auth/account`, {
+        headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
+      }));
+    } finally {
+      await this.deviceImageCache.clearCache();
+      await this.clearSession();
+    }
   }
 
   async handleUnauthorized(error: unknown): Promise<void> {

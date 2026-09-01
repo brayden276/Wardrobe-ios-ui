@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, inject } from '@angular/core';
+import { Component, ElementRef, OnDestroy, ViewChild, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -36,7 +36,7 @@ type AddItemProcessingKind = 'preparingPhotos' | 'uploadingSinglePhoto' | 'uploa
   templateUrl: './add-item.page.html',
   styleUrls: ['./add-item.page.scss']
 })
-export class AddItemPage {
+export class AddItemPage implements OnDestroy {
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
   private readonly actionSheet = inject(ActionSheetController);
@@ -215,27 +215,51 @@ export class AddItemPage {
     await this.addSelectedFiles(files);
   }
 
+  ionViewDidLeave(): void {
+    this.revokeBatchPreviewUrls();
+  }
+
+  ngOnDestroy(): void {
+    this.revokeBatchPreviewUrls();
+  }
+
+  private revokeBatchPreviewUrls(): void {
+    for (const previewUrl of this.batchPreviewUrls) {
+      if (previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    }
+  }
+
   async uploadSelectedPhotos(): Promise<void> {
-    if (!this.batchFiles.length) {
+    if (this.isSaving || this.isBatchSaving || this.isPreparing || !this.batchFiles.length) {
       return;
     }
 
-    if (!await ensureAiConsentWithAlert(
-      this.alertController,
-      'Wardrobe AI uses Google Gemini to classify wardrobe photos and generate cleaned display images. Do you want to continue with AI processing for this device?'))
-    {
-      this.message = 'Gemini consent is required before you can upload wardrobe photos.';
-      this.uploadError = true;
-      void warningFeedback();
-      return;
-    }
+    this.isSaving = true;
+    try {
+      const consentGiven = await ensureAiConsentWithAlert(
+        this.alertController,
+        'Wardrobe AI uses Google Gemini to classify wardrobe photos and generate cleaned display images. Do you want to continue with AI processing for this device?'
+      );
+      if (!consentGiven) {
+        this.message = 'Gemini consent is required before you can upload wardrobe photos.';
+        this.uploadError = true;
+        void warningFeedback();
+        return;
+      }
 
-    if (this.batchFiles.length === 1) {
-      await this.uploadSinglePreparedPhoto(this.batchFiles[0]);
-      return;
-    }
+      this.isSaving = false;
 
-    await this.uploadPreparedPhotos();
+      if (this.batchFiles.length === 1) {
+        await this.uploadSinglePreparedPhoto(this.batchFiles[0]);
+        return;
+      }
+
+      await this.uploadPreparedPhotos();
+    } finally {
+      this.isSaving = false;
+    }
   }
 
   removeBatchFile(index: number): void {
@@ -265,12 +289,7 @@ export class AddItemPage {
     this.message = '';
     this.statusMessage = '';
     this.uploadError = false;
-    for (const previewUrl of this.batchPreviewUrls) {
-      if (previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    }
-
+    this.revokeBatchPreviewUrls();
     this.batchFiles = [];
     this.batchPreviewUrls = [];
 
@@ -345,6 +364,10 @@ export class AddItemPage {
   }
 
   private async uploadSinglePreparedPhoto(photo: PreparedUploadFile): Promise<void> {
+    if (this.isSaving || this.isBatchSaving || this.isPreparing) {
+      return;
+    }
+
     this.isSaving = true;
     this.message = '';
     this.statusMessage = 'Uploading photo...';
@@ -355,6 +378,7 @@ export class AddItemPage {
       this.setProcessingStep(1);
       await this.api.createItem(photo.file, photo.name);
       this.setProcessingStep(2);
+      this.clearBatchSelection();
       void successFeedback();
       this.setProcessingStep(3);
       await this.router.navigateByUrl('/tabs/wardrobe');
@@ -370,6 +394,10 @@ export class AddItemPage {
   }
 
   private async uploadPreparedPhotos(): Promise<void> {
+    if (this.isSaving || this.isBatchSaving || this.isPreparing || !this.batchFiles.length) {
+      return;
+    }
+
     this.isBatchSaving = true;
     this.message = '';
     this.statusMessage = `Uploading ${this.batchFiles.length} photos...`;
@@ -380,13 +408,38 @@ export class AddItemPage {
       const result = await this.api.createItems(this.batchFiles.map((entry) => entry.file));
       this.setProcessingStep(2);
       const failures = result.results.filter((entry) => !entry.success);
-      this.clearBatchSelection();
+
       if (!failures.length) {
+        this.clearBatchSelection();
         void successFeedback();
         this.setProcessingStep(3);
         await this.router.navigateByUrl('/tabs/wardrobe');
         return;
       }
+
+      const remainingFiles: PreparedUploadFile[] = [];
+      const remainingUrls: string[] = [];
+
+      for (let i = 0; i < this.batchFiles.length; i++) {
+        const file = this.batchFiles[i];
+        const previewUrl = this.batchPreviewUrls[i];
+        const itemResult = result.results[i];
+        const succeeded = itemResult ? itemResult.success : false;
+
+        if (succeeded) {
+          if (previewUrl?.startsWith('blob:')) {
+            URL.revokeObjectURL(previewUrl);
+          }
+        } else {
+          remainingFiles.push(file);
+          if (previewUrl) {
+            remainingUrls.push(previewUrl);
+          }
+        }
+      }
+
+      this.batchFiles = remainingFiles;
+      this.batchPreviewUrls = remainingUrls;
 
       const failureSummary = failures
         .slice(0, 3)
@@ -395,6 +448,7 @@ export class AddItemPage {
       this.message = result.succeededCount > 0
         ? `${result.succeededCount} item${result.succeededCount === 1 ? '' : 's'} added. ${result.failedCount} could not be uploaded. ${failureSummary}`
         : failureSummary || 'Could not upload photos. Try again.';
+      this.uploadError = true;
       void warningFeedback();
     } catch (error) {
       this.message = readMessage(error, 'Could not upload photos. Try again.');

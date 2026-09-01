@@ -1,4 +1,7 @@
     <ion-content class="app-content">
+      <ion-refresher slot="fixed" (ionRefresh)="refreshOutfits($event)">
+        <ion-refresher-content></ion-refresher-content>
+      </ion-refresher>
       <section class="screen processing-screen" *ngIf="isDeletingSelected; else outfitsContent" aria-live="polite" aria-busy="true">
         <header class="nav-header">
           <span></span>
@@ -95,7 +98,7 @@
         </article>
         </div>
         <button type="button" class="sheet-backdrop" *ngIf="selectedOutfit" aria-label="Close outfit details" (click)="close()"></button>
-        <article class="inline-sheet bottom-sheet outfit-detail-panel" *ngIf="selectedOutfit">
+        <article class="inline-sheet bottom-sheet outfit-detail-panel" *ngIf="selectedOutfit" role="dialog" aria-modal="true" aria-label="Outfit details">
           <div class="panel-heading">
             <h2 class="section-title">{{ selectedOutfit.name }}</h2>
             <button type="button" class="icon-button" aria-label="Close outfit details" (click)="close()">
@@ -108,7 +111,7 @@
               <img [appLazyImage]="outfitItemImageUrl(item)" [alt]="item.name" decoding="async">
               <div>
                 <strong>{{ item.name }}</strong>
-                <span>{{ item.subcategoryId }}</span>
+                <span>{{ formatSubcategory(item.subcategoryId) }}</span>
               </div>
             </div>
           </div>

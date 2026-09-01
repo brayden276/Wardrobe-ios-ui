@@ -132,6 +132,19 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
 
   async ionViewWillEnter(): Promise<void> {
     await this.load();
+    if (this.hasItemImageGenerationInProgress()) {
+      this.startImageGenerationStreaming();
+    }
+  }
+
+  ionViewWillLeave(): void {
+    this.stopItemImageGenerationStreaming();
+    this.stopItemImageGenerationPolling();
+  }
+
+  ionViewDidLeave(): void {
+    this.stopItemImageGenerationStreaming();
+    this.stopItemImageGenerationPolling();
   }
 
   ngAfterViewInit(): void {
@@ -175,6 +188,14 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
     this.filtersExpanded = !this.filtersExpanded;
     this.scheduleVirtualMetricsSync();
     void lightImpact();
+  }
+
+  async refreshWardrobe(event: Event): Promise<void> {
+    try {
+      await this.load(true, true);
+    } finally {
+      (event.target as { complete?: () => void } | null)?.complete?.();
+    }
   }
 
   async load(forceRefresh = false, resetScroll = false): Promise<void> {
@@ -501,7 +522,7 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   }
 
   private startItemImageGenerationPolling(): void {
-    if (!this.hasItemImageGenerationInProgress()) {
+    if (!this.api.isOnline || !this.hasItemImageGenerationInProgress()) {
       return;
     }
 
@@ -511,6 +532,11 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   }
 
   private async refreshItemImageGenerationStatuses(): Promise<void> {
+    if (!this.api.isOnline) {
+      this.isRefreshingImageGeneration = false;
+      return;
+    }
+
     if (this.isRefreshingImageGeneration) {
       this.startItemImageGenerationPolling();
       return;
