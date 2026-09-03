@@ -80,7 +80,7 @@
             <button type="button" class="quiet-button compact-button" (click)="clearResults()">Edit search</button>
           </div>
           <article class="outfit-card idea-card generated-outfit-card" *ngFor="let card of resultCards; trackBy: trackByGeneratedOutfitKey">
-            <img class="outfit-hero-image" [appLazyImage]="card.imageUrl" [appLazyImagePriority]="card.isPriority" [alt]="card.outfit.title" [attr.loading]="card.isPriority ? 'eager' : null" [attr.fetchpriority]="card.isPriority ? 'high' : null" decoding="async">
+            <img class="outfit-hero-image" *ngIf="card.imageUrl" [appLazyImage]="card.imageUrl" [appLazyImagePriority]="card.isPriority" [alt]="card.outfit.title" [attr.loading]="card.isPriority ? 'eager' : null" [attr.fetchpriority]="card.isPriority ? 'high' : null" decoding="async">
             <div class="outfit-copy">
               <h3>{{ card.outfit.title }}</h3>
               <p class="muted">{{ card.outfit.explanation }}</p>
@@ -107,12 +107,16 @@
             </div>
           </article>
           <article class="panel empty-results" *ngIf="hasGeneratedSearchRun && !isBuildingOutfits && !message && !results.length">
-            <h2 class="plain-title">No outfit matched that request.</h2>
-            <p class="muted">Add at least one wardrobe item, then the builder will return the closest usable look.</p>
+            <h2 class="plain-title">No complete outfit could be formed</h2>
+            <p class="muted">Your active wardrobe items or search filters didn't leave enough matching pieces to style a look for this occasion.</p>
             <div class="recovery-actions">
               <button type="button" class="option-button" *ngIf="selectedAvoids.length" (click)="clearAvoids()">Allow avoided items</button>
-              <button type="button" class="option-button" *ngIf="requiredItemId" (click)="clearRequiredItem()">Use any item</button>
-              <button type="button" class="option-button" *ngIf="query" (click)="clearQuery()">Clear notes</button>
+              <button type="button" class="option-button" *ngIf="requiredItemId" (click)="clearRequiredItem()">Remove required item restriction</button>
+              <button type="button" class="option-button" *ngIf="query" (click)="clearQuery()">Clear custom notes</button>
+              <ion-button class="primary-button" expand="block" routerLink="/tabs/add" fill="outline">
+                <ion-icon name="add-outline" slot="start"></ion-icon>
+                Add items to your wardrobe
+              </ion-button>
             </div>
           </article>
         </ng-container>

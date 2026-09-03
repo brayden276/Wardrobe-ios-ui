@@ -39,6 +39,14 @@
             </button>
           </div>
         </header>
+        <div class="search-row" *ngIf="!isSelectionMode && outfits.length">
+          <ion-searchbar class="wardrobe-search" [(ngModel)]="outfitSearch" placeholder="Search outfits by name or items..." (ionInput)="onSearchInput()"></ion-searchbar>
+        </div>
+        <div class="chip-row outfit-filter-row" *ngIf="!isSelectionMode && outfits.length">
+          <button type="button" class="chip" [class.active]="outfitFilter === 'all'" [attr.aria-pressed]="outfitFilter === 'all'" (click)="setOutfitFilter('all')">All ({{ outfits.length }})</button>
+          <button type="button" class="chip" [class.active]="outfitFilter === 'recent'" [attr.aria-pressed]="outfitFilter === 'recent'" (click)="setOutfitFilter('recent')">Newest</button>
+          <button type="button" class="chip" [class.active]="outfitFilter === 'worn'" [attr.aria-pressed]="outfitFilter === 'worn'" (click)="setOutfitFilter('worn')">Most worn</button>
+        </div>
         <article class="intent-banner selection-summary" *ngIf="isSelectionMode">
           <p class="muted">{{ selectedCount ? 'Selected saved outfits will be removed. Wardrobe items stay available.' : 'Tap outfits to select them.' }}</p>
           <div class="selection-inline-actions">
@@ -95,6 +103,11 @@
           <h2 class="plain-title">No saved outfits</h2>
           <p class="muted">Build an outfit and save the ones worth repeating.</p>
           <ion-button class="primary-button" expand="block" routerLink="/tabs/builder" fill="outline">Build one now</ion-button>
+        </article>
+        <article class="panel" *ngIf="!isLoading && !canRetryMessage && outfits.length && !filteredOutfits.length">
+          <h2 class="plain-title">No matching outfits found</h2>
+          <p class="muted">Try a different search term or clear the filter.</p>
+          <ion-button class="secondary-button" fill="outline" size="small" (click)="outfitSearch = ''; updateVisibleOutfits()">Clear search</ion-button>
         </article>
         </div>
         <button type="button" class="sheet-backdrop" *ngIf="selectedOutfit" aria-label="Close outfit details" (click)="close()"></button>

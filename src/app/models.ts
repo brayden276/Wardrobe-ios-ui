@@ -136,6 +136,7 @@ export interface UpdateWardrobeItemRequest {
   lengthId: string | null;
   bottomShapeId: string | null;
   riseId: string | null;
+  isArchived?: boolean;
 }
 
 export interface GeneratedOutfitDto {

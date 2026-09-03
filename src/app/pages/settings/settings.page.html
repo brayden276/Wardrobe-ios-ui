@@ -17,8 +17,11 @@
           <p class="muted">{{ auth.session?.user?.email }}</p>
         </article>
         <article class="intent-surface settings-card" *ngIf="settingsMode === 'account'">
-          <h2 class="section-title">Personal details</h2>
-          <div class="personal-detail-list" *ngIf="personalDetails as details">
+          <div class="panel-heading">
+            <h2 class="section-title">Personal details</h2>
+            <button type="button" class="quiet-button compact-button" *ngIf="!isEditingPersonalDetails" (click)="startEditingPersonalDetails()">{{ personalDetails ? 'Edit' : 'Add' }}</button>
+          </div>
+          <div class="personal-detail-list" *ngIf="!isEditingPersonalDetails && personalDetails as details">
             <div>
               <span>Wardrobe direction</span>
               <strong>{{ personalDetailLabel('gender', details.gender) }}</strong>
@@ -36,8 +39,47 @@
               <strong>{{ personalDetailLabel('dailyContext', details.dailyContext) }}</strong>
             </div>
           </div>
-          <p class="muted" *ngIf="!personalDetails">Complete your personal details to tune outfit generation.</p>
-          <ion-button class="secondary-button" fill="outline" routerLink="/onboarding" [queryParams]="{ returnUrl: '/tabs/settings' }">{{ personalDetails ? 'Update details' : 'Add details' }}</ion-button>
+          <p class="muted" *ngIf="!isEditingPersonalDetails && !personalDetails">Complete your personal details to tune outfit generation.</p>
+          <form class="form-stack inline-details-editor" *ngIf="isEditingPersonalDetails" (ngSubmit)="savePersonalDetails()">
+            <label>
+              Wardrobe direction
+              <ion-select class="field" [(ngModel)]="personalDetailsForm.gender" name="gender">
+                <ion-select-option value="female">Female</ion-select-option>
+                <ion-select-option value="male">Male</ion-select-option>
+              </ion-select>
+            </label>
+            <label>
+              Fit preference
+              <ion-select class="field" [(ngModel)]="personalDetailsForm.fitPreference" name="fitPreference">
+                <ion-select-option value="tailored">Tailored</ion-select-option>
+                <ion-select-option value="balanced">Balanced</ion-select-option>
+                <ion-select-option value="relaxed">Relaxed</ion-select-option>
+              </ion-select>
+            </label>
+            <label>
+              Style lean
+              <ion-select class="field" [(ngModel)]="personalDetailsForm.stylePreference" name="stylePreference">
+                <ion-select-option value="minimal">Minimal</ion-select-option>
+                <ion-select-option value="classic">Classic</ion-select-option>
+                <ion-select-option value="polished">Polished</ion-select-option>
+                <ion-select-option value="casual">Casual</ion-select-option>
+                <ion-select-option value="creative">Creative</ion-select-option>
+              </ion-select>
+            </label>
+            <label>
+              Daily context
+              <ion-select class="field" [(ngModel)]="personalDetailsForm.dailyContext" name="dailyContext">
+                <ion-select-option value="work">Work</ion-select-option>
+                <ion-select-option value="weekend">Weekend</ion-select-option>
+                <ion-select-option value="evening">Evening</ion-select-option>
+                <ion-select-option value="active">Active</ion-select-option>
+              </ion-select>
+            </label>
+            <div class="inline-details-actions">
+              <ion-button class="primary-button" type="submit" [disabled]="isBusy">{{ isBusy ? 'Saving...' : 'Save details' }}</ion-button>
+              <ion-button class="secondary-button" fill="clear" type="button" (click)="cancelEditingPersonalDetails()" [disabled]="isBusy">Cancel</ion-button>
+            </div>
+          </form>
         </article>
         <article class="intent-surface settings-card" *ngIf="settingsMode === 'account'">
           <h2 class="section-title">Device session</h2>
@@ -58,14 +100,28 @@
             <span>{{ settingsStatusMessage }}</span>
           </div>
           <div class="usage-total" *ngIf="aiUsage && !isLoadingAiUsage">
-            <span>Total estimated AI cost</span>
-            <strong>{{ aiUsageTotalLabel }}</strong>
+            <span>Wardrobe AI Activity</span>
+            <strong class="included-tier-badge">Included with account</strong>
+          </div>
+          <div class="ai-activity-row" *ngIf="aiUsage && !isLoadingAiUsage">
+            <div class="activity-metric">
+              <strong>{{ aiUsage.wardrobeItemClassifications }}</strong>
+              <span>Items scanned</span>
+            </div>
+            <div class="activity-metric">
+              <strong>{{ aiUsage.outfitSearches }}</strong>
+              <span>Outfit searches</span>
+            </div>
+            <div class="activity-metric">
+              <strong>{{ aiUsage.displayImages + aiUsage.outfitImages }}</strong>
+              <span>Looks styled</span>
+            </div>
           </div>
           <article class="panel state-panel" *ngIf="aiUsageLoadMessage && !isLoadingAiUsage" [class.state-panel--offline]="aiUsageLoadKind === 'offline'" [class.state-panel--error]="aiUsageLoadKind === 'error'" aria-live="polite">
             <p class="muted">{{ aiUsageLoadMessage }}</p>
             <ion-button class="secondary-button" fill="outline" size="small" (click)="loadAiUsage()" [disabled]="isBusy">Try again</ion-button>
           </article>
-          <p class="muted" *ngIf="aiUsage">Based on {{ aiUsage.wardrobeItemClassifications }} item scans, {{ aiUsage.outfitSearches }} saved AI outfit searches, and {{ aiUsage.displayImages + aiUsage.outfitImages }} generated images.</p>
+          <p class="muted" *ngIf="aiUsage">Wardrobe AI uses Google Gemini to classify clothing items, parse natural outfit requests, and compose styled look previews.</p>
           <p class="muted">{{ aiConsentAccepted ? 'This device is allowed to send wardrobe photos and outfit requests to Google Gemini.' : 'This device has not granted Gemini processing consent yet.' }}</p>
           <p class="muted">{{ aiDisclosure }}</p>
           <ion-button class="secondary-button" fill="outline" (click)="resetAiConsent()" [disabled]="isBusy || !aiConsentAccepted">Require consent again</ion-button>

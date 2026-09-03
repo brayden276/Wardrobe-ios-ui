@@ -137,9 +137,12 @@
             </label>
           </details>
           <div class="form-actions">
-            <ion-button class="primary-button" expand="block" type="submit" [disabled]="isSaving || isArchiving">{{ isSaving ? 'Saving...' : 'Save details' }}</ion-button>
-            <ion-button class="secondary-button" fill="outline" expand="block" type="button" (click)="deleteItem()" [disabled]="isArchiving || isSaving || isMarkingWorn">
-              {{ isArchiving ? 'Archiving...' : 'Archive item' }}
+            <ion-button class="primary-button" expand="block" type="submit" [disabled]="isSaving || isArchiving || isDeleting">{{ isSaving ? 'Saving...' : 'Save details' }}</ion-button>
+            <ion-button class="secondary-button" fill="outline" expand="block" type="button" (click)="toggleArchive()" [disabled]="isArchiving || isSaving || isDeleting">
+              {{ isArchiving ? 'Updating...' : (item.isArchived ? 'Unarchive item' : 'Archive item (hide from outfits)') }}
+            </ion-button>
+            <ion-button class="secondary-button destructive-button" fill="clear" expand="block" type="button" (click)="deleteItemPermanently()" [disabled]="isArchiving || isSaving || isDeleting">
+              {{ isDeleting ? 'Deleting...' : 'Delete permanently' }}
             </ion-button>
             <ion-button class="secondary-button" fill="clear" expand="block" type="button" (click)="cancelEdit()">Cancel</ion-button>
           </div>

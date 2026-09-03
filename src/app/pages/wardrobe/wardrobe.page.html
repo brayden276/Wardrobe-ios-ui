@@ -72,6 +72,13 @@
               <button type="button" class="chip" *ngFor="let category of lookups?.categories || []; trackBy: trackByOptionId" [class.active]="categoryId === category.id" [attr.aria-pressed]="categoryId === category.id" (click)="setCategory(category.id)">{{ category.label }}</button>
             </div>
           </div>
+          <div class="filter-group subcategory-quick-group" *ngIf="categoryId && subcategoryOptions.length">
+            <span class="filter-label">Subcategory</span>
+            <div class="chip-row">
+              <button type="button" class="chip" [class.active]="!subcategoryId" [attr.aria-pressed]="!subcategoryId" (click)="setSubcategory(null)">All</button>
+              <button type="button" class="chip" *ngFor="let option of subcategoryOptions; trackBy: trackByOptionId" [class.active]="subcategoryId === option.id" [attr.aria-pressed]="subcategoryId === option.id" (click)="setSubcategory(option.id)">{{ option.label }}</button>
+            </div>
+          </div>
           <details class="advanced-filter">
             <summary>
               <span>Advanced filters</span>
@@ -170,7 +177,7 @@
         <p class="status-note" *ngIf="!isLoading && message && !canRetryMessage" [class.status-note--success]="messageKind === 'success'" aria-live="polite">{{ message }}</p>
         <div #wardrobeGrid class="wardrobe-grid wardrobe-grid--virtual" *ngIf="items.length; else emptyWardrobe">
           <div class="wardrobe-grid__spacer" [style.height.px]="virtualTopSpacerHeight"></div>
-          <button type="button" class="item-card" *ngFor="let card of visibleItemCards; trackBy: trackByCardId" [class.selection-mode]="isSelectionMode" [class.selected]="card.isSelected" [attr.aria-pressed]="isSelectionMode ? card.isSelected : null" (pointerdown)="beginItemPress(card.item)" (pointerup)="endItemPress()" (pointerleave)="cancelItemPress()" (pointercancel)="cancelItemPress()" (contextmenu)="suppressContextMenu($event)" (click)="onItemCardClick(card.item)">
+          <button type="button" class="item-card" *ngFor="let card of visibleItemCards; trackBy: trackByCardId" [class.selection-mode]="isSelectionMode" [class.selected]="card.isSelected" [attr.aria-pressed]="isSelectionMode ? card.isSelected : null" (pointerdown)="beginItemPress(card.item, $event)" (pointermove)="onItemPointerMove($event)" (pointerup)="endItemPress()" (pointerleave)="cancelItemPress()" (pointercancel)="cancelItemPress()" (contextmenu)="suppressContextMenu($event)" (click)="onItemCardClick(card.item)">
             <div class="item-card__image-wrap">
               <img [appLazyImage]="card.imageUrl" [appLazyImagePriority]="card.isPriorityImage" [alt]="card.item.name" [attr.loading]="card.isPriorityImage ? 'eager' : null" [attr.fetchpriority]="card.isPriorityImage ? 'high' : null" decoding="async">
               <span class="selection-marker" *ngIf="isSelectionMode">
@@ -197,9 +204,12 @@
         <ng-template #emptyWardrobe>
           <article class="panel" *ngIf="!isLoading && !canRetryMessage">
             <h2 class="plain-title">{{ hasFilters ? 'No matching items found.' : 'Your wardrobe is empty.' }}</h2>
-            <p class="muted">{{ hasFilters ? 'Clear filters to see more wardrobe items.' : 'Add your first item.' }}</p>
+            <p class="muted">{{ hasFilters ? 'Clear filters to see more wardrobe items.' : 'Add your first clothing photo to start building outfits.' }}</p>
             <ion-button *ngIf="hasFilters" class="secondary-button" fill="outline" size="small" (click)="clearFilters()">Clear filters</ion-button>
-            <ion-button *ngIf="!hasFilters" class="primary-button" size="small" routerLink="/tabs/add">Add Item</ion-button>
+            <ion-button *ngIf="!hasFilters" class="primary-button" expand="block" routerLink="/tabs/add">
+              <ion-icon name="camera-outline" slot="start"></ion-icon>
+              Add your first item
+            </ion-button>
           </article>
         </ng-template>
         <div class="bulk-action-bar" *ngIf="isSelectionMode">

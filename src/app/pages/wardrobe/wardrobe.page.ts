@@ -97,6 +97,8 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   private itemLongPressHandle: ReturnType<typeof setTimeout> | null = null;
   private suppressNextItemClick = false;
   private readonly selectionLongPressMs = 450;
+  private pointerStartX = 0;
+  private pointerStartY = 0;
 
   get loadingMessage(): string {
     return this.items.length ? 'Refreshing wardrobe...' : 'Loading wardrobe...';
@@ -713,9 +715,14 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
     void lightImpact();
   }
 
-  beginItemPress(item: WardrobeItemDto): void {
+  beginItemPress(item: WardrobeItemDto, event?: PointerEvent): void {
     if (this.isSelectionMode || this.isLoading || this.isDeletingSelected) {
       return;
+    }
+
+    if (event) {
+      this.pointerStartX = event.clientX;
+      this.pointerStartY = event.clientY;
     }
 
     this.clearItemLongPress();
@@ -726,6 +733,18 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
       this.selectedItemIds.add(item.id);
       this.updateVisibleItemCards();
     }, this.selectionLongPressMs);
+  }
+
+  onItemPointerMove(event: PointerEvent): void {
+    if (!this.itemLongPressHandle) {
+      return;
+    }
+
+    const deltaX = Math.abs(event.clientX - this.pointerStartX);
+    const deltaY = Math.abs(event.clientY - this.pointerStartY);
+    if (deltaX > 10 || deltaY > 10) {
+      this.clearItemLongPress();
+    }
   }
 
   endItemPress(): void {

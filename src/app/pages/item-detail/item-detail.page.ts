@@ -38,6 +38,7 @@ export class ItemDetailPage implements OnDestroy {
   isArchiving = false;
   isOriginalImageOpen = false;
   itemMode: ItemDetailMode = 'view';
+  isDeleting = false;
   private imageGenerationStatusStream: ImageGenerationStatusStream | null = null;
   private readonly imageGenerationPollingIntervalMs = 1800;
   private imageGenerationPollTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -102,7 +103,11 @@ export class ItemDetailPage implements OnDestroy {
     this.message = '';
     this.item = null;
     this.isOriginalImageOpen = false;
-    this.setItemMode('view');
+    const initialMode = this.route.snapshot.queryParamMap.get('mode') === 'edit' ? 'edit' : 'view';
+    this.setItemMode(initialMode);
+    if (this.route.snapshot.queryParamMap.get('newlyAdded') === 'true') {
+      this.message = 'AI classified your item. Review details below and tap Save.';
+    }
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
       this.message = 'Could not load item.';
@@ -318,7 +323,7 @@ export class ItemDetailPage implements OnDestroy {
         };
         this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
       }
-      this.message = 'Marked as worn.';
+      this.message = '✓ Marked as worn today!';
       void successFeedback();
     } catch (error) {
       this.message = readMessage(error, 'Could not mark item as worn.');
@@ -352,30 +357,55 @@ export class ItemDetailPage implements OnDestroy {
     }
   }
 
-  async deleteItem(): Promise<void> {
-    if (!this.item || this.isArchiving) return;
+  async toggleArchive(): Promise<void> {
+    if (!this.item || this.isArchiving || this.isSaving || this.isDeleting) return;
+    const willArchive = !this.item.isArchived;
+    this.isArchiving = true;
+    this.message = willArchive ? 'Archiving item...' : 'Unarchiving item...';
+    try {
+      this.item = await this.api.updateItem(this.item.id, {
+        ...this.form,
+        isArchived: willArchive
+      });
+      this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
+      this.message = willArchive ? 'Item archived and hidden from outfit builder.' : 'Item unarchived and active in wardrobe.';
+      void successFeedback();
+    } catch (error) {
+      this.message = readMessage(error, 'Could not update archive status.');
+      void warningFeedback();
+    } finally {
+      this.isArchiving = false;
+    }
+  }
+
+  async deleteItemPermanently(): Promise<void> {
+    if (!this.item || this.isDeleting || this.isArchiving) return;
     const confirmed = await confirmAction(this.alertController, {
-      title: 'Archive item?',
-      message: `"${this.item.name}" will be removed from your wardrobe and outfit builder.`,
-      confirmLabel: 'Archive item',
+      title: 'Permanently delete item?',
+      message: `"${this.item.name}" will be permanently removed from your wardrobe. This cannot be undone.`,
+      confirmLabel: 'Delete permanently',
       destructive: true
     });
     if (!confirmed) {
       return;
     }
 
-    this.isArchiving = true;
-    this.message = 'Archiving item...';
+    this.isDeleting = true;
+    this.message = 'Deleting item...';
     try {
       await this.api.deleteItem(this.item.id);
       void successFeedback();
       await this.router.navigateByUrl('/tabs/wardrobe');
     } catch (error) {
-      this.message = readMessage(error, 'Could not archive item.');
+      this.message = readMessage(error, 'Could not delete item.');
       void warningFeedback();
     } finally {
-      this.isArchiving = false;
+      this.isDeleting = false;
     }
+  }
+
+  async deleteItem(): Promise<void> {
+    await this.deleteItemPermanently();
   }
 
   cancelEdit(): void {

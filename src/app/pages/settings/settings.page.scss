@@ -21,3 +21,53 @@
   font-weight: 650;
   text-align: right;
 }
+
+.inline-details-editor {
+  margin-top: 12px;
+}
+
+.inline-details-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.included-tier-badge {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3b5a32;
+  background: rgba(85, 120, 75, 0.12);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.ai-activity-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.activity-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 12px 6px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.03);
+
+  strong {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--app-ink, #222);
+  }
+
+  span {
+    font-size: 11px;
+    color: var(--app-muted, #666);
+    margin-top: 4px;
+  }
+}

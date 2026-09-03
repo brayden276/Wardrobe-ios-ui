@@ -52,6 +52,10 @@
           </div>
           <p class="muted" *ngIf="!batchFiles.length">Take a photo or select up to {{ maxBatchUploadCount }} photos.</p>
           <div class="provider-note">
+            <span class="ai-active-pill" *ngIf="hasAiConsent">
+              <ion-icon name="sparkles-outline"></ion-icon>
+              Gemini AI scanning enabled
+            </span>
             <p class="muted consent-note">Wardrobe AI sends uploaded wardrobe photos to Google Gemini to classify items and generate cleaned display images.</p>
             <p class="muted consent-note">Only upload clothing photos you are comfortable sharing with that provider.</p>
           </div>

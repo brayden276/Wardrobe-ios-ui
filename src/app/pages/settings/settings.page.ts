@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
 import { AuthService } from '../../auth.service';
 import { DeviceImageCacheService } from '../../device-image-cache.service';
-import { AiUsageCostSummaryDto, UserPersonalDetailsDto } from '../../models';
+import { AiUsageCostSummaryDto, UpdatePersonalDetailsRequest, UserPersonalDetailsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import {
   AI_DISCLOSURE_TEXT,
@@ -72,6 +72,13 @@ export class SettingsPage {
   busyMessage = '';
   message = '';
   settingsMode: SettingsMode = 'account';
+  isEditingPersonalDetails = false;
+  personalDetailsForm: UpdatePersonalDetailsRequest = {
+    gender: 'female',
+    fitPreference: 'balanced',
+    stylePreference: 'classic',
+    dailyContext: 'weekend'
+  };
 
   async ionViewWillEnter(): Promise<void> {
     this.aiConsentAccepted = await hasAiConsent();
@@ -137,6 +144,42 @@ export class SettingsPage {
 
   personalDetailLabel(group: string, value: string): string {
     return this.personalDetailLabels[group]?.[value] ?? value;
+  }
+
+  startEditingPersonalDetails(): void {
+    const details = this.personalDetails;
+    if (details) {
+      this.personalDetailsForm = {
+        gender: details.gender,
+        fitPreference: details.fitPreference,
+        stylePreference: details.stylePreference,
+        dailyContext: details.dailyContext
+      };
+    }
+    this.isEditingPersonalDetails = true;
+    this.message = '';
+    void lightImpact();
+  }
+
+  cancelEditingPersonalDetails(): void {
+    this.isEditingPersonalDetails = false;
+  }
+
+  async savePersonalDetails(): Promise<void> {
+    this.isBusy = true;
+    this.busyMessage = 'Saving personal details...';
+    try {
+      await this.auth.updatePersonalDetails(this.personalDetailsForm);
+      this.isEditingPersonalDetails = false;
+      this.message = 'Personal details saved.';
+      void successFeedback();
+    } catch (error) {
+      this.message = readMessage(error, 'Could not save personal details.');
+      void warningFeedback();
+    } finally {
+      this.isBusy = false;
+      this.busyMessage = '';
+    }
   }
 
   setSettingsMode(mode: SettingsMode): void {

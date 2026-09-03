@@ -1,0 +1,17 @@
+.ai-active-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #3b5a32;
+  background: rgba(85, 120, 75, 0.12);
+
+  ion-icon {
+    font-size: 14px;
+    color: #4a6741;
+  }
+}

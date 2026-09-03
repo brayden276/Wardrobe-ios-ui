@@ -43,8 +43,42 @@ export class OutfitsPage {
   visibleOutfitCount = this.outfitRenderIncrement;
   visibleOutfits: OutfitCard[] = [];
 
+  outfitSearch = '';
+  outfitFilter: 'all' | 'recent' | 'worn' = 'all';
+
+  get filteredOutfits(): OutfitDto[] {
+    let list = this.outfits;
+    const query = this.outfitSearch.trim().toLowerCase();
+    if (query) {
+      list = list.filter((o) =>
+        o.name.toLowerCase().includes(query) ||
+        (o.explanation && o.explanation.toLowerCase().includes(query)) ||
+        o.items.some((item) => item.name.toLowerCase().includes(query)));
+    }
+
+    if (this.outfitFilter === 'worn') {
+      list = list.slice().sort((a, b) => b.wearCount - a.wearCount);
+    } else if (this.outfitFilter === 'recent') {
+      list = list.slice().sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    }
+
+    return list;
+  }
+
+  setOutfitFilter(filter: 'all' | 'recent' | 'worn'): void {
+    this.outfitFilter = filter;
+    this.visibleOutfitCount = this.outfitRenderIncrement;
+    this.updateVisibleOutfits();
+    void lightImpact();
+  }
+
+  onSearchInput(): void {
+    this.visibleOutfitCount = this.outfitRenderIncrement;
+    this.updateVisibleOutfits();
+  }
+
   get canShowMoreOutfits(): boolean {
-    return this.visibleOutfitCount < this.outfits.length;
+    return this.visibleOutfitCount < this.filteredOutfits.length;
   }
 
   get loadingMessage(): string {
@@ -394,8 +428,8 @@ export class OutfitsPage {
     this.updateVisibleOutfits();
   }
 
-  private updateVisibleOutfits(): void {
-    this.visibleOutfits = this.outfits.slice(0, this.visibleOutfitCount).map((outfit) => {
+  updateVisibleOutfits(): void {
+    this.visibleOutfits = this.filteredOutfits.slice(0, this.visibleOutfitCount).map((outfit) => {
       const isMarking = this.markingOutfitIds.has(outfit.id);
       const isRemoving = this.deletingOutfitIds.has(outfit.id);
       return {

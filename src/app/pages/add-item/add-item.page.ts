@@ -13,6 +13,7 @@ import {
   MAX_UPLOAD_FILE_BYTES,
   MIME_IMAGE_OUTPUT_EXTENSION,
   ensureAiConsentWithAlert,
+  hasAiConsent,
   lightImpact,
   noticeKind,
   NoticeKind,
@@ -50,11 +51,16 @@ export class AddItemPage implements OnDestroy {
   isSaving = false;
   isPreparing = false;
   uploadError = false;
+  hasAiConsent = false;
   batchFiles: PreparedUploadFile[] = [];
   batchPreviewUrls: string[] = [];
   isBatchSaving = false;
   processingKind: AddItemProcessingKind | null = null;
   processingStepIndex = 0;
+
+  async ionViewWillEnter(): Promise<void> {
+    this.hasAiConsent = await hasAiConsent();
+  }
   private readonly processingStepsByKind: Record<AddItemProcessingKind, string[]> = {
     preparingPhotos: ['Reading selected photos', 'Checking image quality', 'Optimising photos', 'Preparing upload queue'],
     uploadingSinglePhoto: ['Uploading photo', 'Classifying clothing', 'Starting image cleanup', 'Opening wardrobe'],
@@ -376,12 +382,18 @@ export class AddItemPage implements OnDestroy {
 
     try {
       this.setProcessingStep(1);
-      await this.api.createItem(photo.file, photo.name);
+      const created = await this.api.createItem(photo.file, photo.name);
       this.setProcessingStep(2);
       this.clearBatchSelection();
       void successFeedback();
       this.setProcessingStep(3);
-      await this.router.navigateByUrl('/tabs/wardrobe');
+      if (created?.id) {
+        await this.router.navigate(['/tabs/wardrobe', created.id], {
+          queryParams: { mode: 'edit', newlyAdded: 'true' }
+        });
+      } else {
+        await this.router.navigateByUrl('/tabs/wardrobe');
+      }
     } catch (error) {
       this.message = readMessage(error, 'Could not upload photo. Try again.');
       this.uploadError = true;
