@@ -22,6 +22,13 @@ export class LoginPage {
   emailBlurred = false;
   showPassword = false;
 
+  async ionViewWillEnter(): Promise<void> {
+    await this.auth.restore();
+    if (this.auth.session) {
+      await this.router.navigateByUrl(this.auth.hasCompletedPersonalDetails ? '/tabs/wardrobe' : '/onboarding');
+    }
+  }
+
   get emailValidationMessage(): string {
     if (!this.email.trim()) {
       return 'Email is required.';

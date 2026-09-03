@@ -21,6 +21,19 @@ const requireSession: CanActivateFn = async () => {
   return auth.session ? true : router.parseUrl('/login');
 };
 
+const requireNoSession: CanActivateFn = async () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  await auth.restore();
+  if (!auth.session) {
+    return true;
+  }
+
+  return auth.hasCompletedPersonalDetails
+    ? router.parseUrl('/tabs/wardrobe')
+    : router.parseUrl('/onboarding');
+};
+
 const requireCompletedPersonalDetails: CanActivateFn = async () => {
   const auth = inject(AuthService);
   const router = inject(Router);
@@ -33,7 +46,7 @@ const requireCompletedPersonalDetails: CanActivateFn = async () => {
 };
 
 const routes: Routes = [
-  { path: 'login', component: LoginPage },
+  { path: 'login', component: LoginPage, canActivate: [requireNoSession] },
   { path: 'onboarding', component: OnboardingPage, canActivate: [requireSession] },
   {
     path: 'tabs',

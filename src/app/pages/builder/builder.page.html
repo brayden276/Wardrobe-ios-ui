@@ -75,7 +75,10 @@
             <ion-button class="primary-button" expand="block" (click)="search()" [disabled]="isBusy || !canGenerate">{{ isBuildingOutfits ? 'Building...' : 'Build outfits' }}</ion-button>
             <p class="muted consent-note">Wardrobe AI sends your outfit request and wardrobe item details to Google Gemini to generate outfit suggestions.</p>
           </article>
-          <h2 class="section-title" *ngIf="resultCards.length">Outfit ideas</h2>
+          <div class="panel-heading" *ngIf="resultCards.length">
+            <h2 class="section-title">Outfit ideas</h2>
+            <button type="button" class="quiet-button compact-button" (click)="clearResults()">Edit search</button>
+          </div>
           <article class="outfit-card idea-card generated-outfit-card" *ngFor="let card of resultCards; trackBy: trackByGeneratedOutfitKey">
             <img class="outfit-hero-image" [appLazyImage]="card.imageUrl" [appLazyImagePriority]="card.isPriority" [alt]="card.outfit.title" [attr.loading]="card.isPriority ? 'eager' : null" [attr.fetchpriority]="card.isPriority ? 'high' : null" decoding="async">
             <div class="outfit-copy">

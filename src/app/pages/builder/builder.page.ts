@@ -273,7 +273,16 @@ export class BuilderPage {
     this.updateBuilderItemViews();
   }
 
+  clearResults(): void {
+    this.results = [];
+    this.resultCards = [];
+  }
+
   async search(): Promise<void> {
+    if (this.isBuildingOutfits) {
+      return;
+    }
+
     if (!await ensureAiConsentWithAlert(
       this.alertController,
       'Wardrobe AI uses Google Gemini to interpret your outfit request and generate outfit suggestions from your wardrobe. Do you want to continue with AI processing for this device?'))

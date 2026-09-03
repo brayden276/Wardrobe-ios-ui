@@ -40,13 +40,25 @@ export class AppComponent implements OnInit, OnDestroy {
         return;
       }
 
+      if (session && (this.router.url === '/login' || this.router.url === '/')) {
+        void this.router.navigateByUrl(this.auth.hasCompletedPersonalDetails ? '/tabs/wardrobe' : '/onboarding');
+        return;
+      }
+
       if (session && !this.auth.hasCompletedPersonalDetails && this.router.url.startsWith('/tabs')) {
         void this.router.navigateByUrl('/onboarding');
       }
     });
 
     if (!this.auth.session) {
-      await this.router.navigateByUrl('/login');
+      if (!this.router.url.startsWith('/login')) {
+        await this.router.navigateByUrl('/login');
+      }
+      return;
+    }
+
+    if (this.router.url === '/login' || this.router.url === '/') {
+      await this.router.navigateByUrl(this.auth.hasCompletedPersonalDetails ? '/tabs/wardrobe' : '/onboarding');
       return;
     }
 

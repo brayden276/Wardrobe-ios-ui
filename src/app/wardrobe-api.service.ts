@@ -43,6 +43,7 @@ export class WardrobeApiService {
   private readonly itemsCache = new Map<string, CachedApiResponse<WardrobeItemDto[]>>();
   private readonly outfitsCacheKey = 'all';
   private readonly outfitsCache = new Map<string, CachedApiResponse<OutfitDto[]>>();
+  private readonly searchOutfitsCache = new Map<string, CachedApiResponse<GeneratedOutfitDto[]>>();
   private onlineStatus = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
   get isOnline(): boolean {
@@ -126,19 +127,29 @@ export class WardrobeApiService {
     return response;
   }
 
-  async searchOutfits(query: string, requiredItemId: string | null = null): Promise<GeneratedOutfitDto[]> {
-    const response = await this.authorized(() => firstValueFrom(this.http.post<{ outfits: GeneratedOutfitDto[] }>(this.url('/api/outfits/search'), { query, requiredItemId }, this.authOptions())));
-    return Promise.all(response.outfits.map(async (outfit) => {
-      const imageUrl = this.normaliseAssetUrl(outfit.imageUrl);
-      return {
-        ...outfit,
-        imageUrl,
-        isComplete: outfit.isComplete ?? true,
-        missingCategories: outfit.missingCategories ?? [],
-        relaxedConstraints: outfit.relaxedConstraints ?? [],
-        displayImageUrl: imageUrl
-      };
-    }));
+  async searchOutfits(query: string, requiredItemId: string | null = null, options: ApiReadOptions = {}): Promise<GeneratedOutfitDto[]> {
+    const cacheKey = `${query.trim().toLowerCase()}|${requiredItemId ?? ''}`;
+    if (!options.forceRefresh) {
+      const cached = this.getCached(this.searchOutfitsCache, cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+
+    return this.setCached(this.searchOutfitsCache, cacheKey, async () => {
+      const response = await this.authorized(() => firstValueFrom(this.http.post<{ outfits: GeneratedOutfitDto[] }>(this.url('/api/outfits/search'), { query, requiredItemId }, this.authOptions())));
+      return Promise.all(response.outfits.map(async (outfit) => {
+        const imageUrl = this.normaliseAssetUrl(outfit.imageUrl);
+        return {
+          ...outfit,
+          imageUrl,
+          isComplete: outfit.isComplete ?? true,
+          missingCategories: outfit.missingCategories ?? [],
+          relaxedConstraints: outfit.relaxedConstraints ?? [],
+          displayImageUrl: imageUrl
+        };
+      }));
+    });
   }
 
   async saveOutfit(name: string, prompt: string | null, explanation: string | null, itemIds: string[], imageUrl: string | null = null): Promise<OutfitDto> {
@@ -294,6 +305,7 @@ export class WardrobeApiService {
 
   private clearOutfitCaches(): void {
     this.outfitsCache.clear();
+    this.searchOutfitsCache.clear();
   }
 
   private async waitForOutfitImage(outfitId: string): Promise<OutfitDto> {

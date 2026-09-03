@@ -11,11 +11,12 @@ describe('LoginPage', () => {
   beforeEach(() => {
     mockAuthService = jasmine.createSpyObj<AuthService>(
       'AuthService',
-      ['login', 'register'],
-      { hasCompletedPersonalDetails: false }
+      ['login', 'register', 'restore'],
+      { session: null, hasCompletedPersonalDetails: false }
     );
     mockAuthService.login.and.returnValue(Promise.resolve());
     mockAuthService.register.and.returnValue(Promise.resolve());
+    mockAuthService.restore.and.returnValue(Promise.resolve());
 
     mockRouter = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
     mockRouter.navigateByUrl.and.returnValue(Promise.resolve(true));
@@ -332,6 +333,51 @@ describe('LoginPage', () => {
       expect(component.message).toBe('Invalid credentials.');
       expect(mockRouter.navigateByUrl).not.toHaveBeenCalled();
       expect(component.isBusy).toBeFalse();
+    });
+  });
+
+  describe('ionViewWillEnter', () => {
+    it('should not navigate when no active session exists', async () => {
+      Object.defineProperty(mockAuthService, 'session', { value: null, configurable: true });
+
+      await component.ionViewWillEnter();
+
+      expect(mockAuthService.restore).toHaveBeenCalled();
+      expect(mockRouter.navigateByUrl).not.toHaveBeenCalled();
+    });
+
+    it('should redirect to /tabs/wardrobe when session exists and personal details are completed', async () => {
+      const mockSession = {
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        tokenType: 'Bearer',
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+        user: { id: '1', email: 'user@example.com', displayName: 'User', personalDetails: null }
+      };
+      Object.defineProperty(mockAuthService, 'session', { value: mockSession, configurable: true });
+      Object.defineProperty(mockAuthService, 'hasCompletedPersonalDetails', { value: true, configurable: true });
+
+      await component.ionViewWillEnter();
+
+      expect(mockAuthService.restore).toHaveBeenCalled();
+      expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/tabs/wardrobe');
+    });
+
+    it('should redirect to /onboarding when session exists and personal details are not completed', async () => {
+      const mockSession = {
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        tokenType: 'Bearer',
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+        user: { id: '1', email: 'user@example.com', displayName: 'User', personalDetails: null }
+      };
+      Object.defineProperty(mockAuthService, 'session', { value: mockSession, configurable: true });
+      Object.defineProperty(mockAuthService, 'hasCompletedPersonalDetails', { value: false, configurable: true });
+
+      await component.ionViewWillEnter();
+
+      expect(mockAuthService.restore).toHaveBeenCalled();
+      expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/onboarding');
     });
   });
 });

@@ -30,6 +30,12 @@
   outline-offset: 2px;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html,
 body,
 ion-app {
@@ -37,6 +43,8 @@ ion-app {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 input,
@@ -121,10 +129,12 @@ ion-tab-button[aria-selected="true"] ion-icon {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
   max-width: 680px;
   min-height: 100%;
   margin: 0 auto;
   padding: calc(var(--ion-safe-area-top) + 20px) 18px calc(96px + var(--ion-safe-area-bottom));
+  box-sizing: border-box;
 }
 
 .page-workspace {
@@ -1507,6 +1517,7 @@ ion-textarea.outfit-query {
 }
 
 @media (max-width: 430px) {
+  .idea-card,
   .generated-outfit-card {
     grid-template-columns: 1fr;
   }
@@ -1514,7 +1525,6 @@ ion-textarea.outfit-query {
   .generated-outfit-card .outfit-hero-image {
     max-height: 320px;
   }
-
 }
 
 .outfit-detail-image {
@@ -1546,6 +1556,12 @@ ion-textarea.outfit-query {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+@media (max-width: 360px) {
+  .outfit-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .outfit-detail-panel {
