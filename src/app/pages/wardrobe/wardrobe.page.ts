@@ -680,7 +680,7 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   }
 
   coloursFor(item: WardrobeItemDto): string[] {
-    return [item.primaryColourId, ...item.secondaryColourIds].filter(Boolean).slice(0, 4);
+    return [item.primaryColourId, ...(item.secondaryColourIds ?? [])].filter(Boolean).slice(0, 4);
   }
 
   colourSwatch(id: string): string {
@@ -963,10 +963,18 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
       this.selectedItemIds.clear();
       this.isSelectionMode = false;
       await this.load(true, true);
-      this.message = result.deletedCount === 1
+      const msg = result.deletedCount === 1
         ? 'Deleted 1 wardrobe item.'
         : `Deleted ${result.deletedCount} wardrobe items.`;
+      this.message = msg;
       void successFeedback();
+      const toast = await this.toastController.create({
+        message: msg,
+        duration: 2000,
+        position: 'bottom',
+        cssClass: 'ios-toast'
+      });
+      await toast.present();
     } catch (error) {
       this.message = readMessage(error, 'Could not delete selected wardrobe items.');
       void warningFeedback();

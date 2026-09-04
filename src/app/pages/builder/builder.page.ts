@@ -375,7 +375,7 @@ export class BuilderPage {
   }
 
   coloursFor(item: WardrobeItemDto): string[] {
-    return [item.primaryColourId, ...item.secondaryColourIds].filter(Boolean).slice(0, 4);
+    return [item.primaryColourId, ...(item.secondaryColourIds ?? [])].filter(Boolean).slice(0, 4);
   }
 
 

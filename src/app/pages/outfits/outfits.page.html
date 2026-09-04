@@ -83,7 +83,7 @@
 
     <!-- Lookbook Cards Grid -->
     <div class="lookbook-grid" *ngIf="visibleOutfits.length">
-      <article class="lookbook-card" *ngFor="let card of visibleOutfits; trackBy: trackByCardId" [class.selected]="card.isSelected" [class.in-selection-mode]="isSelectionMode">
+      <article class="lookbook-card" *ngFor="let card of visibleOutfits; trackBy: trackByCardId" [class.selected]="card.isSelected" [class.in-selection-mode]="isSelectionMode" (click)="onCardClick(card.outfit, $event)">
         <!-- Hero Visual Area -->
         <div class="lookbook-hero" (click)="open(card.outfit, $event)" (pointerdown)="beginOutfitPress(card.outfit)" (pointerup)="endOutfitPress()" (pointerleave)="cancelOutfitPress()" (pointercancel)="cancelOutfitPress()" (contextmenu)="suppressContextMenu($event)">
           <img *ngIf="card.imageUrl" [appLazyImage]="card.imageUrl" [alt]="card.outfit.name" class="hero-image" decoding="async">
@@ -175,7 +175,7 @@
   </div>
 
   <!-- Native iOS Bottom Selection Bar -->
-  <div class="ios-bulk-bar" *ngIf="isSelectionMode">
+  <div class="ios-bulk-bar" slot="fixed" *ngIf="isSelectionMode">
     <span class="bulk-count">{{ selectedCount }} selected</span>
     <button type="button" class="bulk-destructive-btn" (click)="deleteSelectedOutfits()" [disabled]="!selectedCount || isDeletingSelected">
       <ion-spinner name="crescent" *ngIf="isDeletingSelected"></ion-spinner>

@@ -83,7 +83,7 @@ export class ItemDetailPage implements OnDestroy {
 
   openEditModal(): void {
     if (this.item) {
-      this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
+      this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds ? this.item.secondaryColourIds.slice() : [] };
     }
     this.isEditModalOpen = true;
     void lightImpact();

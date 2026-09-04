@@ -251,6 +251,14 @@ export class OutfitsPage {
     void lightImpact();
   }
 
+  onCardClick(outfit: OutfitDto, event?: Event): void {
+    if (this.isSelectionMode) {
+      event?.preventDefault();
+      event?.stopPropagation();
+      this.toggleOutfitSelection(outfit.id);
+    }
+  }
+
   close(): void {
     this.selectedOutfit = null;
     this.message = '';

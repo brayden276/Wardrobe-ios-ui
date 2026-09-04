@@ -173,15 +173,17 @@
       </article>
     </ng-template>
 
-    <!-- Native iOS Bottom Selection Bar -->
-    <div class="ios-bulk-bar" *ngIf="isSelectionMode">
-      <span class="bulk-count">{{ selectedCount }} selected</span>
-      <button type="button" class="bulk-destructive-btn" (click)="deleteSelectedItems()" [disabled]="!selectedCount || isDeletingSelected">
-        <ion-icon name="trash-outline"></ion-icon>
-        <span>{{ isDeletingSelected ? 'Deleting...' : 'Delete' }}</span>
-      </button>
-    </div>
   </section>
+
+  <!-- Native iOS Bottom Selection Bar -->
+  <div class="ios-bulk-bar" slot="fixed" *ngIf="isSelectionMode">
+    <span class="bulk-count">{{ selectedCount }} selected</span>
+    <button type="button" class="bulk-destructive-btn" (click)="deleteSelectedItems()" [disabled]="!selectedCount || isDeletingSelected">
+      <ion-spinner name="crescent" *ngIf="isDeletingSelected"></ion-spinner>
+      <ion-icon name="trash-outline" *ngIf="!isDeletingSelected"></ion-icon>
+      <span>{{ isDeletingSelected ? 'Deleting...' : 'Delete' }}</span>
+    </button>
+  </div>
 </ion-content>
 
 <!-- Native iOS Filter Sheet Modal -->

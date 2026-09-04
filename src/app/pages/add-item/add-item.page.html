@@ -15,7 +15,7 @@
 
     <!-- STATE 1: Empty Viewfinder / Hero Capture Zone -->
     <section class="capture-zone" *ngIf="!batchFiles.length">
-      <div class="viewfinder-card" (click)="openAddPhotoOptions()">
+      <div class="viewfinder-card" role="button" tabindex="0" (click)="openAddPhotoOptions()" (keydown.enter)="openAddPhotoOptions()">
         <div class="viewfinder-icon-pulse">
           <ion-icon name="camera-outline"></ion-icon>
         </div>
