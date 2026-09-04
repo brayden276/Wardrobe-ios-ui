@@ -86,6 +86,10 @@ export class SettingsPage {
     await this.loadAiUsage();
   }
 
+  goBack(): void {
+    this.router.navigateByUrl('/tabs/analytics');
+  }
+
   async loadAiUsage(): Promise<void> {
     this.aiUsageLoadMessage = '';
     this.isLoadingAiUsage = true;

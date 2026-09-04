@@ -234,35 +234,10 @@
 /* Filter Modal Content */
 .filter-modal-content {
   --background: var(--app-bg);
-}
-
-.modal-nav-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 50px;
-  padding: 0 16px;
-  border-bottom: 0.5px solid var(--app-border);
-  background: var(--app-surface);
-
-  .modal-title {
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--app-ink);
-  }
-
-  .text-btn {
-    border: none;
-    background: transparent;
-    font-size: 16px;
-    color: var(--app-muted);
-    cursor: pointer;
-
-    &.primary {
-      color: var(--app-olive);
-      font-weight: 600;
-    }
-  }
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .modal-body-scroll {
@@ -270,6 +245,10 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .filter-modal-section {

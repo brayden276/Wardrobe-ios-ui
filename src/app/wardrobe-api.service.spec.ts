@@ -8,6 +8,7 @@ import { apiBaseUrl } from './api-url';
 import { readMessage } from './pages/page-helpers';
 import {
   AiUsageCostSummaryDto,
+  AnalyticsSummaryDto,
   BatchWardrobeItemsResponse,
   BulkDeleteResponse,
   OutfitDto,
@@ -265,6 +266,20 @@ describe('WardrobeApiService', () => {
       await getP2;
     });
 
+    it('createItem() should return multiple items when detected in outfit photo', async () => {
+      const mockItem2 = { ...mockItem, id: 'item-2', name: 'Black Jeans' };
+      const mockBlob = new Blob(['outfit-img'], { type: 'image/jpeg' });
+      const createP = service.createItem(mockBlob, 'outfit.jpg');
+
+      const req = httpTesting.expectOne(`${baseUrl}/api/wardrobe/items`);
+      req.flush({ item: mockItem, items: [mockItem, mockItem2] });
+
+      const created = await createP;
+      expect(created.id).toBe('item-1');
+      expect(created.items?.length).toBe(2);
+      expect(created.items?.[1].id).toBe('item-2');
+    });
+
     it('createItems() batch should send multiple files in FormData and normalise results', async () => {
       const file1 = new File(['content1'], 'img1.jpg', { type: 'image/jpeg' });
       const file2 = new File(['content2'], 'img2.jpg', { type: 'image/jpeg' });
@@ -447,6 +462,73 @@ describe('WardrobeApiService', () => {
       const result = await usageP;
       expect(result.totalCostUsd).toBe(1.25);
       expect(result.outfitSearches).toBe(5);
+    });
+
+    it('getAnalyticsSummary() should call /api/analytics', async () => {
+      const mockAnalytics: AnalyticsSummaryDto = {
+        userCost: {
+          totalCostUsd: 0.088,
+          classifications: { count: 2, unitCostUsd: 0.002, subtotalCostUsd: 0.004 },
+          outfitSearches: { count: 0, unitCostUsd: 0.002, subtotalCostUsd: 0 },
+          displayImages: { count: 2, unitCostUsd: 0.042, subtotalCostUsd: 0.084 },
+          outfitImages: { count: 0, unitCostUsd: 0.042, subtotalCostUsd: 0 }
+        },
+        userMetrics: {
+          totalItems: 2,
+          activeItems: 2,
+          archivedItems: 0,
+          totalOutfits: 0,
+          outfitsWithImages: 0,
+          totalWearCount: 1,
+          itemsByCategory: { tops: 1, bottoms: 1 },
+          itemsByColour: { blue: 1, black: 1 },
+          topWornItems: []
+        },
+        platformCost: {
+          totalCostUsd: 0.088,
+          classifications: { count: 2, unitCostUsd: 0.002, subtotalCostUsd: 0.004 },
+          outfitSearches: { count: 0, unitCostUsd: 0.002, subtotalCostUsd: 0 },
+          displayImages: { count: 2, unitCostUsd: 0.042, subtotalCostUsd: 0.084 },
+          outfitImages: { count: 0, unitCostUsd: 0.042, subtotalCostUsd: 0 }
+        },
+        platformMetrics: {
+          totalItems: 2,
+          activeItems: 2,
+          archivedItems: 0,
+          totalOutfits: 0,
+          outfitsWithImages: 0,
+          totalWearCount: 1,
+          itemsByCategory: { tops: 1, bottoms: 1 },
+          itemsByColour: { blue: 1, black: 1 },
+          topWornItems: []
+        },
+        platformTelemetry: {
+          totalUsers: 1,
+          totalPlatformItems: 2,
+          totalPlatformOutfits: 0,
+          totalPlatformImages: 2,
+          totalPlatformCostUsd: 0.088,
+          databaseMode: 'Local JSON / In-Memory',
+          modelTier: 'gemini-2.5-flash-lite',
+          imageModelTier: 'gemini-2.5-flash-image'
+        },
+        unitRates: {
+          classificationEstimateUsd: 0.002,
+          outfitSearchEstimateUsd: 0.002,
+          displayImageEstimateUsd: 0.042,
+          outfitImageEstimateUsd: 0.042
+        }
+      };
+
+      const analyticsP = service.getAnalyticsSummary();
+      const req = httpTesting.expectOne(`${baseUrl}/api/analytics`);
+      expect(req.request.method).toBe('GET');
+      req.flush(mockAnalytics);
+
+      const result = await analyticsP;
+      expect(result.userCost.totalCostUsd).toBe(0.088);
+      expect(result.platformTelemetry.totalUsers).toBe(1);
+      expect(result.userMetrics.totalItems).toBe(2);
     });
   });
 

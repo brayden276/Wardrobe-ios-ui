@@ -9,6 +9,7 @@ import { AppComponent } from './app.component';
 import { LazyImageDirective } from './lazy-image.directive';
 import {
   AddItemPage,
+  AnalyticsPage,
   BuilderPage,
   ItemDetailPage,
   LoginPage,
@@ -31,7 +32,8 @@ import {
     ItemDetailPage,
     BuilderPage,
     OutfitsPage,
-    SettingsPage
+    SettingsPage,
+    AnalyticsPage
   ],
   imports: [BrowserModule, HttpClientModule, FormsModule, IonicModule.forRoot(), AppRoutingModule],
   providers: [{ provide: RouteReuseStrategy, useClass: IonicRouteStrategy }],

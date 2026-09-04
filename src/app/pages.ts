@@ -7,3 +7,4 @@ export { ItemDetailPage } from './pages/item-detail/item-detail.page';
 export { BuilderPage } from './pages/builder/builder.page';
 export { OutfitsPage } from './pages/outfits/outfits.page';
 export { SettingsPage } from './pages/settings/settings.page';
+export { AnalyticsPage } from './pages/analytics/analytics.page';

@@ -1,6 +1,12 @@
 <ion-content class="app-content" [fullscreen]="true">
   <div class="settings-viewport">
     <header class="settings-header">
+      <div class="header-nav-row">
+        <button type="button" class="back-link-btn" (click)="goBack()">
+          <ion-icon name="chevron-back-outline"></ion-icon>
+          <span>Analytics</span>
+        </button>
+      </div>
       <h1 class="ios-large-title">Settings</h1>
     </header>
 
@@ -109,6 +115,15 @@
             <span class="metric-num">{{ aiUsage.displayImages + aiUsage.outfitImages }}</span>
             <span class="metric-label">Looks Styled</span>
           </div>
+        </div>
+        <div class="ios-table-row" *ngIf="aiUsage && !isLoadingAiUsage">
+          <div class="row-info-col">
+            <span class="row-label">Estimated AI Cost</span>
+            <span class="row-subtext">{{ aiUsageTotalLabel }} · Detailed platform telemetry</span>
+          </div>
+          <button type="button" class="row-action-link view-link" (click)="goBack()">
+            View Analytics →
+          </button>
         </div>
         <div class="ios-table-row" *ngIf="isLoadingAiUsage">
           <span class="row-label">Loading AI activity...</span>

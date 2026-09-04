@@ -24,7 +24,7 @@
         <div class="guide-chips">
           <span>☀️ Good lighting</span>
           <span>🔲 Plain background</span>
-          <span>👕 Single item</span>
+          <span>👕 Single garment or outfit</span>
         </div>
       </div>
 
@@ -71,8 +71,8 @@
         </button>
       </div>
 
-      <!-- Batch Carousel (If multiple photos queued) -->
-      <div class="batch-carousel" *ngIf="batchFiles.length > 1 && !isScanning">
+      <!-- Batch Carousel (Queue & multi-image manager) -->
+      <div class="batch-carousel" *ngIf="batchFiles.length && !isScanning">
         <div
           class="batch-thumb"
           *ngFor="let file of batchFiles; let i = index"
@@ -83,6 +83,15 @@
             <ion-icon name="close-circle"></ion-icon>
           </button>
         </div>
+        <button
+          type="button"
+          class="batch-thumb-add"
+          *ngIf="batchFiles.length < maxBatchUploadCount"
+          (click)="openAddPhotoOptions()"
+          aria-label="Add more photos">
+          <ion-icon name="add-outline"></ion-icon>
+          <span>Add</span>
+        </button>
       </div>
 
       <!-- Error Guidance Card with Direct Recovery -->

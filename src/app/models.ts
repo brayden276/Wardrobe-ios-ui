@@ -107,6 +107,11 @@ export interface WardrobeItemUploadResultDto {
   success: boolean;
   item: WardrobeItemDto | null;
   error: string | null;
+  items?: WardrobeItemDto[] | null;
+}
+
+export interface CreateWardrobeItemResponse extends WardrobeItemDto {
+  items?: WardrobeItemDto[];
 }
 
 export interface BatchWardrobeItemsResponse {
@@ -172,6 +177,67 @@ export interface AiUsageCostSummaryDto {
   outfitSearches: number;
   displayImages: number;
   outfitImages: number;
+}
+
+export interface AiUsageUnitRatesDto {
+  classificationEstimateUsd: number;
+  outfitSearchEstimateUsd: number;
+  displayImageEstimateUsd: number;
+  outfitImageEstimateUsd: number;
+}
+
+export interface AiCostBreakdownItemDto {
+  count: number;
+  unitCostUsd: number;
+  subtotalCostUsd: number;
+}
+
+export interface AiCostDetailDto {
+  totalCostUsd: number;
+  classifications: AiCostBreakdownItemDto;
+  outfitSearches: AiCostBreakdownItemDto;
+  displayImages: AiCostBreakdownItemDto;
+  outfitImages: AiCostBreakdownItemDto;
+}
+
+export interface TopWornItemSummaryDto {
+  id: string;
+  name: string;
+  categoryId: string;
+  wearCount: number;
+  thumbnailUrl: string | null;
+}
+
+export interface WardrobeAnalyticsMetricsDto {
+  totalItems: number;
+  activeItems: number;
+  archivedItems: number;
+  totalOutfits: number;
+  outfitsWithImages: number;
+  totalWearCount: number;
+  itemsByCategory: Record<string, number>;
+  itemsByColour: Record<string, number>;
+  topWornItems: TopWornItemSummaryDto[];
+}
+
+export interface PlatformTelemetryDto {
+  totalUsers: number;
+  totalPlatformItems: number;
+  totalPlatformOutfits: number;
+  totalPlatformImages: number;
+  totalPlatformCostUsd: number;
+  databaseMode: string;
+  modelTier: string;
+  imageModelTier: string;
+}
+
+export interface AnalyticsSummaryDto {
+  userCost: AiCostDetailDto;
+  userMetrics: WardrobeAnalyticsMetricsDto;
+  platformCost: AiCostDetailDto;
+  platformMetrics: WardrobeAnalyticsMetricsDto;
+  platformTelemetry: PlatformTelemetryDto;
+  unitRates: AiUsageUnitRatesDto;
 }
 
 export interface ApiMessage {

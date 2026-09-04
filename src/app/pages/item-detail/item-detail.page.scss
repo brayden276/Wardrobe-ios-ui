@@ -80,6 +80,7 @@
   font-size: 26px;
   font-weight: 600;
   color: var(--app-ink);
+  word-break: break-word;
 }
 
 .detail-garment-meta {
@@ -102,7 +103,7 @@
 /* iOS Metric Cards */
 .ios-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 
   .metric-card {
@@ -115,6 +116,8 @@
     background: var(--app-surface);
     border: 1px solid var(--app-border);
     text-align: center;
+    min-width: 0;
+    overflow: hidden;
 
     .metric-title {
       font-size: 11px;
@@ -122,12 +125,17 @@
       letter-spacing: 0.5px;
       color: var(--app-muted);
       text-transform: uppercase;
+      white-space: nowrap;
     }
 
     .metric-val {
       font-size: 17px;
       font-weight: 700;
       color: var(--app-ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
 
       &.archived {
         color: var(--app-danger);
@@ -168,6 +176,10 @@
 /* Edit Modal Sheet */
 .edit-modal-content {
   --background: var(--app-bg);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .modal-form-scroll {
@@ -175,6 +187,10 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .ios-name-input {

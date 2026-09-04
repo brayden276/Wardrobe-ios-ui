@@ -135,7 +135,53 @@ export class AddItemPage implements OnDestroy {
   }
 
   openPhotoLibrary(): void {
-    void this.capture(CameraSource.Photos);
+    void this.pickFromPhotoLibrary();
+  }
+
+  async pickFromPhotoLibrary(): Promise<void> {
+    this.message = '';
+    this.statusMessage = '';
+    this.uploadError = false;
+
+    if (!Capacitor.isNativePlatform()) {
+      this.openBatchPicker();
+      return;
+    }
+
+    try {
+      const remainingCount = this.maxBatchUploadCount - this.batchFiles.length;
+      if (remainingCount <= 0) {
+        this.message = `You can upload up to ${this.maxBatchUploadCount} photos at once.`;
+        this.uploadError = true;
+        return;
+      }
+
+      const result = await Camera.pickImages({ quality: 90, limit: remainingCount });
+      if (!result?.photos?.length) {
+        return;
+      }
+
+      const files: File[] = [];
+      for (const [index, photo] of result.photos.entries()) {
+        if (photo.webPath) {
+          const response = await fetch(photo.webPath);
+          const blob = await response.blob();
+          const ext = photo.format || 'jpg';
+          const fileName = `wardrobe-photo-${Date.now()}-${index}.${ext}`;
+          files.push(new File([blob], fileName, { type: blob.type || `image/${ext === 'png' ? 'png' : 'jpeg'}` }));
+        }
+      }
+
+      if (files.length) {
+        await this.addSelectedFiles(files);
+      }
+    } catch {
+      try {
+        await this.capture(CameraSource.Photos);
+      } catch {
+        this.openBatchPicker();
+      }
+    }
   }
 
   get isFullPageProcessing(): boolean {
@@ -202,7 +248,7 @@ export class AddItemPage implements OnDestroy {
           text: 'Select photos',
           icon: 'images-outline',
           handler: () => {
-            this.openBatchPicker();
+            void this.pickFromPhotoLibrary();
           }
         },
         {
@@ -427,7 +473,13 @@ export class AddItemPage implements OnDestroy {
       this.clearBatchSelection();
       void successFeedback();
       this.setProcessingStep(3);
-      if (created?.id) {
+
+      const itemsCreated = created?.items?.length ? created.items : (created?.id ? [created] : []);
+      if (itemsCreated.length > 1) {
+        await this.router.navigate(['/tabs/wardrobe'], {
+          queryParams: { newlyAddedCount: itemsCreated.length }
+        });
+      } else if (created?.id) {
         await this.router.navigate(['/tabs/wardrobe', created.id], {
           queryParams: { mode: 'edit', newlyAdded: 'true' }
         });
@@ -461,11 +513,18 @@ export class AddItemPage implements OnDestroy {
       this.setProcessingStep(2);
       const failures = result.results.filter((entry) => !entry.success);
 
+      const totalItemsCreated = result.results.reduce((count, r) => {
+        if (!r.success) return count;
+        return count + (r.items?.length || (r.item ? 1 : 0));
+      }, 0);
+
       if (!failures.length) {
         this.clearBatchSelection();
         void successFeedback();
         this.setProcessingStep(3);
-        await this.router.navigateByUrl('/tabs/wardrobe');
+        await this.router.navigate(['/tabs/wardrobe'], {
+          queryParams: { newlyAddedCount: totalItemsCreated }
+        });
         return;
       }
 
@@ -498,7 +557,7 @@ export class AddItemPage implements OnDestroy {
         .map((entry) => `${entry.fileName}: ${entry.error || 'Could not upload item. Try again.'}`)
         .join(' ');
       this.message = result.succeededCount > 0
-        ? `${result.succeededCount} item${result.succeededCount === 1 ? '' : 's'} added. ${result.failedCount} could not be uploaded. ${failureSummary}`
+        ? `${totalItemsCreated} garment${totalItemsCreated === 1 ? '' : 's'} added. ${result.failedCount} photo${result.failedCount === 1 ? '' : 's'} could not be uploaded. ${failureSummary}`
         : failureSummary || 'Could not upload photos. Try again.';
       this.uploadError = true;
       void warningFeedback();

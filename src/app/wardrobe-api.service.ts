@@ -6,8 +6,10 @@ import { AuthService } from './auth.service';
 import { DeviceImageCacheService } from './device-image-cache.service';
 import {
   AiUsageCostSummaryDto,
+  AnalyticsSummaryDto,
   BulkDeleteResponse,
   BatchWardrobeItemsResponse,
+  CreateWardrobeItemResponse,
   GeneratedOutfitDto,
   ImageGenerationStreamUpdate,
   OutfitDto,
@@ -85,12 +87,16 @@ export class WardrobeApiService {
     return this.normaliseItem(this.unwrapItemResponse(response));
   }
 
-  async createItem(image: Blob, fileName: string): Promise<WardrobeItemDto> {
+  async createItem(image: Blob, fileName: string): Promise<CreateWardrobeItemResponse> {
     const body = new FormData();
     body.append('image', image, fileName);
-    const response = await this.authorized(() => firstValueFrom(this.http.post<{ item: WardrobeItemDto }>(this.url('/api/wardrobe/items'), body, this.authOptions())));
+    const response = await this.authorized(() => firstValueFrom(this.http.post<{ item: WardrobeItemDto; items?: WardrobeItemDto[] }>(this.url('/api/wardrobe/items'), body, this.authOptions())));
     this.clearWardrobeCaches();
-    return this.normaliseItem(response.item);
+    const item = await this.normaliseItem(response.item);
+    const items = response.items?.length
+      ? await Promise.all(response.items.map((entry) => this.normaliseItem(entry)))
+      : [item];
+    return Object.assign(item, { items });
   }
 
   async createItems(images: File[]): Promise<BatchWardrobeItemsResponse> {
@@ -105,7 +111,10 @@ export class WardrobeApiService {
       ...response,
       results: await Promise.all(response.results.map(async (result) => ({
         ...result,
-        item: result.item ? await this.normaliseItem(result.item) : null
+        item: result.item ? await this.normaliseItem(result.item) : null,
+        items: result.items?.length
+          ? await Promise.all(result.items.map((i) => this.normaliseItem(i)))
+          : (result.item ? [await this.normaliseItem(result.item)] : null)
       })))
     };
   }
@@ -247,6 +256,10 @@ export class WardrobeApiService {
 
   async getAiUsageCostSummary(): Promise<AiUsageCostSummaryDto> {
     return this.authorized(() => firstValueFrom(this.http.get<AiUsageCostSummaryDto>(this.url('/api/usage/ai'), this.authOptions())));
+  }
+
+  async getAnalyticsSummary(): Promise<AnalyticsSummaryDto> {
+    return this.authorized(() => firstValueFrom(this.http.get<AnalyticsSummaryDto>(this.url('/api/analytics'), this.authOptions())));
   }
 
   private url(path: string): string {

@@ -373,6 +373,9 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 
   .manual-top-header {
     display: flex;
@@ -384,6 +387,17 @@
       font-size: 16px;
       font-weight: 650;
       color: var(--app-ink);
+    }
+  }
+
+  .ios-form-row {
+    background: var(--app-surface-muted);
+    border-radius: 10px;
+    padding: 6px 12px;
+    min-height: 44px;
+
+    &::after {
+      display: none;
     }
   }
 
@@ -399,13 +413,20 @@
 /* Anchor Modal */
 .anchor-modal-content {
   --background: var(--app-bg);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .anchor-picker-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
   padding: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 
   .anchor-pick-card {
     display: flex;
@@ -416,11 +437,20 @@
     border: 1px solid var(--app-border);
     background: var(--app-surface);
     cursor: pointer;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    transition: transform 120ms ease;
+
+    &:active {
+      transform: scale(0.97);
+    }
 
     img {
       width: 100%;
       aspect-ratio: 1 / 1.1;
       object-fit: contain;
+      border-radius: 8px;
     }
 
     .pick-meta {
@@ -428,15 +458,27 @@
       text-align: center;
       display: flex;
       flex-direction: column;
+      width: 100%;
+      min-width: 0;
 
       strong {
         font-size: 13px;
         color: var(--app-ink);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+        width: 100%;
       }
 
       span {
         font-size: 11px;
         color: var(--app-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+        width: 100%;
       }
     }
   }

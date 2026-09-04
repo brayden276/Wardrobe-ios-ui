@@ -462,10 +462,20 @@
 }
 
 /* iOS Sheet Modal Detail */
+ion-modal {
+  --border-radius: 24px 24px 0 0;
+  --background: var(--app-bg);
+  --max-width: 100%;
+}
+
 .sheet-modal-content {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
   background: var(--app-bg);
 }
 
@@ -475,14 +485,24 @@
   align-items: center;
   padding: 16px 20px 12px;
   border-bottom: 1px solid var(--app-border);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 
   .sheet-title-group {
+    flex: 1;
+    min-width: 0;
+    padding-right: 12px;
+
     h2 {
       margin: 0;
       font-size: 20px;
       font-weight: 700;
       color: var(--app-ink);
       letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .sheet-wear-badge {
@@ -494,24 +514,35 @@
   }
 
   .sheet-close-btn {
+    flex-shrink: 0;
     background: none;
     border: none;
     font-size: 26px;
     color: var(--app-muted);
     cursor: pointer;
     padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 
 .sheet-modal-scrollable {
   flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   padding: 18px 20px;
 }
 
 .sheet-hero-image {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   border-radius: 18px;
   overflow: hidden;
   margin-bottom: 18px;
@@ -519,6 +550,7 @@
 
   img {
     width: 100%;
+    max-width: 100%;
     height: 200px;
     object-fit: cover;
     display: block;
@@ -526,6 +558,9 @@
 }
 
 .sheet-section {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   margin-bottom: 22px;
 
   .sheet-section-heading {
@@ -545,6 +580,10 @@
   border: 1px solid var(--app-border);
   border-radius: 14px;
   padding: 14px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 
   .notes-icon {
     font-size: 18px;
@@ -558,6 +597,10 @@
     font-size: 14px;
     color: var(--app-ink);
     line-height: 1.45;
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 }
 
@@ -566,6 +609,9 @@
   border: 1px solid var(--app-border);
   border-radius: 16px;
   overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .garment-detail-row {
@@ -574,6 +620,10 @@
   gap: 14px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--app-border);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 
   &:last-child {
     border-bottom: none;
@@ -592,22 +642,34 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+    flex: 1;
+    min-width: 0;
 
     .garment-name {
       font-size: 15px;
       font-weight: 600;
       color: var(--app-ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .garment-sub {
       font-size: 12px;
       color: var(--app-muted);
       text-transform: capitalize;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   }
 }
 
 .sheet-modal-footer {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
   padding: 14px 20px calc(14px + var(--ion-safe-area-bottom));
   border-top: 1px solid var(--app-border);
   background: var(--app-surface);
@@ -633,6 +695,7 @@
 
     ion-icon {
       font-size: 20px;
+      flex-shrink: 0;
     }
 
     &:active {
@@ -643,9 +706,13 @@
   .sheet-footer-secondary {
     display: flex;
     gap: 10px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 
     button {
       flex: 1;
+      min-width: 0;
       min-height: 40px;
       border-radius: 12px;
       border: 1px solid var(--app-border);
@@ -657,9 +724,12 @@
       justify-content: center;
       gap: 6px;
       cursor: pointer;
+      white-space: nowrap;
+      padding: 0 8px;
 
       ion-icon {
         font-size: 16px;
+        flex-shrink: 0;
       }
 
       &.sheet-btn-secondary {

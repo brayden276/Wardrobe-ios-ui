@@ -252,6 +252,38 @@
       cursor: pointer;
     }
   }
+
+  .batch-thumb-add {
+    flex: 0 0 68px;
+    height: 82px;
+    border-radius: 12px;
+    border: 2px dashed var(--app-border);
+    background: var(--app-surface);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: var(--app-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    ion-icon {
+      font-size: 22px;
+    }
+
+    span {
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    &:active {
+      background: var(--app-surface-muted);
+      border-color: var(--app-olive);
+      color: var(--app-olive);
+      transform: scale(0.96);
+    }
+  }
 }
 
 /* Error Guidance Card */

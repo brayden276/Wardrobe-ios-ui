@@ -1,0 +1,270 @@
+<ion-content class="app-content" [fullscreen]="true">
+  <ion-refresher slot="fixed" (ionRefresh)="loadAnalytics($event)">
+    <ion-refresher-content pullingIcon="chevron-down-circle-outline" refreshingSpinner="crescent"></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="analytics-viewport">
+    <!-- Header -->
+    <header class="analytics-header">
+      <div class="header-top-row">
+        <div class="title-group">
+          <span class="ios-caption">TESTING SUITE</span>
+          <h1 class="ios-large-title">Analytics</h1>
+        </div>
+        <div class="header-actions">
+          <button type="button" class="header-icon-btn" (click)="loadAnalytics()" [disabled]="isLoading" aria-label="Refresh analytics">
+            <ion-icon name="refresh-outline" [class.spin]="isLoading"></ion-icon>
+          </button>
+          <button type="button" class="header-icon-btn" (click)="openSettings()" aria-label="Open Settings">
+            <ion-icon name="settings-outline"></ion-icon>
+          </button>
+        </div>
+      </div>
+
+      <!-- Scope Switcher: My Wardrobe vs Platform -->
+      <div class="ios-scope-segmented" role="tablist">
+        <button
+          type="button"
+          class="scope-tab"
+          [class.active]="scope === 'user'"
+          (click)="setScope('user')"
+          role="tab"
+          [attr.aria-selected]="scope === 'user'">
+          <ion-icon name="person-outline"></ion-icon>
+          <span>My Wardrobe</span>
+        </button>
+        <button
+          type="button"
+          class="scope-tab"
+          [class.active]="scope === 'platform'"
+          (click)="setScope('platform')"
+          role="tab"
+          [attr.aria-selected]="scope === 'platform'">
+          <ion-icon name="globe-outline"></ion-icon>
+          <span>Platform (Testing)</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Loading State -->
+    <div class="loading-panel" *ngIf="isLoading && !analytics">
+      <ion-spinner name="crescent"></ion-spinner>
+      <p>Gathering platform metrics & AI usage...</p>
+    </div>
+
+    <!-- Error State -->
+    <div class="error-card" *ngIf="error">
+      <ion-icon name="alert-circle-outline"></ion-icon>
+      <p>{{ error }}</p>
+      <button type="button" class="retry-btn" (click)="loadAnalytics()">Retry</button>
+    </div>
+
+    <ng-container *ngIf="analytics && currentCost && currentMetrics">
+      <!-- SECTION 1: Exact AI Cost Breakdown -->
+      <section class="ios-section">
+        <div class="ios-section-header">
+          <span>EXACT AI USAGE & COST</span>
+          <span class="rate-badge">USD</span>
+        </div>
+
+        <div class="ios-grouped-card hero-cost-card">
+          <div class="hero-cost-main">
+            <span class="cost-scope-label">{{ scope === 'user' ? 'My AI Spend' : 'Total Platform AI Spend' }}</span>
+            <div class="cost-amount-wrap">
+              <span class="cost-number">{{ formattedTotalCost }}</span>
+            </div>
+            <span class="cost-disclaimer">Computed with exact Gemini rate schedules</span>
+          </div>
+
+          <div class="cost-breakdown-table">
+            <div class="breakdown-row">
+              <div class="breakdown-col-info">
+                <div class="breakdown-dot classification-dot"></div>
+                <div class="breakdown-text">
+                  <span class="breakdown-name">Item Classification</span>
+                  <span class="breakdown-sub">{{ currentCost.classifications.count }} scans × {{ formatCurrency(currentCost.classifications.unitCostUsd, 3, 3) }}/item</span>
+                </div>
+              </div>
+              <span class="breakdown-val">{{ formatCurrency(currentCost.classifications.subtotalCostUsd) }}</span>
+            </div>
+
+            <div class="breakdown-row">
+              <div class="breakdown-col-info">
+                <div class="breakdown-dot search-dot"></div>
+                <div class="breakdown-text">
+                  <span class="breakdown-name">Outfit Search & Styling</span>
+                  <span class="breakdown-sub">{{ currentCost.outfitSearches.count }} queries × {{ formatCurrency(currentCost.outfitSearches.unitCostUsd, 3, 3) }}/query</span>
+                </div>
+              </div>
+              <span class="breakdown-val">{{ formatCurrency(currentCost.outfitSearches.subtotalCostUsd) }}</span>
+            </div>
+
+            <div class="breakdown-row">
+              <div class="breakdown-col-info">
+                <div class="breakdown-dot display-dot"></div>
+                <div class="breakdown-text">
+                  <span class="breakdown-name">Garment Display / Cutout</span>
+                  <span class="breakdown-sub">{{ currentCost.displayImages.count }} images × {{ formatCurrency(currentCost.displayImages.unitCostUsd, 3, 3) }}/img</span>
+                </div>
+              </div>
+              <span class="breakdown-val">{{ formatCurrency(currentCost.displayImages.subtotalCostUsd) }}</span>
+            </div>
+
+            <div class="breakdown-row">
+              <div class="breakdown-col-info">
+                <div class="breakdown-dot outfit-img-dot"></div>
+                <div class="breakdown-text">
+                  <span class="breakdown-name">Rendered Outfit Looks</span>
+                  <span class="breakdown-sub">{{ currentCost.outfitImages.count }} renders × {{ formatCurrency(currentCost.outfitImages.unitCostUsd, 3, 3) }}/render</span>
+                </div>
+              </div>
+              <span class="breakdown-val">{{ formatCurrency(currentCost.outfitImages.subtotalCostUsd) }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: Wardrobe & Inventory Metrics -->
+      <section class="ios-section">
+        <div class="ios-section-header">
+          <span>{{ scope === 'user' ? 'MY WARDROBE METRICS' : 'PLATFORM INVENTORY METRICS' }}</span>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <span class="metric-value">{{ currentMetrics.totalItems }}</span>
+            <span class="metric-title">Total Items</span>
+            <span class="metric-sub">{{ currentMetrics.activeItems }} active · {{ currentMetrics.archivedItems }} archived</span>
+          </div>
+
+          <div class="metric-card">
+            <span class="metric-value">{{ currentMetrics.totalOutfits }}</span>
+            <span class="metric-title">Outfits Saved</span>
+            <span class="metric-sub">{{ currentMetrics.outfitsWithImages }} with generated image</span>
+          </div>
+
+          <div class="metric-card">
+            <span class="metric-value">{{ currentMetrics.totalWearCount }}</span>
+            <span class="metric-title">Wear Events</span>
+            <span class="metric-sub">Logged wear history</span>
+          </div>
+
+          <div class="metric-card">
+            <span class="metric-value">{{ avgCostPerItem }}</span>
+            <span class="metric-title">Avg Cost / Item</span>
+            <span class="metric-sub">{{ avgCostPerOutfit }} / outfit</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 3: Category Distribution -->
+      <section class="ios-section" *ngIf="categoryList.length > 0">
+        <div class="ios-section-header">
+          <span>ITEMS BY CATEGORY</span>
+          <span class="section-sub">{{ categoryList.length }} categories</span>
+        </div>
+
+        <div class="ios-grouped-card">
+          <div class="distribution-row" *ngFor="let cat of categoryList">
+            <div class="distribution-header">
+              <span class="cat-label">{{ cat.label }}</span>
+              <span class="cat-count">{{ cat.count }} <small>({{ cat.percentage }}%)</small></span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" [style.width.%]="cat.percentage"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 4: Colour Distribution -->
+      <section class="ios-section" *ngIf="colourList.length > 0">
+        <div class="ios-section-header">
+          <span>COLOUR PALETTE DISTRIBUTION</span>
+        </div>
+
+        <div class="ios-grouped-card colour-card">
+          <div class="colour-chips-wrap">
+            <div class="colour-chip" *ngFor="let col of colourList">
+              <span class="colour-chip-dot" [attr.data-colour]="col.id"></span>
+              <span class="colour-chip-name">{{ col.label }}</span>
+              <span class="colour-chip-count">{{ col.count }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 5: Top Worn Pieces -->
+      <section class="ios-section" *ngIf="currentMetrics.topWornItems && currentMetrics.topWornItems.length > 0">
+        <div class="ios-section-header">
+          <span>MOST WORN ITEMS</span>
+        </div>
+
+        <div class="ios-grouped-card">
+          <div class="top-worn-row" *ngFor="let item of currentMetrics.topWornItems">
+            <div class="item-thumb-box">
+              <img *ngIf="item.thumbnailUrl" [src]="item.thumbnailUrl" alt="{{ item.name }}" />
+              <ion-icon *ngIf="!item.thumbnailUrl" name="shirt-outline"></ion-icon>
+            </div>
+            <div class="item-meta">
+              <span class="item-name">{{ item.name }}</span>
+              <span class="item-cat">{{ formatCategoryLabel(item.categoryId) }}</span>
+            </div>
+            <div class="wear-pill">
+              <ion-icon name="repeat-outline"></ion-icon>
+              <span>{{ item.wearCount }} {{ item.wearCount === 1 ? 'wear' : 'wears' }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 6: Platform Telemetry & Diagnostics -->
+      <section class="ios-section">
+        <div class="ios-section-header">
+          <span>PLATFORM DIAGNOSTICS & SYSTEM</span>
+          <span class="status-indicator-pill online">
+            <span class="indicator-dot"></span> LIVE
+          </span>
+        </div>
+
+        <div class="ios-grouped-card">
+          <div class="ios-table-row">
+            <span class="row-label">Testing Users Registered</span>
+            <span class="row-value">{{ analytics.platformTelemetry.totalUsers }}</span>
+          </div>
+          <div class="ios-table-row">
+            <span class="row-label">Platform Items Total</span>
+            <span class="row-value">{{ analytics.platformTelemetry.totalPlatformItems }} items</span>
+          </div>
+          <div class="ios-table-row">
+            <span class="row-label">Platform Outfits Total</span>
+            <span class="row-value">{{ analytics.platformTelemetry.totalPlatformOutfits }} outfits</span>
+          </div>
+          <div class="ios-table-row">
+            <span class="row-label">Cloud Images Stored</span>
+            <span class="row-value">{{ analytics.platformTelemetry.totalPlatformImages }} assets</span>
+          </div>
+          <div class="ios-table-row">
+            <span class="row-label">Persistence Engine</span>
+            <span class="row-value highlight">{{ analytics.platformTelemetry.databaseMode }}</span>
+          </div>
+          <div class="ios-table-row">
+            <span class="row-label">Text & Classification Model</span>
+            <span class="row-value code">{{ analytics.platformTelemetry.modelTier }}</span>
+          </div>
+          <div class="ios-table-row">
+            <span class="row-label">Image Generation Model</span>
+            <span class="row-value code">{{ analytics.platformTelemetry.imageModelTier }}</span>
+          </div>
+          <div class="ios-table-row" *ngIf="pingLatencyMs !== null">
+            <span class="row-label">API Health Latency</span>
+            <span class="row-value latency">{{ pingLatencyMs }} ms</span>
+          </div>
+        </div>
+        <p class="ios-section-footer center" *ngIf="lastRefreshedLabel">
+          Last updated at {{ lastRefreshedLabel }}. Pull to refresh live testing data.
+        </p>
+      </section>
+    </ng-container>
+  </div>
+</ion-content>

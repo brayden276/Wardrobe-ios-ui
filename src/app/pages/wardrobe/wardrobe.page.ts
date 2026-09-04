@@ -1,5 +1,5 @@
 import { AfterViewChecked, AfterViewInit, Component, ElementRef, HostListener, NgZone, OnDestroy, ViewChild, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { ActionSheetController, AlertController, IonContent, ToastController } from '@ionic/angular';
 import { ImageGenerationStreamUpdate, LookupOptionDto, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
 import { ImageGenerationStatusStream, WardrobeApiService } from '../../wardrobe-api.service';
@@ -35,6 +35,7 @@ interface WardrobeItemCard {
 export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy {
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly alertController = inject(AlertController);
   private readonly actionSheetController = inject(ActionSheetController);
   private readonly toastController = inject(ToastController);
@@ -180,6 +181,25 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
     if (this.hasItemImageGenerationInProgress()) {
       this.startImageGenerationStreaming();
     }
+
+    const newlyAddedParam = this.route.snapshot.queryParamMap.get('newlyAddedCount');
+    if (newlyAddedParam) {
+      const count = parseInt(newlyAddedParam, 10);
+      if (count > 0) {
+        void this.showNewlyAddedToast(count);
+        void this.router.navigate([], { queryParams: {}, replaceUrl: true });
+      }
+    }
+  }
+
+  private async showNewlyAddedToast(count: number): Promise<void> {
+    const toast = await this.toastController.create({
+      message: count === 1 ? '✨ 1 garment added to your wardrobe' : `✨ ${count} garments added from your photo`,
+      duration: 3000,
+      position: 'bottom',
+      color: 'dark'
+    });
+    await toast.present();
   }
 
   ionViewWillLeave(): void {

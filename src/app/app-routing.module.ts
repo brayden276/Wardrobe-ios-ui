@@ -4,6 +4,7 @@ import { inject } from '@angular/core';
 import { AuthService } from './auth.service';
 import {
   AddItemPage,
+  AnalyticsPage,
   BuilderPage,
   ItemDetailPage,
   LoginPage,
@@ -63,6 +64,7 @@ const routes: Routes = [
       { path: 'add', children: [{ path: '', component: AddItemPage }] },
       { path: 'outfits', children: [{ path: '', component: OutfitsPage }] },
       { path: 'builder', children: [{ path: '', component: BuilderPage }] },
+      { path: 'analytics', children: [{ path: '', component: AnalyticsPage }] },
       { path: 'settings', children: [{ path: '', component: SettingsPage }] },
       { path: '', redirectTo: 'wardrobe', pathMatch: 'full' }
     ]

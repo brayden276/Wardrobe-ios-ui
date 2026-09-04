@@ -148,6 +148,7 @@ ion-tab-button[aria-selected="true"] ion-icon {
   margin: 0 auto;
   padding: calc(var(--ion-safe-area-top) + 20px) 18px calc(96px + var(--ion-safe-area-bottom));
   box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .page-workspace {
@@ -1729,6 +1730,356 @@ ion-select.field {
   z-index: 2;
 }
 
+/* ==========================================================================
+   Global iOS Modal System & Constraints
+   ========================================================================== */
+
+ion-modal {
+  --background: var(--app-bg);
+  --border-radius: 24px 24px 0 0;
+  --max-width: 100%;
+}
+
+ion-modal::part(content) {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  border-radius: 24px 24px 0 0;
+}
+
+ion-modal::part(backdrop) {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+ion-modal ion-content {
+  --background: var(--app-bg);
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+ion-modal ion-content::part(scroll) {
+  overflow-x: hidden;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.modal-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  min-height: 52px;
+  padding: 0 16px;
+  border-bottom: 0.5px solid var(--app-border);
+  background: var(--app-surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+
+  .modal-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--app-ink);
+    text-align: center;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin: 0 8px;
+  }
+
+  .text-btn {
+    border: none;
+    background: transparent;
+    font-size: 16px;
+    color: var(--app-muted);
+    cursor: pointer;
+    padding: 6px 4px;
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 150ms ease;
+
+    &:active {
+      opacity: 0.6;
+    }
+
+    &.primary {
+      color: var(--app-olive);
+      font-weight: 600;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+
+  .header-action-spacer {
+    min-width: 44px;
+    height: 1px;
+    visibility: hidden;
+  }
+}
+
+/* ==========================================================================
+   Global iOS Inset Grouped System
+   ========================================================================== */
+
+.ios-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.ios-section-header,
+.section-title,
+.specs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--app-muted);
+
+  .section-action-btn {
+    border: none;
+    background: transparent;
+    color: var(--app-olive);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: none;
+  }
+}
+
+.ios-section-footer {
+  margin: 4px 16px 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--app-muted);
+
+  &.center {
+    text-align: center;
+  }
+}
+
+.ios-grouped-card {
+  border-radius: 14px;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(36, 31, 26, 0.04);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.ios-table-row,
+.ios-form-row,
+.ios-action-row,
+.ios-link-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 10px 16px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+
+  &:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 16px;
+    right: 0;
+    height: 0.5px;
+    background: var(--app-border);
+  }
+}
+
+.row-label {
+  font-size: 15px;
+  color: var(--app-ink);
+  flex-shrink: 0;
+  margin-right: 12px;
+}
+
+.row-value {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--app-muted);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  .row-subtext {
+    font-size: 12px;
+    color: var(--app-muted);
+  }
+}
+
+.row-action-link {
+  border: none;
+  background: transparent;
+  color: var(--app-danger);
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.swatch-val-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  .colour-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid var(--app-border-strong);
+    flex-shrink: 0;
+  }
+}
+
+.ios-select {
+  --padding-start: 0;
+  --padding-end: 0;
+  font-size: 15px;
+  color: var(--app-olive);
+  font-weight: 600;
+  max-width: 65%;
+  text-align: right;
+}
+
+.ios-name-input {
+  --padding-start: 0;
+  --padding-end: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--app-ink);
+  width: 100%;
+}
+
+.ios-form-row:has(.row-label) .ios-name-input {
+  text-align: right;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.ios-action-row {
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 150ms ease;
+
+  &:active {
+    background: var(--app-surface-pressed);
+  }
+
+  .action-label {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--app-ink);
+  }
+
+  .action-icon {
+    font-size: 18px;
+    color: var(--app-muted);
+  }
+
+  &.centered {
+    justify-content: center;
+
+    .action-label {
+      color: var(--app-olive);
+      font-weight: 600;
+    }
+  }
+
+  &.destructive .action-label {
+    color: var(--app-danger);
+    font-weight: 600;
+  }
+}
+
+.ios-link-row {
+  text-decoration: none;
+  color: inherit;
+
+  &:active {
+    background: var(--app-surface-pressed);
+  }
+
+  .link-label {
+    font-size: 15px;
+    color: var(--app-ink);
+  }
+
+  .link-icon {
+    font-size: 16px;
+    color: var(--app-muted);
+  }
+}
+
+/* ==========================================================================
+   Global Controls: Toggle, Action Sheet, Alert, Toast, Spinner
+   ========================================================================== */
+
+ion-toggle {
+  --track-background-checked: var(--app-olive);
+  --handle-background-checked: #ffffff;
+}
+
+ion-spinner {
+  --color: var(--app-olive);
+}
+
+ion-action-sheet {
+  --background: rgba(255, 250, 243, 0.95);
+  --button-color: var(--app-ink);
+  --button-color-destructive: var(--app-danger);
+}
+
+ion-alert {
+  --background: var(--app-surface);
+  --backdrop-opacity: 0.4;
+}
+
+ion-toast.ios-toast {
+  --background: rgba(36, 31, 26, 0.92);
+  --color: #ffffff;
+  --border-radius: 999px;
+  --box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15);
+  text-align: center;
+}
+
 @media (min-width: 700px) {
   .screen {
     padding-right: 24px;
@@ -1822,7 +2173,24 @@ ion-select.field {
     --color: #f5ede4;
   }
 
+  .modal-nav-bar {
+    background: rgba(36, 32, 27, 0.95);
+    border-bottom-color: rgba(245, 237, 228, 0.14);
+  }
+
   ion-modal {
+    --background: #181512;
+  }
+
+  ion-modal::part(content) {
+    background: #181512;
+  }
+
+  ion-modal::part(backdrop) {
+    background: rgba(0, 0, 0, 0.65);
+  }
+
+  ion-modal ion-content {
     --background: #181512;
   }
 
@@ -1830,6 +2198,11 @@ ion-select.field {
     --background: rgba(36, 32, 27, 0.95);
     --button-color: #f5ede4;
     --button-color-destructive: #e26f66;
+  }
+
+  ion-alert {
+    --background: rgba(44, 39, 34, 0.95);
+    --backdrop-opacity: 0.6;
   }
 
   ion-toast.ios-toast {
