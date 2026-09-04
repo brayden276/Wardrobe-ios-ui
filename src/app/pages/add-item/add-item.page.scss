@@ -18,46 +18,47 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 4 / 4.2;
-  border: 2px dashed var(--app-border-strong);
-  border-radius: 24px;
+  aspect-ratio: 4 / 3.8;
+  border: 1px dashed var(--app-border-strong);
+  border-radius: var(--app-radius-lg);
   background: var(--app-surface);
   padding: 24px;
   text-align: center;
   cursor: pointer;
-  transition: transform 180ms ease, border-color 180ms ease;
+  transition: border-color 150ms ease;
 
   &:active {
-    transform: scale(0.98);
     border-color: var(--app-olive);
   }
 
   .viewfinder-icon-pulse {
-    width: 68px;
-    height: 68px;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
-    background: rgba(91, 96, 64, 0.12);
+    background: var(--app-surface-muted);
     display: grid;
     place-items: center;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
 
     ion-icon {
-      font-size: 32px;
+      font-size: 26px;
       color: var(--app-olive);
     }
   }
 
   h2 {
-    font-size: 20px;
-    font-weight: 650;
-    margin: 0 0 6px;
+    font-family: var(--app-heading-font);
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+    margin: 0 0 4px;
     color: var(--app-ink);
   }
 
   .guide-chips {
     display: flex;
     gap: 6px;
-    margin-top: 16px;
+    margin-top: 14px;
     flex-wrap: wrap;
     justify-content: center;
 
@@ -66,8 +67,8 @@
       font-weight: 500;
       color: var(--app-muted);
       background: var(--app-surface-muted);
-      padding: 4px 9px;
-      border-radius: 12px;
+      padding: 4px 10px;
+      border-radius: var(--app-radius-pill);
     }
   }
 }
@@ -76,13 +77,13 @@
 .quick-action-row {
   display: flex;
   gap: 10px;
-  margin-top: 14px;
+  margin-top: 12px;
   width: 100%;
 
   .flex-1 {
     flex: 1;
     margin: 0;
-    height: 48px;
+    min-height: 46px;
     font-size: 15px;
     font-weight: 600;
   }
@@ -94,26 +95,31 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin: 16px auto 0;
-  padding: 6px 14px;
-  border-radius: 999px;
+  margin: 14px auto 0;
+  padding: 5px 12px;
+  border-radius: var(--app-radius-pill);
   background: var(--app-surface-muted);
-  color: var(--app-olive);
+  color: var(--app-muted);
   font-size: 12px;
-  font-weight: 550;
+  font-weight: 500;
   text-align: center;
+
+  ion-icon {
+    font-size: 14px;
+    color: var(--app-olive);
+  }
 }
 
 /* Photo Stage Card */
 .photo-stage-card {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 4.6;
-  border-radius: 22px;
+  aspect-ratio: 4 / 4.4;
+  border-radius: var(--app-radius-lg);
   overflow: hidden;
   background: var(--app-stage-bg);
   box-shadow: var(--app-stage-shadow);
-  border: 1px solid var(--app-border);
+  border: 0.5px solid var(--app-border);
   display: grid;
   place-items: center;
 
@@ -125,21 +131,19 @@
   }
 
   &.is-scanning {
-    box-shadow: 0 0 24px rgba(91, 96, 64, 0.3);
+    box-shadow: var(--app-shadow);
   }
 
   .retake-button {
     position: absolute;
     top: 12px;
     right: 12px;
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
-    border: none;
-    background: rgba(36, 31, 26, 0.55);
-    color: #fff;
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+    border: 0.5px solid var(--app-border);
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--app-ink);
     display: grid;
     place-items: center;
     font-size: 18px;
@@ -147,7 +151,14 @@
   }
 }
 
-/* Laser Scanner Animation */
+@media (prefers-color-scheme: dark) {
+  .photo-stage-card .retake-button {
+    background: rgba(35, 32, 28, 0.92);
+    color: var(--app-ink);
+  }
+}
+
+/* Subtle Apple-style scan sweep line */
 .laser-scanner {
   position: absolute;
   inset: 0;
@@ -158,28 +169,20 @@
     position: absolute;
     left: 0;
     right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, transparent, #8ea06a 20%, #ffffff 50%, #8ea06a 80%, transparent);
-    box-shadow: 0 0 14px #8ea06a, 0 0 28px #5b6040;
-    animation: scanBeam 2.2s ease-in-out infinite alternate;
+    height: 1px;
+    background: var(--app-olive);
+    opacity: 0.5;
+    animation: scanBeam 2.4s ease-in-out infinite alternate;
   }
 
   .laser-glow {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(91, 96, 64, 0.12) 0%, transparent 40%);
-    animation: pulseAura 2.2s ease-in-out infinite alternate;
+    display: none;
   }
 }
 
 @keyframes scanBeam {
-  0% { top: 4%; }
+  0% { top: 6%; }
   100% { top: 94%; }
-}
-
-@keyframes pulseAura {
-  0% { opacity: 0.3; }
-  100% { opacity: 0.8; }
 }
 
 /* Scanning Floating Status Pill */
@@ -189,20 +192,20 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
-  border-radius: 999px;
+  padding: 7px 14px;
+  border-radius: var(--app-radius-pill);
   background: var(--app-header-bg);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--app-border);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border: 0.5px solid var(--app-border);
+  box-shadow: var(--app-shadow);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 550;
   color: var(--app-ink);
 
   ion-spinner {
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
     color: var(--app-olive);
   }
 }
@@ -221,10 +224,10 @@
 
   .batch-thumb {
     position: relative;
-    flex: 0 0 68px;
-    height: 82px;
-    border-radius: 12px;
-    border: 2px solid var(--app-border);
+    flex: 0 0 64px;
+    height: 76px;
+    border-radius: var(--app-radius-sm);
+    border: 1.5px solid var(--app-border);
     overflow: hidden;
     background: var(--app-stage-bg);
     cursor: pointer;
@@ -254,34 +257,33 @@
   }
 
   .batch-thumb-add {
-    flex: 0 0 68px;
-    height: 82px;
-    border-radius: 12px;
-    border: 2px dashed var(--app-border);
+    flex: 0 0 64px;
+    height: 76px;
+    border-radius: var(--app-radius-sm);
+    border: 1px dashed var(--app-border-strong);
     background: var(--app-surface);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 3px;
     color: var(--app-muted);
     cursor: pointer;
     transition: all 0.15s ease;
 
     ion-icon {
-      font-size: 22px;
+      font-size: 20px;
     }
 
     span {
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 550;
     }
 
     &:active {
       background: var(--app-surface-muted);
       border-color: var(--app-olive);
       color: var(--app-olive);
-      transform: scale(0.96);
     }
   }
 }
@@ -291,13 +293,13 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  border-radius: 14px;
+  padding: 12px 14px;
+  border-radius: var(--app-radius-md);
   background: var(--app-danger-bg);
-  border: 1px solid rgba(138, 48, 42, 0.2);
+  border: 0.5px solid rgba(158, 50, 42, 0.2);
 
   ion-icon {
-    font-size: 24px;
+    font-size: 22px;
     color: var(--app-danger);
     flex-shrink: 0;
   }
@@ -329,10 +331,5 @@
 
   ion-button {
     margin: 0;
-    height: 50px;
-    font-size: 16px;
-    font-weight: 600;
-    --border-radius: 14px;
-    --box-shadow: 0 4px 14px rgba(91, 96, 64, 0.3);
   }
 }

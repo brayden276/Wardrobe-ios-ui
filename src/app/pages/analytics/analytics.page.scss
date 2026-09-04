@@ -31,8 +31,8 @@
 
 .ios-caption {
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.8px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
   color: var(--app-olive);
   text-transform: uppercase;
 }
@@ -40,9 +40,9 @@
 .ios-large-title {
   margin: 0;
   font-family: var(--app-heading-font);
-  font-size: 34px;
+  font-size: 28px;
   font-weight: 700;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.3px;
   color: var(--app-ink);
 }
 
@@ -55,18 +55,17 @@
 .header-icon-btn {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  border: 1px solid var(--app-border);
+  border: 0.5px solid var(--app-border);
   background: var(--app-surface);
   color: var(--app-ink);
-  font-size: 20px;
+  font-size: 18px;
   cursor: pointer;
-  transition: transform 0.15s ease, background 0.15s ease;
+  transition: background 0.15s ease;
 
   &:active {
-    transform: scale(0.92);
     background: var(--app-surface-pressed);
   }
 
@@ -83,11 +82,11 @@
 /* iOS Scope Segmented Control */
 .ios-scope-segmented {
   display: flex;
-  padding: 4px;
-  border-radius: 12px;
+  padding: 3px;
+  border-radius: var(--app-radius-md);
   background: var(--app-segment-bg);
-  border: 1px solid var(--app-border);
-  gap: 4px;
+  border: 0.5px solid var(--app-border);
+  gap: 3px;
 }
 
 .scope-tab {
@@ -95,25 +94,26 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 38px;
+  gap: 6px;
+  min-height: 34px;
   border-radius: 9px;
   border: none;
   background: transparent;
   color: var(--app-muted);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 550;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.18s ease;
 
   ion-icon {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   &.active {
     background: var(--app-surface);
     color: var(--app-ink);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--app-shadow-subtle);
+    font-weight: 600;
   }
 }
 
@@ -133,16 +133,16 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 18px;
-  border-radius: 14px;
+  padding: 12px 16px;
+  border-radius: var(--app-radius-md);
   background: var(--app-danger-bg);
-  border: 1px solid var(--app-danger);
+  border: 0.5px solid var(--app-danger);
   color: var(--app-danger);
 
   p {
     margin: 0;
     flex: 1;
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .retry-btn {
@@ -150,7 +150,7 @@
     background: var(--app-danger);
     color: #fff;
     padding: 6px 14px;
-    border-radius: 8px;
+    border-radius: var(--app-radius-xs);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -161,7 +161,7 @@
 .ios-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .ios-section-header {
@@ -169,19 +169,19 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   text-transform: uppercase;
   color: var(--app-muted);
 
   .rate-badge {
-    padding: 2px 7px;
-    border-radius: 6px;
+    padding: 2px 6px;
+    border-radius: 4px;
     background: var(--app-surface-muted);
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--app-olive);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--app-muted);
   }
 
   .section-sub {
@@ -193,11 +193,11 @@
 }
 
 .ios-grouped-card {
-  border-radius: 16px;
-  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  border: 0.5px solid var(--app-border);
   background: var(--app-surface);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(36, 31, 26, 0.04);
+  box-shadow: var(--app-shadow-subtle);
 }
 
 /* Hero Cost Card */
@@ -211,31 +211,32 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 26px 20px 22px;
-  background: linear-gradient(180deg, rgba(91, 96, 64, 0.08) 0%, transparent 100%);
-  border-bottom: 1px solid var(--app-border);
+  padding: 22px 18px 18px;
+  background: var(--app-surface);
+  border-bottom: 0.5px solid var(--app-border);
   text-align: center;
 }
 
 .cost-scope-label {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
   text-transform: uppercase;
   color: var(--app-muted);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .cost-amount-wrap {
-  margin: 4px 0 6px;
+  margin: 2px 0 4px;
 }
 
 .cost-number {
   font-family: var(--app-heading-font);
-  font-size: 42px;
-  font-weight: 800;
-  letter-spacing: -1px;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
   color: var(--app-olive);
+  font-variant-numeric: tabular-nums;
 }
 
 .cost-disclaimer {
@@ -253,7 +254,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 18px;
+  padding: 10px 16px;
   border-bottom: 0.5px solid var(--app-border);
 
   &:last-child {
@@ -264,30 +265,30 @@
 .breakdown-col-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .breakdown-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 
-  &.classification-dot { background: #4a90e2; }
-  &.search-dot { background: #8e44ad; }
-  &.display-dot { background: #e67e22; }
-  &.outfit-img-dot { background: #27ae60; }
+  &.classification-dot { background: var(--app-olive); }
+  &.search-dot { background: #6d7a5b; }
+  &.display-dot { background: #8e9a7e; }
+  &.outfit-img-dot { background: #b0bca0; }
 }
 
 .breakdown-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .breakdown-name {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 550;
   color: var(--app-ink);
 }
 
@@ -298,7 +299,7 @@
 
 .breakdown-val {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--app-ink);
   font-variant-numeric: tabular-nums;
 }
@@ -307,39 +308,40 @@
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 10px;
 }
 
 .metric-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 16px;
-  border-radius: 14px;
+  gap: 3px;
+  padding: 14px;
+  border-radius: var(--app-radius-md);
   background: var(--app-surface);
-  border: 1px solid var(--app-border);
-  box-shadow: 0 1px 3px rgba(36, 31, 26, 0.04);
+  border: 0.5px solid var(--app-border);
+  box-shadow: var(--app-shadow-subtle);
 }
 
 .metric-value {
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--app-ink);
-  letter-spacing: -0.5px;
+  letter-spacing: -0.3px;
+  font-variant-numeric: tabular-nums;
 }
 
 .metric-title {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--app-muted);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.4px;
 }
 
 .metric-sub {
   font-size: 11px;
   color: var(--app-muted);
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 /* Category Distribution Bars */
@@ -376,46 +378,46 @@
 
 .progress-bar-bg {
   width: 100%;
-  height: 8px;
-  border-radius: 4px;
+  height: 6px;
+  border-radius: 3px;
   background: var(--app-surface-muted);
   overflow: hidden;
 }
 
 .progress-bar-fill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: 3px;
   background: var(--app-olive);
   transition: width 0.4s ease;
 }
 
 /* Colour Chips */
 .colour-card {
-  padding: 16px;
+  padding: 14px 16px;
 }
 
 .colour-chips-wrap {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 7px;
 }
 
 .colour-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 10px;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--app-radius-pill);
   background: var(--app-surface-muted);
-  border: 1px solid var(--app-border);
-  font-size: 13px;
+  border: 0.5px solid var(--app-border);
+  font-size: 12px;
 }
 
 .colour-chip-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.12);
   background: #999;
 
   &[data-colour="black"] { background: #1c1c1e; }
@@ -439,7 +441,7 @@
 }
 
 .colour-chip-count {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--app-muted);
 }
 
@@ -459,9 +461,9 @@
 .item-thumb-box {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--app-radius-xs);
   overflow: hidden;
   background: var(--app-surface-muted);
   flex-shrink: 0;
@@ -473,7 +475,7 @@
   }
 
   ion-icon {
-    font-size: 22px;
+    font-size: 20px;
     color: var(--app-muted);
   }
 }
@@ -481,13 +483,13 @@
 .item-meta {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   flex: 1;
   min-width: 0;
 
   .item-name {
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 550;
     color: var(--app-ink);
     white-space: nowrap;
     overflow: hidden;
@@ -503,16 +505,16 @@
 .wear-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
-  border-radius: 12px;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--app-radius-pill);
   background: var(--app-surface-muted);
   color: var(--app-olive);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
 
   ion-icon {
-    font-size: 14px;
+    font-size: 13px;
   }
 }
 

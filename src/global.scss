@@ -10,24 +10,31 @@
   color-scheme: light;
   --app-bg: #f7efe6;
   --app-surface: #fffaf3;
-  --app-header-bg: rgba(255, 250, 243, 0.88);
-  --app-ink: #241f1a;
-  --app-muted: #5c5246;
-  --app-border: rgba(61, 49, 40, 0.13);
-  --app-border-strong: rgba(61, 49, 40, 0.22);
-  --app-surface-muted: #f1e7db;
-  --app-surface-pressed: #f3eadf;
+  --app-header-bg: rgba(255, 250, 243, 0.92);
+  --app-ink: #1f1b16;
+  --app-muted: #6a6256;
+  --app-border: rgba(60, 48, 38, 0.09);
+  --app-border-strong: rgba(60, 48, 38, 0.16);
+  --app-surface-muted: #efe5d8;
+  --app-surface-pressed: #ebdccf;
   --app-stage-bg: #ffffff;
-  --app-stage-shadow: 0 4px 16px rgba(36, 31, 26, 0.08);
-  --app-danger: #8a302a;
-  --app-danger-bg: #fff4f1;
-  --app-olive: #5b6040;
-  --app-olive-pressed: #4b5035;
-  --app-taupe: #b9aa96;
-  --app-shadow: 0 3px 10px rgba(36, 31, 26, 0.08);
-  --app-segment-bg: rgba(61, 49, 40, 0.08);
+  --app-stage-shadow: 0 2px 8px rgba(36, 31, 26, 0.04);
+  --app-danger: #9e322a;
+  --app-danger-bg: #faeceb;
+  --app-olive: #535a3b;
+  --app-olive-pressed: #444a30;
+  --app-taupe: #b2a492;
+  --app-shadow: 0 2px 8px rgba(36, 31, 26, 0.05);
+  --app-shadow-subtle: 0 1px 2px rgba(36, 31, 26, 0.03);
+  --app-segment-bg: rgba(60, 48, 38, 0.06);
   --app-segment-thumb: #ffffff;
-  --app-heading-font: Optima, "Iowan Old Style", Georgia, serif;
+  --app-heading-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", -apple-system-body, "Helvetica Neue", system-ui, sans-serif;
+  --app-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", -apple-system-body, "Helvetica Neue", system-ui, sans-serif;
+  --app-radius-xs: 6px;
+  --app-radius-sm: 8px;
+  --app-radius-md: 12px;
+  --app-radius-lg: 16px;
+  --app-radius-pill: 999px;
 }
 
 :focus-visible {
@@ -77,6 +84,7 @@ ion-router-outlet,
 
 body {
   font-size: 15px;
+  font-family: var(--app-font);
 }
 
 ion-content.app-content {
@@ -99,14 +107,13 @@ ion-toolbar {
 }
 
 ion-tab-bar {
-  --background: rgba(255, 250, 243, 0.88);
+  --background: rgba(255, 250, 243, 0.92);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
   --border: none;
   border-top: 0.5px solid var(--app-border);
-  height: calc(52px + var(--ion-safe-area-bottom));
+  height: calc(50px + var(--ion-safe-area-bottom));
   padding: 2px 4px var(--ion-safe-area-bottom);
-  box-shadow: 0 -1px 4px rgba(36, 31, 26, 0.03);
 }
 
 ion-tab-button {
@@ -122,7 +129,7 @@ ion-tab-button {
 }
 
 ion-tab-button ion-icon {
-  font-size: 24px;
+  font-size: 22px;
   margin-bottom: 2px;
 }
 
@@ -187,20 +194,25 @@ ion-tab-button[aria-selected="true"] ion-icon {
 }
 
 .page-header h1,
-.nav-header h1,
 .plain-title {
   margin: 0;
   color: var(--app-ink);
   font-family: var(--app-heading-font);
-  font-size: 31px;
-  font-weight: 500;
-  letter-spacing: 0;
-  line-height: 1;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  line-height: 1.15;
 }
 
 .nav-header h1 {
+  margin: 0;
+  color: var(--app-ink);
+  font-family: var(--app-heading-font);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
   text-align: center;
-  font-size: 23px;
+  line-height: 1.2;
 }
 
 .page-title-stack {
@@ -310,31 +322,34 @@ ion-searchbar.wardrobe-search {
 .chip {
   flex: 0 1 auto;
   max-width: 100%;
-  border: 1px solid var(--app-border);
-  border-radius: 10px;
-  background: rgba(255, 250, 243, 0.74);
-  color: #4f4439;
-  min-height: 44px;
-  padding: 7px 11px;
+  border: 0.5px solid var(--app-border);
+  border-radius: var(--app-radius-pill);
+  background: var(--app-surface);
+  color: var(--app-muted);
+  min-height: 36px;
+  padding: 6px 13px;
   display: inline-flex;
   align-items: center;
   font: inherit;
   font-size: 13px;
+  font-weight: 550;
   overflow-wrap: anywhere;
   text-align: left;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
 }
 
 .chip.active {
   border-color: var(--app-olive);
   background: var(--app-olive);
-  color: #fffaf3;
+  color: #ffffff;
 }
 
 .panel,
 .outfit-card {
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
-  background: rgba(255, 250, 243, 0.9);
+  border: 0.5px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-subtle);
 }
 
 .panel {
@@ -348,13 +363,13 @@ ion-searchbar.wardrobe-search {
 }
 
 .state-panel--success {
-  border-color: rgba(91, 96, 64, 0.24);
-  background: rgba(245, 250, 237, 0.92);
+  border-color: rgba(83, 90, 59, 0.2);
+  background: #f3f6ee;
 }
 
 .state-panel--error,
 .state-panel--offline {
-  border-color: rgba(138, 48, 42, 0.24);
+  border-color: rgba(158, 50, 42, 0.2);
   background: var(--app-danger-bg);
 }
 
@@ -654,39 +669,56 @@ ion-searchbar.wardrobe-search {
 .primary-button,
 .taupe-button,
 .secondary-button,
-.quiet-button {
-  min-height: 44px;
+.quiet-button,
+.ios-primary-button {
+  min-height: 46px;
   text-transform: none;
+  font-weight: 600;
+  letter-spacing: -0.1px;
 }
 
-.primary-button {
+.primary-button,
+.ios-primary-button {
   --background: var(--app-olive);
   --background-activated: var(--app-olive-pressed);
-  --border-radius: 12px;
+  --background-focused: var(--app-olive-pressed);
+  --background-hover: var(--app-olive-pressed);
+  --border-radius: var(--app-radius-md);
   --box-shadow: none;
-  --color: #fffaf3;
+  --color: #ffffff;
+  font-size: 15px;
 }
 
 .olive-button {
-  --background: #696d45;
+  --background: var(--app-olive);
 }
 
 .taupe-button {
   --background: var(--app-taupe);
-  --background-activated: #a99780;
-  --border-radius: 12px;
+  --background-activated: #a09280;
+  --border-radius: var(--app-radius-md);
   --box-shadow: none;
-  --color: var(--app-ink);
+  --color: #ffffff;
 }
 
 .secondary-button {
-  --border-color: var(--app-border);
-  --border-radius: 12px;
+  --background: transparent;
+  --background-activated: var(--app-surface-pressed);
+  --border-color: var(--app-border-strong);
+  --border-radius: var(--app-radius-md);
+  --border-width: 1px;
   --color: var(--app-ink);
+  --box-shadow: none;
+  font-size: 15px;
+  font-weight: 550;
 }
 
 .quiet-button {
-  --color: #796a5c;
+  --background: transparent;
+  --color: var(--app-muted);
+  --box-shadow: none;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .small-action {
@@ -695,29 +727,30 @@ ion-searchbar.wardrobe-search {
 }
 
 .compact-button {
-  min-height: 44px;
-  font-size: 12px;
+  min-height: 38px;
+  font-size: 13px;
 }
 
 .wardrobe-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
 .item-card {
   appearance: none;
   display: block;
   width: 100%;
-  border: 1px solid rgba(61, 49, 40, 0.08);
-  border-radius: 12px;
-  background: rgba(255, 250, 243, 0.9);
+  border: 0.5px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  background: var(--app-surface);
   color: inherit;
   font: inherit;
   overflow: hidden;
   padding: 0;
   text-align: left;
   text-decoration: none;
+  box-shadow: var(--app-shadow-subtle);
   transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
 }
 
@@ -1736,7 +1769,7 @@ ion-select.field {
 
 ion-modal {
   --background: var(--app-bg);
-  --border-radius: 24px 24px 0 0;
+  --border-radius: 20px 20px 0 0;
   --max-width: 100%;
 }
 
@@ -1745,7 +1778,7 @@ ion-modal::part(content) {
   width: 100%;
   box-sizing: border-box;
   overflow-x: hidden;
-  border-radius: 24px 24px 0 0;
+  border-radius: 20px 20px 0 0;
 }
 
 ion-modal::part(backdrop) {
@@ -1772,11 +1805,13 @@ ion-modal ion-content::part(scroll) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 52px;
-  min-height: 52px;
+  height: 48px;
+  min-height: 48px;
   padding: 0 16px;
   border-bottom: 0.5px solid var(--app-border);
-  background: var(--app-surface);
+  background: var(--app-header-bg);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -1787,6 +1822,7 @@ ion-modal ion-content::part(scroll) {
   .modal-title {
     font-size: 17px;
     font-weight: 600;
+    letter-spacing: -0.1px;
     color: var(--app-ink);
     text-align: center;
     flex: 1;
@@ -1811,7 +1847,7 @@ ion-modal ion-content::part(scroll) {
     transition: opacity 150ms ease;
 
     &:active {
-      opacity: 0.6;
+      opacity: 0.5;
     }
 
     &.primary {
@@ -1820,7 +1856,7 @@ ion-modal ion-content::part(scroll) {
     }
 
     &:disabled {
-      opacity: 0.4;
+      opacity: 0.35;
       cursor: not-allowed;
     }
   }
@@ -1852,9 +1888,9 @@ ion-modal ion-content::part(scroll) {
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   text-transform: uppercase;
   color: var(--app-muted);
 
@@ -1881,11 +1917,11 @@ ion-modal ion-content::part(scroll) {
 }
 
 .ios-grouped-card {
-  border-radius: 14px;
-  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  border: 0.5px solid var(--app-border);
   background: var(--app-surface);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(36, 31, 26, 0.04);
+  box-shadow: var(--app-shadow-subtle);
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -2105,32 +2141,33 @@ ion-toast.ios-toast {
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --app-bg: #181512;
-    --app-surface: #24201b;
-    --app-header-bg: rgba(24, 21, 18, 0.88);
-    --app-ink: #f5ede4;
-    --app-muted: #a89d91;
-    --app-border: rgba(245, 237, 228, 0.14);
-    --app-border-strong: rgba(245, 237, 228, 0.25);
-    --app-surface-muted: #2c2722;
-    --app-surface-pressed: #352f29;
-    --app-stage-bg: #201b17;
-    --app-stage-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --app-bg: #171513;
+    --app-surface: #23201c;
+    --app-header-bg: rgba(23, 21, 19, 0.92);
+    --app-ink: #f4ede4;
+    --app-muted: #9c9183;
+    --app-border: rgba(245, 237, 228, 0.1);
+    --app-border-strong: rgba(245, 237, 228, 0.18);
+    --app-surface-muted: #2a2622;
+    --app-surface-pressed: #332e29;
+    --app-stage-bg: #1e1b18;
+    --app-stage-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     --app-danger: #e26f66;
     --app-danger-bg: #321c1a;
-    --app-olive: #8ea06a;
-    --app-olive-pressed: #a5b880;
+    --app-olive: #9bb078;
+    --app-olive-pressed: #aebd8e;
     --app-taupe: #8a7c6c;
-    --app-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-    --app-segment-bg: rgba(245, 237, 228, 0.1);
-    --app-segment-thumb: #383129;
+    --app-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    --app-shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --app-segment-bg: rgba(245, 237, 228, 0.08);
+    --app-segment-thumb: #332e29;
   }
 
   ion-tab-bar {
-    --background: rgba(36, 32, 27, 0.88);
+    --background: rgba(23, 21, 19, 0.92);
     -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
-    border-top: 0.5px solid rgba(245, 237, 228, 0.14);
+    border-top: 0.5px solid var(--app-border);
   }
 
   ion-tab-button {
@@ -2145,15 +2182,16 @@ ion-toast.ios-toast {
   .inline-sheet,
   .ios-grouped-card,
   .ios-selection-group {
-    background: rgba(36, 32, 27, 0.94);
+    background: var(--app-surface);
+    border-color: var(--app-border);
   }
 
   .chip,
   .capsule-pill,
   .vibe-chip {
-    background: rgba(36, 32, 27, 0.8);
-    color: #f5ede4;
-    border-color: rgba(245, 237, 228, 0.14);
+    background: var(--app-surface);
+    color: var(--app-ink);
+    border-color: var(--app-border);
   }
 
   .icon-button,
@@ -2161,21 +2199,22 @@ ion-toast.ios-toast {
   .filter-button,
   .clear-button,
   .action-btn-menu {
-    background: rgba(36, 32, 27, 0.85);
-    color: #f5ede4;
+    background: var(--app-surface);
+    color: var(--app-ink);
+    border-color: var(--app-border);
   }
 
   ion-searchbar.wardrobe-search,
   .ios-searchbar {
-    --background: rgba(245, 237, 228, 0.1);
-    --icon-color: #a89d91;
-    --placeholder-color: #a89d91;
-    --color: #f5ede4;
+    --background: var(--app-segment-bg);
+    --icon-color: var(--app-muted);
+    --placeholder-color: var(--app-muted);
+    --color: var(--app-ink);
   }
 
   .modal-nav-bar {
-    background: rgba(36, 32, 27, 0.95);
-    border-bottom-color: rgba(245, 237, 228, 0.14);
+    background: var(--app-header-bg);
+    border-bottom-color: var(--app-border);
   }
 
   ion-modal {

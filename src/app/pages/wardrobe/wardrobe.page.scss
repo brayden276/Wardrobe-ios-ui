@@ -122,14 +122,13 @@
   position: absolute;
   top: 8px;
   left: 8px;
-  background: rgba(36, 31, 26, 0.65);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.92);
+  border: 0.5px solid var(--app-border);
+  color: var(--app-ink);
   font-size: 11px;
-  font-weight: 700;
-  padding: 3px 7px;
-  border-radius: 8px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--app-radius-xs);
   z-index: 2;
 }
 
@@ -137,14 +136,26 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  background: rgba(138, 48, 42, 0.85);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.92);
+  border: 0.5px solid rgba(158, 50, 42, 0.2);
+  color: var(--app-danger);
   font-size: 10px;
-  font-weight: 700;
-  padding: 3px 6px;
-  border-radius: 6px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--app-radius-xs);
   z-index: 2;
   text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .card-wear-badge {
+    background: rgba(35, 32, 28, 0.92);
+  }
+
+  .card-archive-badge {
+    background: rgba(35, 32, 28, 0.92);
+  }
 }
 
 /* iOS Bottom Selection Bar */
@@ -153,13 +164,13 @@
   bottom: calc(52px + var(--ion-safe-area-bottom));
   left: 16px;
   right: 16px;
-  height: 52px;
-  border-radius: 16px;
+  height: 50px;
+  border-radius: var(--app-radius-md);
   background: var(--app-header-bg);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--app-border);
-  box-shadow: 0 4px 18px rgba(36, 31, 26, 0.14);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border: 0.5px solid var(--app-border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -199,34 +210,37 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 48px 24px;
+  padding: 48px 20px;
 
   .empty-icon-wrap {
-    width: 72px;
-    height: 72px;
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
-    background: rgba(91, 96, 64, 0.1);
+    background: var(--app-surface-muted);
     display: grid;
     place-items: center;
     margin-bottom: 16px;
 
     ion-icon {
-      font-size: 36px;
+      font-size: 28px;
       color: var(--app-olive);
     }
   }
 
   h2 {
     font-family: var(--app-heading-font);
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 600;
-    margin: 0 0 8px;
+    letter-spacing: -0.2px;
+    margin: 0 0 6px;
     color: var(--app-ink);
   }
 
   p {
     margin: 0 0 20px;
     font-size: 14px;
+    line-height: 1.4;
+    color: var(--app-muted);
     max-width: 280px;
   }
 }

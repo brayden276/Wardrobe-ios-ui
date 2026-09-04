@@ -7,10 +7,10 @@
   <div class="builder-segment-wrap">
     <ion-segment [(ngModel)]="builderMode" mode="ios">
       <ion-segment-button value="generate">
-        <ion-label>✨ AI Stylist</ion-label>
+        <ion-label>AI Stylist</ion-label>
       </ion-segment-button>
       <ion-segment-button value="manual">
-        <ion-label>👔 Canvas</ion-label>
+        <ion-label>Manual Canvas</ion-label>
       </ion-segment-button>
     </ion-segment>
   </div>
@@ -103,9 +103,9 @@
             placeholder="Add specific notes, e.g. 'Chilly evening, pair with Chelsea boots'"></ion-textarea>
           
           <div class="prompt-quick-tags" *ngIf="!query">
-            <span (click)="applyPromptInspiration('Warm layers, tailored outerwear')">🧥 Layered</span>
-            <span (click)="applyPromptInspiration('Monochrome minimalist tones')">🖤 Monochrome</span>
-            <span (click)="applyPromptInspiration('Rainy day, water-resistant footwear')">🌧️ Rainy day</span>
+            <span (click)="applyPromptInspiration('Warm layers, tailored outerwear')">Layered</span>
+            <span (click)="applyPromptInspiration('Monochrome minimalist tones')">Monochrome</span>
+            <span (click)="applyPromptInspiration('Rainy day, water-resistant footwear')">Rainy day</span>
           </div>
         </div>
 
@@ -114,7 +114,7 @@
           expand="block"
           (click)="search()"
           [disabled]="isBusy || !canGenerate">
-          <ion-icon name="sparkles" slot="start"></ion-icon>
+          <ion-icon name="sparkles-outline" slot="start"></ion-icon>
           {{ isBuildingOutfits ? 'Designing Looks...' : 'Generate Outfits' }}
         </ion-button>
       </section>
@@ -123,7 +123,7 @@
       <section class="ai-loading-shimmer-stage" *ngIf="isBuildingOutfits">
         <div class="ai-shimmer-pill">
           <ion-spinner name="crescent"></ion-spinner>
-          <span>✨ Gemini styling looks from your wardrobe...</span>
+          <span>Styling outfits from your wardrobe...</span>
         </div>
         <div class="outfit-card skeleton-card shimmer-card">
           <div class="skeleton-image hero-skeleton"></div>

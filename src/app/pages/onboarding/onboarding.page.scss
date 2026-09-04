@@ -64,8 +64,8 @@
 }
 
 .step-indicator-pill {
-  height: 4px;
-  border-radius: 4px;
+  height: 3px;
+  border-radius: 2px;
   background: var(--app-segment-bg);
   transition: background-color 260ms ease;
 
@@ -101,8 +101,9 @@
 .step-title {
   margin: 4px 0 6px;
   font-family: var(--app-heading-font);
-  font-size: 28px;
-  font-weight: 600;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
   line-height: 1.15;
   color: var(--app-ink);
 }
@@ -118,11 +119,11 @@
 .ios-selection-group {
   display: flex;
   flex-direction: column;
-  border-radius: 14px;
+  border-radius: var(--app-radius-lg, 16px);
   border: 1px solid var(--app-border);
   background: var(--app-surface);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--app-shadow-subtle);
 }
 
 .ios-selection-row {
@@ -225,9 +226,10 @@
 .ios-primary-button {
   --background: var(--app-olive);
   --background-activated: var(--app-olive-pressed);
-  --border-radius: 14px;
-  --box-shadow: 0 4px 12px rgba(91, 96, 64, 0.2);
-  min-height: 50px;
+  --border-radius: var(--app-radius-md, 12px);
+  --box-shadow: none;
+  box-shadow: none;
+  min-height: 48px;
   font-size: 16px;
   font-weight: 600;
 }
