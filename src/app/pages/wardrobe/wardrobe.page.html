@@ -6,20 +6,13 @@
       </ion-button>
     </ion-buttons>
 
-    <ion-title *ngIf="!isSelectionMode" size="large">Wardrobe</ion-title>
+    <ion-title *ngIf="!isSelectionMode">Wardrobe</ion-title>
     <ion-title *ngIf="isSelectionMode">{{ selectedCount }} Selected</ion-title>
 
     <ion-buttons slot="end">
-      <ng-container *ngIf="!isSelectionMode">
-        <ion-button fill="clear" class="filter-header-btn" (click)="openFilterModal()" aria-label="Filter wardrobe">
-          <ion-icon name="options-outline"></ion-icon>
-          <span class="filter-badge-pill" *ngIf="activeFilterCount">{{ activeFilterCount }}</span>
-        </ion-button>
-        <ion-button fill="clear" (click)="enterSelectionMode()" [disabled]="isLoading || !items.length">
-          Select
-        </ion-button>
-      </ng-container>
-
+      <ion-button *ngIf="!isSelectionMode" fill="clear" (click)="enterSelectionMode()" [disabled]="isLoading || !items.length">
+        Select
+      </ion-button>
       <ion-button *ngIf="isSelectionMode" fill="clear" class="done-btn" (click)="cancelSelectionMode()">
         Done
       </ion-button>
@@ -38,24 +31,39 @@
     </ion-searchbar>
   </ion-toolbar>
 
-  <!-- Category Capsule Strip -->
-  <div class="category-capsule-strip" *ngIf="!isSelectionMode && lookups?.categories?.length">
-    <button
-      type="button"
-      class="capsule-pill"
-      [class.active]="!categoryId"
-      (click)="setCategory(null)">
-      All
-    </button>
-    <button
-      type="button"
-      class="capsule-pill"
-      *ngFor="let cat of lookups?.categories; trackBy: trackByOptionId"
-      [class.active]="categoryId === cat.id"
-      (click)="setCategory(cat.id)">
-      {{ cat.label }}
-    </button>
-  </div>
+  <!-- Category & Filter Capsule Strip -->
+  <ion-toolbar class="category-toolbar" *ngIf="!isSelectionMode">
+    <div class="category-capsule-strip">
+      <button
+        type="button"
+        class="capsule-pill filter-capsule-btn"
+        [class.has-active]="activeFilterCount > 0"
+        (click)="openFilterModal()"
+        aria-label="Filter wardrobe">
+        <ion-icon name="options-outline"></ion-icon>
+        <span>Filter</span>
+        <span class="filter-pill-badge" *ngIf="activeFilterCount">{{ activeFilterCount }}</span>
+      </button>
+
+      <div class="capsule-divider" *ngIf="lookups?.categories?.length"></div>
+
+      <button
+        type="button"
+        class="capsule-pill"
+        [class.active]="!categoryId"
+        (click)="setCategory(null)">
+        All
+      </button>
+      <button
+        type="button"
+        class="capsule-pill"
+        *ngFor="let cat of lookups?.categories; trackBy: trackByOptionId"
+        [class.active]="categoryId === cat.id"
+        (click)="setCategory(cat.id)">
+        {{ cat.label }}
+      </button>
+    </div>
+  </ion-toolbar>
 </ion-header>
 
 <ion-content class="app-content" [scrollEvents]="true" [fullscreen]="true">
@@ -66,8 +74,11 @@
   <section class="screen wardrobe-screen">
     <!-- Active Filters Token Pill (if advanced filters are on) -->
     <div class="active-filter-token-bar" *ngIf="!isSelectionMode && activeFilterCount">
-      <span class="token-label">{{ activeFilterSummary }}</span>
-      <button type="button" class="token-clear-btn" (click)="clearFilters()">
+      <div class="token-content">
+        <ion-icon name="funnel-outline" class="token-icon"></ion-icon>
+        <span class="token-label">{{ activeFilterSummary }}</span>
+      </div>
+      <button type="button" class="token-clear-btn" (click)="clearFilters()" aria-label="Clear all filters">
         <ion-icon name="close-circle"></ion-icon>
       </button>
     </div>
@@ -89,7 +100,7 @@
 
     <!-- Virtual Grid -->
     <div #wardrobeGrid class="wardrobe-grid wardrobe-grid--virtual" *ngIf="items.length; else emptyWardrobe">
-      <div class="wardrobe-grid__spacer" [style.height.px]="virtualTopSpacerHeight"></div>
+      <div class="wardrobe-grid__spacer" *ngIf="virtualTopSpacerHeight > 0" [style.height.px]="virtualTopSpacerHeight"></div>
       <button
         type="button"
         class="item-card"
@@ -139,7 +150,7 @@
           </div>
         </div>
       </button>
-      <div class="wardrobe-grid__spacer" [style.height.px]="virtualBottomSpacerHeight"></div>
+      <div class="wardrobe-grid__spacer" *ngIf="virtualBottomSpacerHeight > 0" [style.height.px]="virtualBottomSpacerHeight"></div>
     </div>
 
     <ion-infinite-scroll threshold="280px" *ngIf="canLoadMore && !canRetryMessage" (ionInfinite)="loadMore($event)">
@@ -183,36 +194,51 @@
   <ng-template>
     <ion-content class="filter-modal-content">
       <header class="modal-nav-bar">
-        <button type="button" class="text-btn" (click)="clearFilters(); closeFilterModal()">Reset</button>
+        <button type="button" class="text-btn" (click)="clearFilters()">Reset</button>
         <span class="modal-title">Filters</span>
         <button type="button" class="text-btn primary" (click)="closeFilterModal()">Done</button>
       </header>
 
       <div class="modal-body-scroll">
-        <!-- Subcategory Filter -->
-        <div class="filter-modal-section" *ngIf="subcategoryOptions.length">
-          <span class="section-title">SUBCATEGORY</span>
-          <div class="chip-row">
-            <button type="button" class="chip" [class.active]="!subcategoryId" (click)="setSubcategory(null)">All</button>
-            <button type="button" class="chip" *ngFor="let opt of subcategoryOptions" [class.active]="subcategoryId === opt.id" (click)="setSubcategory(opt.id)">{{ opt.label }}</button>
+        <!-- Classification -->
+        <div class="filter-modal-section">
+          <span class="section-title">CLASSIFICATION</span>
+          <div class="ios-grouped-card">
+            <div class="ios-form-row">
+              <label class="row-label">Category</label>
+              <ion-select class="ios-select" [value]="categoryId" (ionChange)="setCategory($event.detail.value)" interface="action-sheet">
+                <ion-select-option [value]="null">All Categories</ion-select-option>
+                <ion-select-option *ngFor="let opt of lookups?.categories" [value]="opt.id">{{ opt.label }}</ion-select-option>
+              </ion-select>
+            </div>
+            <div class="ios-form-row" *ngIf="subcategoryOptions.length">
+              <label class="row-label">Subcategory</label>
+              <ion-select class="ios-select" [value]="subcategoryId" (ionChange)="setSubcategory($event.detail.value)" interface="action-sheet">
+                <ion-select-option [value]="null">All Subcategories</ion-select-option>
+                <ion-select-option *ngFor="let opt of subcategoryOptions" [value]="opt.id">{{ opt.label }}</ion-select-option>
+              </ion-select>
+            </div>
           </div>
         </div>
 
-        <!-- Colour Filter -->
+        <!-- Colour & Pattern -->
         <div class="filter-modal-section">
-          <span class="section-title">COLOUR</span>
-          <div class="chip-row">
-            <button type="button" class="chip" [class.active]="!colourId" (click)="setColour(null)">All</button>
-            <button type="button" class="chip" *ngFor="let opt of lookups?.colours" [class.active]="colourId === opt.id" (click)="setColour(opt.id)">{{ opt.label }}</button>
-          </div>
-        </div>
-
-        <!-- Pattern Filter -->
-        <div class="filter-modal-section">
-          <span class="section-title">PATTERN</span>
-          <div class="chip-row">
-            <button type="button" class="chip" [class.active]="!patternId" (click)="setPattern(null)">All</button>
-            <button type="button" class="chip" *ngFor="let opt of lookups?.patterns" [class.active]="patternId === opt.id" (click)="setPattern(opt.id)">{{ opt.label }}</button>
+          <span class="section-title">COLOUR & PATTERN</span>
+          <div class="ios-grouped-card">
+            <div class="ios-form-row">
+              <label class="row-label">Primary Colour</label>
+              <ion-select class="ios-select" [value]="colourId" (ionChange)="setColour($event.detail.value)" interface="action-sheet">
+                <ion-select-option [value]="null">Any Colour</ion-select-option>
+                <ion-select-option *ngFor="let opt of lookups?.colours" [value]="opt.id">{{ opt.label }}</ion-select-option>
+              </ion-select>
+            </div>
+            <div class="ios-form-row">
+              <label class="row-label">Pattern</label>
+              <ion-select class="ios-select" [value]="patternId" (ionChange)="setPattern($event.detail.value)" interface="action-sheet">
+                <ion-select-option [value]="null">Any Pattern</ion-select-option>
+                <ion-select-option *ngFor="let opt of lookups?.patterns" [value]="opt.id">{{ opt.label }}</ion-select-option>
+              </ion-select>
+            </div>
           </div>
         </div>
 
@@ -248,15 +274,37 @@
                 <ion-select-option *ngFor="let opt of lookups?.sleeveLengths" [value]="opt.id">{{ opt.label }}</ion-select-option>
               </ion-select>
             </div>
+            <div class="ios-form-row">
+              <label class="row-label">Length</label>
+              <ion-select class="ios-select" [(ngModel)]="lengthId" (ionChange)="onAdvancedFilterChanged()" interface="action-sheet">
+                <ion-select-option [value]="null">Any</ion-select-option>
+                <ion-select-option *ngFor="let opt of lookups?.garmentLengths" [value]="opt.id">{{ opt.label }}</ion-select-option>
+              </ion-select>
+            </div>
+            <div class="ios-form-row">
+              <label class="row-label">Bottom Shape</label>
+              <ion-select class="ios-select" [(ngModel)]="bottomShapeId" (ionChange)="onAdvancedFilterChanged()" interface="action-sheet">
+                <ion-select-option [value]="null">Any</ion-select-option>
+                <ion-select-option *ngFor="let opt of lookups?.bottomShapes" [value]="opt.id">{{ opt.label }}</ion-select-option>
+              </ion-select>
+            </div>
+            <div class="ios-form-row">
+              <label class="row-label">Rise</label>
+              <ion-select class="ios-select" [(ngModel)]="riseId" (ionChange)="onAdvancedFilterChanged()" interface="action-sheet">
+                <ion-select-option [value]="null">Any</ion-select-option>
+                <ion-select-option *ngFor="let opt of lookups?.rises" [value]="opt.id">{{ opt.label }}</ion-select-option>
+              </ion-select>
+            </div>
           </div>
         </div>
 
         <!-- Include Archived Toggle -->
         <div class="filter-modal-section">
+          <span class="section-title">STATUS</span>
           <div class="ios-grouped-card">
             <div class="ios-table-row">
               <span class="row-label">Include Archived Items</span>
-              <ion-toggle [checked]="includeArchived" (ionChange)="setIncludeArchived($event.detail.checked)"></ion-toggle>
+              <ion-toggle class="ios-toggle" [checked]="includeArchived" (ionChange)="setIncludeArchived($event.detail.checked)"></ion-toggle>
             </div>
           </div>
         </div>

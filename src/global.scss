@@ -737,6 +737,14 @@ ion-searchbar.wardrobe-search {
   gap: 10px;
 }
 
+.wardrobe-grid__spacer {
+  grid-column: 1 / -1;
+  width: 100%;
+  pointer-events: none;
+  margin: 0;
+  padding: 0;
+}
+
 .item-card {
   appearance: none;
   display: block;
