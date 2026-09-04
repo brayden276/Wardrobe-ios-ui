@@ -83,7 +83,7 @@ export class ItemDetailPage implements OnDestroy {
 
   openEditModal(): void {
     if (this.item) {
-      this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds ? this.item.secondaryColourIds.slice() : [] };
+      this.form = this.toFormState(this.item);
     }
     this.isEditModalOpen = true;
     void lightImpact();
@@ -91,6 +91,14 @@ export class ItemDetailPage implements OnDestroy {
 
   closeEditModal(): void {
     this.isEditModalOpen = false;
+    if (this.route.snapshot.queryParamMap.has('mode') || this.route.snapshot.queryParamMap.has('newlyAdded')) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { mode: null, newlyAdded: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true
+      });
+    }
   }
 
   async openMoreMenu(): Promise<void> {
@@ -453,6 +461,7 @@ export class ItemDetailPage implements OnDestroy {
     this.message = 'Deleting item...';
     try {
       await this.api.deleteItem(this.item.id);
+      this.closeEditModal();
       void successFeedback();
       await this.router.navigateByUrl('/tabs/wardrobe');
     } catch (error) {

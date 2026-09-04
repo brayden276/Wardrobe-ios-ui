@@ -20,6 +20,7 @@ export class LoginPage {
   isBusy = false;
   hasSubmitted = false;
   emailBlurred = false;
+  displayNameBlurred = false;
   showPassword = false;
 
   async ionViewWillEnter(): Promise<void> {
@@ -79,7 +80,7 @@ export class LoginPage {
   }
 
   get showDisplayNameValidationMessage(): boolean {
-    return this.mode === 'register' && (this.hasSubmitted || !!this.displayName.trim());
+    return this.mode === 'register' && (this.hasSubmitted || !!this.displayName.trim() || this.displayNameBlurred);
   }
 
   get activeErrorMessage(): string {
@@ -105,6 +106,7 @@ export class LoginPage {
     this.message = '';
     this.hasSubmitted = false;
     this.emailBlurred = false;
+    this.displayNameBlurred = false;
     void lightImpact();
   }
 

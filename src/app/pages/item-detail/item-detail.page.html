@@ -178,6 +178,12 @@
       </header>
 
       <form class="modal-form-scroll" (ngSubmit)="save()">
+        <!-- Modal Error Feedback -->
+        <div class="modal-error-banner" *ngIf="message && messageKind === 'error'" aria-live="polite">
+          <ion-icon name="alert-circle-outline"></ion-icon>
+          <span>{{ message }}</span>
+        </div>
+
         <div class="ios-section">
           <span class="section-title">GARMENT NAME</span>
           <div class="ios-grouped-card">

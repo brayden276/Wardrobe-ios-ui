@@ -89,6 +89,7 @@ export class OnboardingPage {
   private returnUrl = '/tabs/wardrobe';
 
   ionViewWillEnter(): void {
+    this.stepIndex = 0;
     this.returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') || '/tabs/wardrobe';
     const personalDetails = this.auth.session?.user?.personalDetails;
     if (personalDetails) {

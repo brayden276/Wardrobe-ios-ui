@@ -296,6 +296,9 @@ export class AddItemPage implements OnDestroy {
 
     this.batchFiles = this.batchFiles.filter((_, currentIndex) => currentIndex !== index);
     this.batchPreviewUrls = this.batchPreviewUrls.filter((_, currentIndex) => currentIndex !== index);
+    if (this.activePreviewIndex >= this.batchFiles.length) {
+      this.activePreviewIndex = Math.max(0, this.batchFiles.length - 1);
+    }
     void lightImpact();
   }
 
@@ -391,10 +394,6 @@ export class AddItemPage implements OnDestroy {
     this.uploadError = false;
 
     try {
-      const created = await this.api.createItem(photo.file, photo.name);
-      this.clearBatchSelection();
-      void successFeedback();
-
       const itemsCreated = created?.items?.length ? created.items : (created?.id ? [created] : []);
       if (itemsCreated.length > 1) {
         await this.router.navigate(['/tabs/wardrobe'], {
@@ -407,6 +406,8 @@ export class AddItemPage implements OnDestroy {
       } else {
         await this.router.navigateByUrl('/tabs/wardrobe');
       }
+      this.clearBatchSelection();
+      void successFeedback();
     } catch (error) {
       this.message = readMessage(error, 'Could not upload photo. Try again.');
       this.uploadError = true;
@@ -436,11 +437,11 @@ export class AddItemPage implements OnDestroy {
       }, 0);
 
       if (!failures.length) {
-        this.clearBatchSelection();
         void successFeedback();
         await this.router.navigate(['/tabs/wardrobe'], {
           queryParams: { newlyAddedCount: totalItemsCreated }
         });
+        this.clearBatchSelection();
         return;
       }
 
@@ -467,6 +468,9 @@ export class AddItemPage implements OnDestroy {
 
       this.batchFiles = remainingFiles;
       this.batchPreviewUrls = remainingUrls;
+      if (this.activePreviewIndex >= this.batchFiles.length) {
+        this.activePreviewIndex = Math.max(0, this.batchFiles.length - 1);
+      }
 
       const failureSummary = failures
         .slice(0, 3)

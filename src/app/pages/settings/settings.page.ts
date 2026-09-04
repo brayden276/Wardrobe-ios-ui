@@ -11,6 +11,7 @@ import {
   TERMS_OF_USE_URL,
   clearAiConsent,
   confirmAction,
+  ensureAiConsentWithAlert,
   hasAiConsent,
   lightImpact,
   noticeKind,
@@ -38,8 +39,8 @@ export class SettingsPage {
   readonly supportUrl = SUPPORT_URL;
   private readonly personalDetailLabels: Record<string, Record<string, string>> = {
     gender: {
-      male: 'Male',
-      female: 'Female'
+      male: 'Menswear',
+      female: 'Womenswear'
     },
     fitPreference: {
       tailored: 'Tailored',
@@ -64,7 +65,10 @@ export class SettingsPage {
   aiUsage: AiUsageCostSummaryDto | null = null;
   aiUsageLoadMessage = '';
   isLoadingAiUsage = false;
-  isBusy = false;
+  busyAction: 'details' | 'signout' | 'delete' | 'cache' | 'consent' | null = null;
+  get isBusy(): boolean {
+    return this.busyAction !== null;
+  }
   busyMessage = '';
   message = '';
   isEditingPersonalDetails = false;
@@ -149,7 +153,7 @@ export class SettingsPage {
   }
 
   async savePersonalDetails(): Promise<void> {
-    this.isBusy = true;
+    this.busyAction = 'details';
     this.busyMessage = 'Saving personal details...';
     try {
       await this.auth.updatePersonalDetails(this.personalDetailsForm);
@@ -160,7 +164,7 @@ export class SettingsPage {
       this.message = readMessage(error, 'Could not save personal details.');
       void warningFeedback();
     } finally {
-      this.isBusy = false;
+      this.busyAction = null;
       this.busyMessage = '';
     }
   }
@@ -179,7 +183,7 @@ export class SettingsPage {
       return;
     }
 
-    this.isBusy = true;
+    this.busyAction = 'signout';
     this.busyMessage = 'Signing out...';
     this.message = '';
     try {
@@ -189,7 +193,7 @@ export class SettingsPage {
       this.message = readMessage(error, 'Could not sign out. Check your connection and try again.');
       void warningFeedback();
     } finally {
-      this.isBusy = false;
+      this.busyAction = null;
       this.busyMessage = '';
     }
   }
@@ -199,7 +203,7 @@ export class SettingsPage {
       return;
     }
 
-    this.isBusy = true;
+    this.busyAction = 'cache';
     this.busyMessage = 'Clearing image cache...';
     this.message = '';
     try {
@@ -216,7 +220,7 @@ export class SettingsPage {
       this.message = readMessage(error, 'Could not clear image cache.');
       void warningFeedback();
     } finally {
-      this.isBusy = false;
+      this.busyAction = null;
       this.busyMessage = '';
     }
   }
@@ -235,7 +239,7 @@ export class SettingsPage {
       return;
     }
 
-    this.isBusy = true;
+    this.busyAction = 'consent';
     this.busyMessage = 'Clearing Gemini consent...';
     this.message = '';
     try {
@@ -244,8 +248,21 @@ export class SettingsPage {
       this.message = 'Gemini consent was cleared for this device.';
       void successFeedback();
     } finally {
-      this.isBusy = false;
+      this.busyAction = null;
       this.busyMessage = '';
+    }
+  }
+
+  async grantAiConsent(): Promise<void> {
+    if (this.isBusy) {
+      return;
+    }
+
+    const granted = await ensureAiConsentWithAlert(this.alertController, 'Settings');
+    if (granted) {
+      this.aiConsentAccepted = true;
+      this.message = 'Gemini consent was granted.';
+      void successFeedback();
     }
   }
 
@@ -264,7 +281,7 @@ export class SettingsPage {
       return;
     }
 
-    this.isBusy = true;
+    this.busyAction = 'delete';
     this.busyMessage = 'Deleting account and wardrobe data...';
     this.message = '';
     try {
@@ -276,7 +293,7 @@ export class SettingsPage {
       this.message = readMessage(error, 'Could not delete your account. Try again.');
       void warningFeedback();
     } finally {
-      this.isBusy = false;
+      this.busyAction = null;
       this.busyMessage = '';
     }
   }

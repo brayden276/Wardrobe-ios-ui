@@ -85,7 +85,9 @@ export class AnalyticsPage {
     });
   }
 
-  formatCategoryLabel(catId: string): string {
+  formatCategoryLabel(catId: string | null | undefined): string {
+    if (!catId) return 'Unknown';
+    const clean = catId.toLowerCase().replace(/_/g, ' ');
     const labels: Record<string, string> = {
       tops: 'Tops',
       bottoms: 'Bottoms',
@@ -95,13 +97,17 @@ export class AnalyticsPage {
       dresses: 'Dresses',
       bags: 'Bags',
       accessories: 'Accessories',
+      one_pieces: 'One-Pieces',
+      'one pieces': 'One-Pieces',
       other: 'Other'
     };
-    return labels[catId.toLowerCase()] ?? catId.charAt(0).toUpperCase() + catId.slice(1);
+    return labels[catId.toLowerCase()] ?? labels[clean] ?? clean.charAt(0).toUpperCase() + clean.slice(1);
   }
 
-  formatColourLabel(colourId: string): string {
-    return colourId.charAt(0).toUpperCase() + colourId.slice(1);
+  formatColourLabel(colourId: string | null | undefined): string {
+    if (!colourId) return 'Unknown';
+    const clean = colourId.replace(/_/g, ' ');
+    return clean.charAt(0).toUpperCase() + clean.slice(1);
   }
 
   get categoryList(): Array<{ id: string; label: string; count: number; percentage: number }> {

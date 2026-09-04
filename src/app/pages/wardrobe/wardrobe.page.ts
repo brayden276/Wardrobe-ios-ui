@@ -113,6 +113,7 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
 
   get activeFilterCount(): number {
     let count = 0;
+    if (this.subcategoryId) count++;
     if (this.colourId) count++;
     if (this.patternId) count++;
     if (this.visibleMaterialId) count++;
@@ -1072,6 +1073,41 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
     if (this.patternId) {
       const pattern = this.lookups?.patterns.find((option) => option.id === this.patternId)?.label ?? this.patternId;
       filters.push(`Pattern: ${pattern}`);
+    }
+
+    if (this.visibleMaterialId && this.lookups) {
+      const mat = lookupLabel(this.lookups, this.visibleMaterialId);
+      if (mat) filters.push(`Material: ${mat}`);
+    }
+
+    if (this.fitId && this.lookups) {
+      const fit = lookupLabel(this.lookups, this.fitId);
+      if (fit) filters.push(`Fit: ${fit}`);
+    }
+
+    if (this.necklineId && this.lookups) {
+      const neck = lookupLabel(this.lookups, this.necklineId);
+      if (neck) filters.push(`Neckline: ${neck}`);
+    }
+
+    if (this.sleeveLengthId && this.lookups) {
+      const sleeve = lookupLabel(this.lookups, this.sleeveLengthId);
+      if (sleeve) filters.push(`Sleeve: ${sleeve}`);
+    }
+
+    if (this.lengthId && this.lookups) {
+      const len = lookupLabel(this.lookups, this.lengthId);
+      if (len) filters.push(`Length: ${len}`);
+    }
+
+    if (this.bottomShapeId && this.lookups) {
+      const shape = lookupLabel(this.lookups, this.bottomShapeId);
+      if (shape) filters.push(`Shape: ${shape}`);
+    }
+
+    if (this.riseId && this.lookups) {
+      const rise = lookupLabel(this.lookups, this.riseId);
+      if (rise) filters.push(`Rise: ${rise}`);
     }
 
     if (this.includeArchived) {

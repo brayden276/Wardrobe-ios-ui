@@ -14,6 +14,7 @@ import {
   ImageGenerationStreamUpdate,
   OutfitDto,
   UpdateWardrobeItemRequest,
+  WardrobeAnalyticsMetricsDto,
   WardrobeItemDto,
   WardrobeLookupsDto
 } from './models';
@@ -259,7 +260,22 @@ export class WardrobeApiService {
   }
 
   async getAnalyticsSummary(): Promise<AnalyticsSummaryDto> {
-    return this.authorized(() => firstValueFrom(this.http.get<AnalyticsSummaryDto>(this.url('/api/analytics'), this.authOptions())));
+    const summary = await this.authorized(() => firstValueFrom(this.http.get<AnalyticsSummaryDto>(this.url('/api/analytics'), this.authOptions())));
+    const normaliseMetrics = (metrics?: WardrobeAnalyticsMetricsDto): WardrobeAnalyticsMetricsDto => {
+      if (!metrics) return metrics!;
+      return {
+        ...metrics,
+        topWornItems: (metrics.topWornItems ?? []).map((item) => ({
+          ...item,
+          thumbnailUrl: this.normaliseAssetUrl(item.thumbnailUrl)
+        }))
+      };
+    };
+    return {
+      ...summary,
+      userMetrics: normaliseMetrics(summary.userMetrics),
+      platformMetrics: normaliseMetrics(summary.platformMetrics)
+    };
   }
 
   private url(path: string): string {

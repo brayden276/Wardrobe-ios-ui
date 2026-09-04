@@ -5,12 +5,16 @@
       <button
         type="button"
         class="ios-nav-back"
+        *ngIf="stepIndex > 0 || canLeave; else navSpacer"
         (click)="handleBack()"
-        [attr.aria-label]="stepIndex === 0 && canLeave ? 'Cancel' : 'Previous step'"
+        [attr.aria-label]="stepIndex === 0 ? 'Cancel onboarding' : 'Previous step'"
         [disabled]="isBusy">
-        <ion-icon name="chevron-back"></ion-icon>
-        <span>{{ stepIndex === 0 && canLeave ? 'Settings' : 'Back' }}</span>
+        <ion-icon [name]="stepIndex > 0 ? 'chevron-back' : 'close'"></ion-icon>
+        <span>{{ stepIndex === 0 ? 'Cancel' : 'Back' }}</span>
       </button>
+      <ng-template #navSpacer>
+        <span class="ios-nav-spacer"></span>
+      </ng-template>
 
       <div class="ios-nav-title">Personal Style</div>
 

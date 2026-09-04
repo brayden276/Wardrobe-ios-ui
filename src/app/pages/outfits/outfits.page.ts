@@ -167,6 +167,7 @@ export class OutfitsPage {
       this.lookups = lookups;
       this.outfits = outfits;
       this.pruneSelectedOutfits();
+      this.pruneFavoriteIds();
       if (this.selectedOutfit) {
         this.selectedOutfit = this.outfits.find((outfit) => outfit.id === this.selectedOutfit?.id) ?? null;
       }
@@ -537,6 +538,28 @@ export class OutfitsPage {
       this.isSelectionMode = false;
     }
     this.updateVisibleOutfits();
+  }
+
+  private pruneFavoriteIds(): void {
+    if (!this.favoriteOutfitIds.size || !this.outfits.length) {
+      return;
+    }
+    const activeOutfitIds = new Set(this.outfits.map((o) => o.id));
+    let changed = false;
+    for (const id of this.favoriteOutfitIds) {
+      if (!activeOutfitIds.has(id)) {
+        this.favoriteOutfitIds.delete(id);
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.saveFavorites();
+    }
+  }
+
+  resetFilters(): void {
+    this.outfitSearch = '';
+    this.setOutfitFilter('all');
   }
 
   updateVisibleOutfits(): void {

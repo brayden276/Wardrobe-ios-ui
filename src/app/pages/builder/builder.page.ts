@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
-import { AlertController } from '@ionic/angular';
+import { Router } from '@angular/router';
+import { AlertController, ToastController } from '@ionic/angular';
 import { GeneratedOutfitDto, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import {
@@ -51,6 +52,8 @@ interface GeneratedOutfitCard {
 export class BuilderPage {
   private readonly api = inject(WardrobeApiService);
   private readonly alertController = inject(AlertController);
+  private readonly toastController = inject(ToastController);
+  private readonly router = inject(Router);
   builderMode: BuilderMode = 'generate';
   query = '';
   readonly occasionOptions = ['Work', 'Dinner', 'Brunch', 'Weekend'];
@@ -58,24 +61,23 @@ export class BuilderPage {
   readonly avoidOptions = ['No heels', 'No jacket', 'No dress'];
   occasion = 'Dinner';
   dressCode = 'Smart casual';
-  selectedAvoids = ['No heels'];
-  items: WardrobeItemDto[] = [];
-  lookups: WardrobeLookupsDto | null = null;
-  results: GeneratedOutfitDto[] = [];
+  selectedAvoids: string[] = [];
   requiredItemId: string | null = null;
   manualName = 'Manual outfit';
   manualItemIds: string[] = [];
   manualCanSave = false;
   manualHint = '';
+  items: WardrobeItemDto[] = [];
+  results: GeneratedOutfitDto[] = [];
+  lookups: WardrobeLookupsDto | null = null;
+  lastGeneratedPrompt = '';
   message = '';
-  hasGeneratedSearchRun = false;
-  isLoadingWardrobe = true;
+  isLoadingWardrobe = false;
   isBuildingOutfits = false;
   isSavingManualOutfit = false;
-  private lastGeneratedPrompt = '';
-  private readonly savingGeneratedOutfitKeys = new Set<string>();
-  private readonly savedGeneratedOutfitKeys = new Set<string>();
-  private readonly failedGeneratedOutfitKeys = new Set<string>();
+  private savingGeneratedOutfitKeys = new Set<string>();
+  private savedGeneratedOutfitKeys = new Set<string>();
+  private failedGeneratedOutfitKeys = new Set<string>();
   private readonly builderItemRenderIncrement = 60;
   private readonly generatedOutfitImagePreloadLimit = 4;
   visibleBuilderItemCount = this.builderItemRenderIncrement;
@@ -103,7 +105,7 @@ export class BuilderPage {
   }
 
   get canGenerate(): boolean {
-    return !!this.buildOutfitQuery();
+    return !this.isLoadingWardrobe && this.items.length > 0 && !!this.buildOutfitQuery();
   }
 
   get loadingStatus(): string {
@@ -239,6 +241,14 @@ export class BuilderPage {
     this.updateBuilderItemViews();
   }
 
+  toggleSelectAllManual(): void {
+    if (this.manualItemIds.length === this.items.length && this.items.length > 0) {
+      this.clearManualSelection();
+    } else {
+      this.selectAllItems();
+    }
+  }
+
   clearResults(): void {
     this.results = [];
     this.resultCards = [];
@@ -316,6 +326,24 @@ export class BuilderPage {
       await this.api.saveOutfit(this.manualName.trim() || 'Manual outfit', null, explanation.trim(), this.manualItemIds);
       this.message = 'Outfit saved.';
       void successFeedback();
+      this.manualItemIds = [];
+      this.manualItemIdSet.clear();
+      this.manualName = 'Manual outfit';
+      this.updateBuilderItemViews();
+      const toast = await this.toastController.create({
+        message: 'Outfit saved to lookbook.',
+        duration: 3500,
+        position: 'bottom',
+        buttons: [
+          {
+            text: 'View',
+            handler: () => {
+              void this.router.navigate(['/tabs/outfits']);
+            }
+          }
+        ]
+      });
+      await toast.present();
     } catch (error) {
       this.message = readMessage(error, 'Could not save outfit.');
       void warningFeedback();
@@ -668,6 +696,7 @@ export class BuilderPage {
       if (saved?.id) {
         await this.api.markWorn(saved.id);
       }
+      this.savedGeneratedOutfitKeys.add(card.key);
       card.saveState = 'saved';
       card.isWornToday = true;
       card.saveStatusMessage = '✓ Worn today!';

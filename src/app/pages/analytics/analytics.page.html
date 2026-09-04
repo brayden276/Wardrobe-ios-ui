@@ -169,6 +169,10 @@
               ? 'Catalog items and save styled outfits to unlock category breakdowns, color distributions, and wear frequency telemetry.'
               : 'No items or outfits have been registered on the platform yet.' }}
           </p>
+          <ion-button class="primary-button zero-data-cta" *ngIf="scope === 'user'" routerLink="/tabs/add">
+            <ion-icon name="add-outline" slot="start"></ion-icon>
+            Add Garments
+          </ion-button>
         </div>
       </section>
 

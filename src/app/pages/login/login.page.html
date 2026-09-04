@@ -35,7 +35,7 @@
     <form class="ios-form" (ngSubmit)="submit()" novalidate>
       <div class="ios-grouped-card">
         <!-- Display Name (Register Mode Only) -->
-        <div class="ios-form-row" *ngIf="mode === 'register'">
+        <div class="ios-form-row" *ngIf="mode === 'register'" [class.has-error]="showDisplayNameValidationMessage && displayNameValidationMessage">
           <label class="ios-field-label" for="displayNameInput">Name</label>
           <div class="ios-field-wrap">
             <ion-input
@@ -49,9 +49,16 @@
               spellcheck="false"
               enterkeyhint="next"
               placeholder="Your full name"
+              (ionBlur)="displayNameBlurred = true"
               (keyup.enter)="focusInput(emailInputRef)"
               [disabled]="isBusy">
             </ion-input>
+            <ion-icon
+              *ngIf="showDisplayNameValidationMessage && displayNameValidationMessage"
+              name="alert-circle-outline"
+              class="field-status-icon error"
+              aria-hidden="true">
+            </ion-icon>
           </div>
         </div>
 
@@ -132,6 +139,7 @@
         class="ios-primary-button"
         expand="block"
         type="submit"
+        [attr.aria-label]="authSubmitLabel"
         [disabled]="isBusy">
         <ion-spinner *ngIf="isBusy" name="crescent" color="light" class="button-spinner"></ion-spinner>
         <span *ngIf="!isBusy">{{ authSubmitLabel }}</span>

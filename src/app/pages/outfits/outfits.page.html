@@ -168,7 +168,7 @@
       <h2>No Matches Found</h2>
       <p *ngIf="outfitFilter === 'favorites'">You haven't favorited any outfits yet. Tap the heart icon on any look.</p>
       <p *ngIf="outfitFilter !== 'favorites'">No outfits match "{{ outfitSearch }}".</p>
-      <ion-button fill="outline" class="secondary-button" (click)="outfitSearch = ''; outfitFilter = 'all'; updateVisibleOutfits()">
+      <ion-button fill="outline" class="secondary-button" (click)="resetFilters()">
         Reset Filters
       </ion-button>
     </div>
@@ -230,9 +230,10 @@
 
         <!-- Sticky Sheet Bottom Actions -->
         <footer class="sheet-modal-footer">
-          <button type="button" class="sheet-cta-wear" (click)="markWorn(selectedOutfit)">
-            <ion-icon name="checkmark-circle"></ion-icon>
-            <span>Log Outfit as Worn Today</span>
+          <button type="button" class="sheet-cta-wear" (click)="markWorn(selectedOutfit)" [disabled]="markingOutfitIds.has(selectedOutfit.id)">
+            <ion-spinner name="crescent" *ngIf="markingOutfitIds.has(selectedOutfit.id)"></ion-spinner>
+            <ion-icon name="checkmark-circle" *ngIf="!markingOutfitIds.has(selectedOutfit.id)"></ion-icon>
+            <span>{{ markingOutfitIds.has(selectedOutfit.id) ? 'Logging Wear...' : 'Log Outfit as Worn Today' }}</span>
           </button>
           <div class="sheet-footer-secondary">
             <button type="button" class="sheet-btn-secondary" (click)="toggleFavorite(selectedOutfit)">

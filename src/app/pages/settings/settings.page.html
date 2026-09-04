@@ -92,7 +92,7 @@
             Cancel
           </ion-button>
           <ion-button class="primary-button compact-button flex-1" type="submit" [disabled]="isBusy">
-            {{ isBusy ? 'Saving...' : 'Save' }}
+            {{ busyAction === 'details' ? 'Saving...' : 'Save' }}
           </ion-button>
         </div>
       </form>
@@ -129,6 +129,10 @@
           <span class="row-label">Loading AI activity...</span>
           <ion-spinner name="crescent" slot="end"></ion-spinner>
         </div>
+        <div class="ios-table-row" *ngIf="!isLoadingAiUsage && !aiUsage && aiUsageLoadMessage">
+          <span class="row-subtext">{{ aiUsageLoadMessage }}</span>
+          <button type="button" class="row-action-link" (click)="loadAiUsage()">Retry</button>
+        </div>
         <div class="ios-table-row">
           <div class="row-info-col">
             <span class="row-label">Gemini Processing Consent</span>
@@ -136,6 +140,9 @@
           </div>
           <button type="button" class="row-action-link" *ngIf="aiConsentAccepted" (click)="resetAiConsent()" [disabled]="isBusy">
             Revoke
+          </button>
+          <button type="button" class="row-action-link" *ngIf="!aiConsentAccepted" (click)="grantAiConsent()" [disabled]="isBusy">
+            Grant
           </button>
         </div>
       </div>
@@ -180,7 +187,7 @@
     <div class="ios-section">
       <div class="ios-grouped-card">
         <button type="button" class="ios-action-row centered" (click)="logout()" [disabled]="isBusy">
-          <span class="action-label">{{ isBusy ? 'Signing out...' : 'Sign Out' }}</span>
+          <span class="action-label">{{ busyAction === 'signout' ? 'Signing out...' : 'Sign Out' }}</span>
         </button>
       </div>
     </div>
@@ -188,7 +195,7 @@
     <div class="ios-section danger-section">
       <div class="ios-grouped-card">
         <button type="button" class="ios-action-row centered destructive" (click)="deleteAccount()" [disabled]="isBusy">
-          <span class="action-label">{{ isBusy ? 'Deleting...' : 'Delete Account' }}</span>
+          <span class="action-label">{{ busyAction === 'delete' ? 'Deleting...' : 'Delete Account' }}</span>
         </button>
       </div>
       <p class="ios-section-footer center">Permanently deletes your account, wardrobe items, saved outfits, and images.</p>
