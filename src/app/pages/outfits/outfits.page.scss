@@ -43,6 +43,8 @@
 }
 
 .outfits-container {
+  max-width: 1040px;
+  margin: 0 auto;
   padding: 16px;
   padding-bottom: calc(32px + var(--ion-safe-area-bottom));
 }
@@ -54,14 +56,14 @@
   background: var(--app-surface);
   border: 1px solid var(--app-border);
   border-radius: 14px;
-  padding: 10px 16px;
+  padding: 8px 16px;
   margin-bottom: 16px;
   font-size: 14px;
   font-weight: 500;
 
   .selection-banner-actions {
     display: flex;
-    gap: 14px;
+    gap: 8px;
 
     .action-link {
       background: none;
@@ -70,9 +72,20 @@
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
+      min-width: 44px;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 8px;
+
+      &:active {
+        opacity: 0.6;
+      }
 
       &:disabled {
         opacity: 0.4;
+        cursor: not-allowed;
       }
     }
   }
@@ -80,9 +93,17 @@
 
 /* Editorial Lookbook Grid */
 .lookbook-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+
+  @media (min-width: 680px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (min-width: 1040px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .lookbook-card {
@@ -92,6 +113,8 @@
   box-shadow: var(--app-shadow-subtle);
   border: 0.5px solid var(--app-border);
   transition: opacity 150ms ease;
+  display: flex;
+  flex-direction: column;
 
   &.in-selection-mode {
     cursor: pointer;
@@ -107,6 +130,7 @@
   position: relative;
   width: 100%;
   aspect-ratio: 4 / 3.8;
+  max-height: 420px;
   background: var(--app-surface-muted);
   display: flex;
   align-items: center;
@@ -159,10 +183,12 @@
 /* Floating Favorite Heart */
 .favorite-button {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 34px;
-  height: 34px;
+  top: 8px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.92);
   border: 0.5px solid var(--app-border);
@@ -177,7 +203,7 @@
   }
 
   ion-icon {
-    font-size: 18px;
+    font-size: 20px;
     color: var(--app-muted);
     transition: color 150ms ease;
 
@@ -257,6 +283,10 @@
 /* Lookbook Card Body */
 .lookbook-body {
   padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
 
   .lookbook-info {
     cursor: pointer;
@@ -296,31 +326,34 @@
     justify-content: center;
     gap: 6px;
     min-height: 44px;
-    border-radius: var(--app-radius-md);
-    background: var(--app-olive);
-    color: #ffffff;
+    border-radius: var(--app-radius-pill);
+    background: var(--app-surface-muted);
+    border: 0.5px solid var(--app-border-strong);
+    color: var(--app-ink);
     font-size: 14px;
     font-weight: 600;
-    border: none;
     cursor: pointer;
-    transition: opacity 120ms ease;
+    transition: background 120ms ease, opacity 120ms ease;
 
     &:active {
+      background: var(--app-surface-pressed);
       opacity: 0.85;
     }
 
     &:disabled {
-      opacity: 0.5;
+      opacity: var(--app-opacity-disabled);
+      cursor: not-allowed;
     }
 
     ion-icon {
       font-size: 17px;
+      color: var(--app-olive);
     }
 
     ion-spinner {
       width: 16px;
       height: 16px;
-      --color: #ffffff;
+      --color: var(--app-ink);
     }
   }
 
@@ -328,17 +361,18 @@
     width: 44px;
     min-width: 44px;
     height: 44px;
-    border-radius: var(--app-radius-md);
+    border-radius: var(--app-radius-pill);
     background: var(--app-surface-muted);
-    border: 0.5px solid var(--app-border);
+    border: 0.5px solid var(--app-border-strong);
     color: var(--app-ink);
     display: grid;
     place-items: center;
     cursor: pointer;
     font-size: 19px;
-    transition: opacity 120ms ease;
+    transition: background 120ms ease, opacity 120ms ease;
 
     &:active {
+      background: var(--app-surface-pressed);
       opacity: 0.7;
     }
   }
@@ -350,9 +384,17 @@
 
 /* Skeletons */
 .outfit-skeletons {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+
+  @media (min-width: 680px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (min-width: 1040px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .outfit-skeleton-card {
@@ -364,6 +406,7 @@
   .skeleton-hero {
     width: 100%;
     aspect-ratio: 4 / 3.8;
+    max-height: 420px;
     background: linear-gradient(90deg, rgba(0,0,0,0.04) 25%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.04) 75%);
     background-size: 200% 100%;
     animation: skeletonShimmer 1.5s infinite;
@@ -455,12 +498,6 @@
 }
 
 /* iOS Sheet Modal Detail */
-ion-modal {
-  --border-radius: 24px 24px 0 0;
-  --background: var(--app-bg);
-  --max-width: 100%;
-}
-
 .sheet-modal-content {
   display: flex;
   flex-direction: column;
@@ -472,51 +509,60 @@ ion-modal {
   background: var(--app-bg);
 }
 
-.sheet-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--app-border);
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
+.modal-nav-bar {
+  min-height: 52px;
+  height: auto;
+  padding: 6px 16px;
 
   .sheet-title-group {
     flex: 1;
     min-width: 0;
-    padding-right: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 
+    .modal-title,
     h2 {
       margin: 0;
-      font-size: 20px;
-      font-weight: 700;
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.1px;
       color: var(--app-ink);
-      letter-spacing: -0.01em;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      text-align: left;
     }
 
     .sheet-wear-badge {
-      margin: 2px 0 0;
+      margin: 1px 0 0;
       font-size: 12px;
       font-weight: 600;
       color: var(--ion-color-primary, #5b6040);
+      line-height: 1.2;
     }
   }
 
   .sheet-close-btn {
     flex-shrink: 0;
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     background: none;
     border: none;
     font-size: 26px;
     color: var(--app-muted);
     cursor: pointer;
-    padding: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    transition: opacity 150ms ease;
+
+    &:active {
+      opacity: 0.6;
+    }
   }
 }
 

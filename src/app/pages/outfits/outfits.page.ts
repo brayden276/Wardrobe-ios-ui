@@ -100,11 +100,6 @@ export class OutfitsPage {
     return this.selectedOutfitIds.size;
   }
 
-  get processingDetail(): string {
-    return this.selectedCount === 1
-      ? 'Deleting 1 saved outfit. Wardrobe items stay available.'
-      : `Deleting ${this.selectedCount} saved outfits. Wardrobe items stay available.`;
-  }
 
   get messageKind(): NoticeKind {
     return noticeKind(this.message);

@@ -157,6 +157,21 @@
         </div>
       </section>
 
+      <!-- Zero-data placeholder when user has 0 items and 0 outfits -->
+      <section class="ios-section" *ngIf="hasZeroData">
+        <div class="ios-grouped-card zero-data-card">
+          <div class="zero-data-icon">
+            <ion-icon name="shirt-outline"></ion-icon>
+          </div>
+          <h2 class="zero-data-title">{{ scope === 'user' ? 'No Wardrobe Items Yet' : 'No Platform Activity' }}</h2>
+          <p class="zero-data-text">
+            {{ scope === 'user'
+              ? 'Catalog items and save styled outfits to unlock category breakdowns, color distributions, and wear frequency telemetry.'
+              : 'No items or outfits have been registered on the platform yet.' }}
+          </p>
+        </div>
+      </section>
+
       <!-- SECTION 3: Category Distribution -->
       <section class="ios-section" *ngIf="categoryList.length > 0">
         <div class="ios-section-header">

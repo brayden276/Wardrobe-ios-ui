@@ -6,7 +6,6 @@ import { DeviceImageCacheService } from '../../device-image-cache.service';
 import { AiUsageCostSummaryDto, UpdatePersonalDetailsRequest, UserPersonalDetailsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import {
-  AI_DISCLOSURE_TEXT,
   PRIVACY_POLICY_URL,
   SUPPORT_URL,
   TERMS_OF_USE_URL,
@@ -20,8 +19,6 @@ import {
   successFeedback,
   warningFeedback
 } from '../page-helpers';
-
-type SettingsMode = 'account' | 'ai' | 'legal' | 'danger';
 
 @Component({
   selector: 'app-settings',
@@ -39,7 +36,6 @@ export class SettingsPage {
   readonly privacyPolicyUrl = PRIVACY_POLICY_URL;
   readonly termsUrl = TERMS_OF_USE_URL;
   readonly supportUrl = SUPPORT_URL;
-  readonly aiDisclosure = AI_DISCLOSURE_TEXT;
   private readonly personalDetailLabels: Record<string, Record<string, string>> = {
     gender: {
       male: 'Male',
@@ -71,7 +67,6 @@ export class SettingsPage {
   isBusy = false;
   busyMessage = '';
   message = '';
-  settingsMode: SettingsMode = 'account';
   isEditingPersonalDetails = false;
   personalDetailsForm: UpdatePersonalDetailsRequest = {
     gender: 'female',
@@ -126,24 +121,8 @@ export class SettingsPage {
     return this.auth.session?.user?.personalDetails ?? null;
   }
 
-  get settingsStatusMessage(): string {
-    if (this.busyMessage) {
-      return this.busyMessage;
-    }
-
-    if (this.isLoadingAiUsage) {
-      return 'Loading AI processing activity...';
-    }
-
-    return '';
-  }
-
   get messageKind(): NoticeKind {
     return noticeKind(this.message);
-  }
-
-  get aiUsageLoadKind(): NoticeKind {
-    return noticeKind(this.aiUsageLoadMessage);
   }
 
   personalDetailLabel(group: string, value: string): string {
@@ -184,18 +163,6 @@ export class SettingsPage {
       this.isBusy = false;
       this.busyMessage = '';
     }
-  }
-
-  setSettingsMode(mode: SettingsMode): void {
-    if (this.settingsMode === mode) {
-      return;
-    }
-
-    this.settingsMode = mode;
-    if (mode !== 'danger') {
-      this.message = '';
-    }
-    void lightImpact();
   }
 
   async logout(): Promise<void> {

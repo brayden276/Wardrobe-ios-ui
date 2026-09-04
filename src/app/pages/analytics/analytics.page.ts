@@ -61,6 +61,11 @@ export class AnalyticsPage {
     return this.scope === 'user' ? this.analytics.userMetrics : this.analytics.platformMetrics;
   }
 
+  get hasZeroData(): boolean {
+    const metrics = this.currentMetrics;
+    return !!metrics && metrics.totalItems === 0 && metrics.totalOutfits === 0;
+  }
+
   get formattedTotalCost(): string {
     const cost = this.currentCost?.totalCostUsd ?? 0;
     return cost.toLocaleString(undefined, {

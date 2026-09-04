@@ -3,9 +3,9 @@
   flex-direction: column;
   gap: 24px;
   width: 100%;
-  max-width: 640px;
+  max-width: 680px;
   margin: 0 auto;
-  padding: calc(var(--ion-safe-area-top) + 16px) 16px calc(var(--ion-safe-area-bottom) + 32px);
+  padding: calc(var(--ion-safe-area-top) + 16px) 16px calc(96px + var(--ion-safe-area-bottom));
   box-sizing: border-box;
 }
 
@@ -25,6 +25,7 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    min-height: 44px;
     border: none;
     background: transparent;
     color: var(--app-olive);

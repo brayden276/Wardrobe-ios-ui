@@ -19,7 +19,7 @@
   --padding-top: 0;
   --padding-bottom: 4px;
   --background: transparent;
-  --min-height: 38px;
+  --min-height: 44px;
 }
 
 .ios-searchbar {
@@ -47,6 +47,7 @@
   }
 
   .capsule-pill {
+    position: relative;
     flex: 0 0 auto;
     border: 1px solid var(--app-border);
     border-radius: 999px;
@@ -55,8 +56,24 @@
     font-size: 13px;
     font-weight: 550;
     padding: 6px 14px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
     cursor: pointer;
     transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      transform: translateY(-50%);
+      min-height: 44px;
+      height: 100%;
+    }
 
     &:active {
       background: var(--app-surface-pressed);
@@ -158,6 +175,7 @@
   }
 
   .token-clear-btn {
+    position: relative;
     border: none;
     background: transparent;
     color: var(--app-muted);
@@ -167,7 +185,20 @@
     cursor: pointer;
     padding: 0;
     flex-shrink: 0;
+    min-width: 44px;
+    min-height: 44px;
+    margin: -10px -8px -10px 0;
     transition: color 150ms ease;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      min-width: 44px;
+      min-height: 44px;
+    }
 
     &:active {
       color: var(--app-ink);
@@ -192,8 +223,8 @@
 
 .card-archive-badge {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  bottom: 8px;
+  left: 8px;
   background: rgba(255, 255, 255, 0.92);
   border: 0.5px solid rgba(158, 50, 42, 0.2);
   color: var(--app-danger);
@@ -213,6 +244,10 @@
 
   .card-archive-badge {
     background: rgba(35, 32, 28, 0.92);
+  }
+
+  .category-capsule-strip .filter-capsule-btn.has-active {
+    background: rgba(155, 176, 120, 0.2);
   }
 }
 

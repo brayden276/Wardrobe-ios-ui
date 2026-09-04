@@ -20,7 +20,7 @@
   </ion-toolbar>
 
   <!-- Search Toolbar -->
-  <ion-toolbar class="search-toolbar" *ngIf="!isSelectionMode">
+  <ion-toolbar class="search-toolbar">
     <ion-searchbar
       class="ios-searchbar"
       [(ngModel)]="search"
@@ -32,7 +32,7 @@
   </ion-toolbar>
 
   <!-- Category & Filter Capsule Strip -->
-  <ion-toolbar class="category-toolbar" *ngIf="!isSelectionMode">
+  <ion-toolbar class="category-toolbar">
     <div class="category-capsule-strip">
       <button
         type="button"
@@ -73,7 +73,7 @@
 
   <section class="screen wardrobe-screen">
     <!-- Active Filters Token Pill (if advanced filters are on) -->
-    <div class="active-filter-token-bar" *ngIf="!isSelectionMode && activeFilterCount">
+    <div class="active-filter-token-bar" *ngIf="activeFilterCount">
       <div class="token-content">
         <ion-icon name="funnel-outline" class="token-icon"></ion-icon>
         <span class="token-label">{{ activeFilterSummary }}</span>

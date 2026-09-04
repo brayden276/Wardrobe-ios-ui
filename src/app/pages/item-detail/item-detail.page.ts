@@ -16,8 +16,6 @@ import {
   warningFeedback
 } from '../page-helpers';
 
-type ItemDetailMode = 'view' | 'edit';
-
 @Component({
   selector: 'app-item-detail',
   standalone: false,
@@ -38,10 +36,8 @@ export class ItemDetailPage implements OnDestroy {
   isSaving = false;
   isMarkingWorn = false;
   isArchiving = false;
-  isOriginalImageOpen = false;
   isEditModalOpen = false;
   activeImageLayer: 'display' | 'original' = 'display';
-  itemMode: ItemDetailMode = 'view';
   isDeleting = false;
   private imageGenerationStatusStream: ImageGenerationStatusStream | null = null;
   private readonly imageGenerationPollingIntervalMs = 1800;
@@ -52,22 +48,11 @@ export class ItemDetailPage implements OnDestroy {
     return this.lookups?.categories.find((category) => category.id === this.form.categoryId)?.subcategories ?? [];
   }
 
-  get visibleTags(): string[] {
-    if (!this.item || !this.lookups) return [];
-    const tags = [
-      this.item.categoryId,
-      this.item.subcategoryId,
-      this.item.primaryColourId,
-      this.item.patternId,
-      this.item.visibleMaterialId,
-      this.item.necklineId,
-      this.item.sleeveLengthId,
-      this.item.fitId,
-      this.item.lengthId,
-      this.item.bottomShapeId,
-      this.item.riseId
-    ];
-    return Array.from(new Set(tags.map((id) => lookupLabel(this.lookups!, id)).filter(Boolean))).slice(0, 8);
+  setImageLayer(layer: 'display' | 'original'): void {
+    if (layer) {
+      this.activeImageLayer = layer;
+      void lightImpact();
+    }
   }
 
   get messageKind(): NoticeKind {
@@ -172,9 +157,6 @@ export class ItemDetailPage implements OnDestroy {
     this.isLoading = true;
     this.message = '';
     this.item = null;
-    this.isOriginalImageOpen = false;
-    const initialMode = this.route.snapshot.queryParamMap.get('mode') === 'edit' ? 'edit' : 'view';
-    this.setItemMode(initialMode);
     if (this.route.snapshot.queryParamMap.get('newlyAdded') === 'true') {
       this.message = 'AI classified your item. Review details below and tap Save.';
     }
@@ -193,6 +175,9 @@ export class ItemDetailPage implements OnDestroy {
       this.item = item;
       this.form = this.toFormState(item);
       this.startImageGenerationStreaming();
+      if (this.route.snapshot.queryParamMap.get('mode') === 'edit') {
+        this.openEditModal();
+      }
     } catch (error) {
       this.message = readMessage(error, 'Could not load item.');
       if (this.isUnauthorized(error)) {
@@ -243,13 +228,12 @@ export class ItemDetailPage implements OnDestroy {
       return;
     }
 
-    const currentMode = this.itemMode;
     this.item = {
       ...this.item,
       imageGenerationStatus: update.status
     };
-    if (currentMode !== 'edit') {
-      this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
+    if (!this.isEditModalOpen) {
+      this.form = this.toFormState(this.item);
     }
 
     if (!this.shouldPollImageGeneration()) {
@@ -265,10 +249,9 @@ export class ItemDetailPage implements OnDestroy {
 
     try {
       const latestItem = await this.api.getItem(this.item.id);
-      const mode = this.itemMode;
       this.item = latestItem;
-      if (mode !== 'edit') {
-        this.form = { ...latestItem, secondaryColourIds: latestItem.secondaryColourIds.slice() };
+      if (!this.isEditModalOpen) {
+        this.form = this.toFormState(latestItem);
       }
     } catch {
       // Ignore temporary network issues after image generation completes.
@@ -312,10 +295,9 @@ export class ItemDetailPage implements OnDestroy {
     this.isRefreshingImageGeneration = true;
     try {
       const latestItem = await this.api.getItem(this.item.id);
-      const mode = this.itemMode;
       this.item = latestItem;
-      if (mode !== 'edit') {
-        this.form = { ...latestItem, secondaryColourIds: latestItem.secondaryColourIds.slice() };
+      if (!this.isEditModalOpen) {
+        this.form = this.toFormState(latestItem);
       }
     } catch {
       // Ignore temporary network issues while polling for image-generation state.
@@ -352,18 +334,6 @@ export class ItemDetailPage implements OnDestroy {
 
   isImageGenerationInProgress(status: string | null): boolean {
     return status === 'queued' || status === 'generating';
-  }
-
-  openOriginalImage(): void {
-    if (!this.item?.image?.originalUrl) {
-      return;
-    }
-
-    this.isOriginalImageOpen = true;
-  }
-
-  closeOriginalImage(): void {
-    this.isOriginalImageOpen = false;
   }
 
   async markWorn(): Promise<void> {
@@ -437,7 +407,6 @@ export class ItemDetailPage implements OnDestroy {
       this.form = this.toFormState(this.item);
       this.message = 'Details saved.';
       this.closeEditModal();
-      this.setItemMode('view');
       void successFeedback();
     } catch (error) {
       this.message = readMessage(error, 'Could not save details.');
@@ -496,43 +465,6 @@ export class ItemDetailPage implements OnDestroy {
 
   async deleteItem(): Promise<void> {
     await this.deleteItemPermanently();
-  }
-
-  cancelEdit(): void {
-    this.setItemMode('view');
-  }
-
-  get editing(): boolean {
-    return this.itemMode === 'edit';
-  }
-
-  get processingMessage(): string {
-    if (this.isSaving) {
-      return 'Saving item details...';
-    }
-
-    if (this.isMarkingWorn) {
-      return 'Marking item as worn...';
-    }
-
-    if (this.isArchiving) {
-      return 'Archiving item...';
-    }
-
-    return '';
-  }
-
-  setItemMode(mode: ItemDetailMode): void {
-    if (this.itemMode === mode) {
-      return;
-    }
-
-    this.itemMode = mode;
-    this.message = '';
-    if (mode === 'view' && this.item) {
-      this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
-    }
-    void lightImpact();
   }
 
   private isUnauthorized(error: unknown): boolean {

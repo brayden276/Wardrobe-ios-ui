@@ -103,9 +103,9 @@
             placeholder="Add specific notes, e.g. 'Chilly evening, pair with Chelsea boots'"></ion-textarea>
           
           <div class="prompt-quick-tags" *ngIf="!query">
-            <span (click)="applyPromptInspiration('Warm layers, tailored outerwear')">Layered</span>
-            <span (click)="applyPromptInspiration('Monochrome minimalist tones')">Monochrome</span>
-            <span (click)="applyPromptInspiration('Rainy day, water-resistant footwear')">Rainy day</span>
+            <span role="button" tabindex="0" (click)="applyPromptInspiration('Warm layers, tailored outerwear')">Layered</span>
+            <span role="button" tabindex="0" (click)="applyPromptInspiration('Monochrome minimalist tones')">Monochrome</span>
+            <span role="button" tabindex="0" (click)="applyPromptInspiration('Rainy day, water-resistant footwear')">Rainy day</span>
           </div>
         </div>
 
@@ -214,7 +214,27 @@
 
     <!-- MODE 2: MANUAL CANVAS -->
     <ng-container *ngIf="builderMode === 'manual'">
-      <article class="ios-grouped-card manual-builder-card">
+      <!-- Zero Inventory Empty State -->
+      <article class="ios-empty-state" *ngIf="!isLoadingWardrobe && !items.length">
+        <div class="empty-icon-wrap">
+          <ion-icon name="shirt-outline"></ion-icon>
+        </div>
+        <h2>Your wardrobe is empty</h2>
+        <p class="muted">Add garments to your wardrobe to start building custom outfits manually.</p>
+        <ion-button class="primary-button" routerLink="/tabs/add">
+          <ion-icon name="add-circle-outline" slot="start"></ion-icon>
+          Add Garments
+        </ion-button>
+      </article>
+
+      <!-- Loading State when wardrobe items are being fetched -->
+      <div class="builder-loading-state" *ngIf="isLoadingWardrobe && !items.length">
+        <ion-spinner name="crescent"></ion-spinner>
+        <span>Loading wardrobe items...</span>
+      </div>
+
+      <!-- Manual Builder Card -->
+      <article class="ios-grouped-card manual-builder-card" *ngIf="items.length">
         <div class="manual-top-header">
           <div>
             <h3>Select Outfit Pieces</h3>
@@ -223,12 +243,12 @@
           <button type="button" class="text-link-btn" (click)="selectAllItems()" [disabled]="!items.length || isBusy">Select all</button>
         </div>
 
-        <div class="ios-form-row" *ngIf="manualItemIds.length">
+        <div class="ios-form-row">
           <label class="row-label">Outfit Name</label>
           <ion-input class="ios-name-input" [(ngModel)]="manualName" placeholder="Outfit title"></ion-input>
         </div>
 
-        <div class="manual-grid" *ngIf="items.length">
+        <div class="manual-grid">
           <button
             type="button"
             class="item-card manual-item"
@@ -254,7 +274,7 @@
 
         <p class="manual-hint-text" *ngIf="manualItemIds.length && manualHint">{{ manualHint }}</p>
 
-        <ion-button class="primary-button" expand="block" *ngIf="manualItemIds.length" (click)="saveManual()" [disabled]="isBusy">
+        <ion-button class="primary-button" expand="block" (click)="saveManual()" [disabled]="isBusy || !manualCanSave">
           <ion-icon name="checkmark-outline" slot="start"></ion-icon>
           {{ isSavingManualOutfit ? 'Saving...' : 'Save Outfit to Lookbook' }}
         </ion-button>

@@ -36,20 +36,19 @@
     <!-- Hero Product Stage -->
     <div class="product-hero-stage">
       <!-- Cutout / Original Segment Toggle -->
-      <div class="image-segment-pill" *ngIf="item.image?.originalUrl">
-        <button
-          type="button"
-          [class.active]="activeImageLayer === 'display'"
-          (click)="activeImageLayer = 'display'">
-          Cutout
-        </button>
-        <button
-          type="button"
-          [class.active]="activeImageLayer === 'original'"
-          (click)="activeImageLayer = 'original'">
-          Original
-        </button>
-      </div>
+      <ion-segment
+        mode="ios"
+        class="stage-image-segment"
+        *ngIf="item.image?.originalUrl"
+        [value]="activeImageLayer"
+        (ionChange)="setImageLayer($any($event).detail.value)">
+        <ion-segment-button value="display">
+          <ion-label>Cutout</ion-label>
+        </ion-segment-button>
+        <ion-segment-button value="original">
+          <ion-label>Original</ion-label>
+        </ion-segment-button>
+      </ion-segment>
 
       <img
         class="hero-product-image"

@@ -109,10 +109,6 @@ export class OnboardingPage {
     return this.stepIndex === this.steps.length - 1;
   }
 
-  get progressPercent(): number {
-    return ((this.stepIndex + 1) / this.steps.length) * 100;
-  }
-
   get canContinue(): boolean {
     return !!this.values[this.currentStep.key] && !this.isBusy;
   }

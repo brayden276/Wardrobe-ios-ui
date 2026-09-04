@@ -1,27 +1,136 @@
 :root {
+  /* Font Family Stacks */
   --ion-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", -apple-system-body, "Helvetica Neue", system-ui, sans-serif;
+  --app-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", -apple-system-body, "Helvetica Neue", system-ui, sans-serif;
+  --app-heading-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", -apple-system-body, "Helvetica Neue", system-ui, sans-serif;
+  --app-mono-font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Ionic Light Palette */
   --ion-background-color: #f7efe6;
+  --ion-background-color-rgb: 247, 239, 230;
   --ion-text-color: #1f1b16;
+  --ion-text-color-rgb: 31, 27, 22;
   --ion-color-primary: #535a3b;
   --ion-color-primary-rgb: 83, 90, 59;
   --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #444a30;
+  --ion-color-primary-tint: #646b48;
   --ion-color-secondary: #6e7a63;
+  --ion-color-secondary-rgb: 110, 122, 99;
+  --ion-color-secondary-contrast: #ffffff;
   --ion-color-tertiary: #a4785e;
-  --ion-color-medium: #6c6356;
+  --ion-color-tertiary-rgb: 164, 120, 94;
+  --ion-color-tertiary-contrast: #ffffff;
+  --ion-color-medium: #6a6256;
+  --ion-color-medium-rgb: 106, 98, 86;
   --ion-color-light: #fffaf3;
+  --ion-color-light-rgb: 255, 250, 243;
+  --ion-color-light-contrast: #1f1b16;
+  --ion-color-danger: #9e322a;
+  --ion-color-danger-rgb: 158, 50, 42;
+  --ion-color-danger-contrast: #ffffff;
+
+  /* App Semantic Light Palette */
+  --app-bg: #f7efe6;
+  --app-surface: #fffaf3;
+  --app-surface-muted: #efe5d8;
+  --app-surface-pressed: #ebdccf;
+  --app-stage-bg: #ffffff;
+  --app-header-bg: rgba(255, 250, 243, 0.92);
+  --app-ink: #1f1b16;
+  --app-muted: #6a6256;
+  --app-olive: #535a3b;
+  --app-olive-pressed: #444a30;
+  --app-taupe: #b2a492;
+  --app-danger: #9e322a;
+  --app-danger-bg: #faeceb;
+  --app-border: rgba(60, 48, 38, 0.09);
+  --app-border-strong: rgba(60, 48, 38, 0.16);
+  --app-segment-bg: rgba(60, 48, 38, 0.06);
+  --app-segment-thumb: #ffffff;
+
+  /* Shadows */
+  --app-shadow: 0 2px 8px rgba(36, 31, 26, 0.05);
+  --app-shadow-subtle: 0 1px 2px rgba(36, 31, 26, 0.03);
+  --app-stage-shadow: 0 2px 8px rgba(36, 31, 26, 0.04);
+  --app-elevated-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* Spacing Scale */
+  --app-space-1: 4px;
+  --app-space-2: 8px;
+  --app-space-3: 12px;
+  --app-space-4: 16px;
+  --app-space-5: 20px;
+  --app-space-6: 24px;
+  --app-space-8: 32px;
+
+  /* Border Radius Scale */
+  --app-radius-xs: 6px;
+  --app-radius-sm: 8px;
+  --app-radius-md: 12px;
+  --app-radius-lg: 16px;
+  --app-radius-sheet: 20px 20px 0 0;
+  --app-radius-pill: 999px;
+
+  /* Interactive States & Targets */
+  --app-touch-target-min: 44px;
+  --app-opacity-disabled: 0.38;
+  --app-opacity-pressed: 0.72;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    /* Ionic Dark Palette */
     --ion-background-color: #171513;
+    --ion-background-color-rgb: 23, 21, 19;
     --ion-text-color: #f4ede4;
+    --ion-text-color-rgb: 244, 237, 228;
     --ion-color-primary: #9bb078;
     --ion-color-primary-rgb: 155, 176, 120;
     --ion-color-primary-contrast: #171513;
+    --ion-color-primary-contrast-rgb: 23, 21, 19;
+    --ion-color-primary-shade: #8ca069;
+    --ion-color-primary-tint: #aebd8e;
     --ion-color-secondary: #8da484;
+    --ion-color-secondary-rgb: 141, 164, 132;
+    --ion-color-secondary-contrast: #171513;
     --ion-color-tertiary: #c8957e;
+    --ion-color-tertiary-rgb: 200, 149, 126;
+    --ion-color-tertiary-contrast: #171513;
     --ion-color-medium: #9c9183;
-    --ion-color-light: #24201b;
+    --ion-color-medium-rgb: 156, 145, 131;
+    --ion-color-light: #23201c;
+    --ion-color-light-rgb: 35, 32, 28;
+    --ion-color-light-contrast: #f4ede4;
+    --ion-color-danger: #e26f66;
+    --ion-color-danger-rgb: 226, 111, 102;
+    --ion-color-danger-contrast: #171513;
+
+    /* App Semantic Dark Palette */
+    --app-bg: #171513;
+    --app-surface: #23201c;
+    --app-surface-muted: #2a2622;
+    --app-surface-pressed: #332e29;
+    --app-stage-bg: #1e1b18;
+    --app-header-bg: rgba(23, 21, 19, 0.92);
+    --app-ink: #f4ede4;
+    --app-muted: #9c9183;
+    --app-olive: #9bb078;
+    --app-olive-pressed: #aebd8e;
+    --app-taupe: #8a7c6c;
+    --app-danger: #e26f66;
+    --app-danger-bg: #321c1a;
+    --app-border: rgba(245, 237, 228, 0.1);
+    --app-border-strong: rgba(245, 237, 228, 0.18);
+    --app-segment-bg: rgba(245, 237, 228, 0.08);
+    --app-segment-thumb: #332e29;
+
+    /* Shadows */
+    --app-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    --app-shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --app-stage-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --app-elevated-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   }
 }
 

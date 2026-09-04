@@ -174,12 +174,13 @@
     </div>
   </div>
 
-  <!-- Selection Mode Bottom Bar -->
-  <div class="bulk-action-bar" *ngIf="isSelectionMode">
-    <button type="button" class="bulk-action-bar__secondary" (click)="cancelSelectionMode()">Cancel</button>
-    <button type="button" class="bulk-action-bar__danger" (click)="deleteSelectedOutfits()" [disabled]="!selectedCount || isDeletingSelected">
+  <!-- Native iOS Bottom Selection Bar -->
+  <div class="ios-bulk-bar" *ngIf="isSelectionMode">
+    <span class="bulk-count">{{ selectedCount }} selected</span>
+    <button type="button" class="bulk-destructive-btn" (click)="deleteSelectedOutfits()" [disabled]="!selectedCount || isDeletingSelected">
       <ion-spinner name="crescent" *ngIf="isDeletingSelected"></ion-spinner>
-      <span>{{ isDeletingSelected ? 'Deleting...' : (selectedCount ? ('Delete (' + selectedCount + ')') : 'Select Outfits') }}</span>
+      <ion-icon name="trash-outline" *ngIf="!isDeletingSelected"></ion-icon>
+      <span>{{ isDeletingSelected ? 'Deleting...' : 'Delete' }}</span>
     </button>
   </div>
 
@@ -187,12 +188,12 @@
   <ion-modal [isOpen]="!!selectedOutfit" [breakpoints]="[0, 0.65, 0.95]" [initialBreakpoint]="0.65" [handle]="true" (ionModalDidDismiss)="close()">
     <ng-template>
       <div class="sheet-modal-content" *ngIf="selectedOutfit">
-        <header class="sheet-modal-header">
+        <header class="modal-nav-bar">
           <div class="sheet-title-group">
-            <h2>{{ selectedOutfit.name }}</h2>
+            <h2 class="modal-title">{{ selectedOutfit.name }}</h2>
             <p class="sheet-wear-badge" *ngIf="selectedOutfit.wearCount > 0">Worn {{ selectedOutfit.wearCount }} {{ selectedOutfit.wearCount === 1 ? 'time' : 'times' }}</p>
           </div>
-          <button type="button" class="sheet-close-btn" (click)="close()" aria-label="Close">
+          <button type="button" class="sheet-close-btn text-btn" (click)="close()" aria-label="Close">
             <ion-icon name="close-circle"></ion-icon>
           </button>
         </header>

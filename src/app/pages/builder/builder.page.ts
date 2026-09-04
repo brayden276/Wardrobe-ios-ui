@@ -3,7 +3,6 @@ import { AlertController } from '@ionic/angular';
 import { GeneratedOutfitDto, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import {
-  colourSwatch,
   ensureAiConsentWithAlert,
   isActivewearBottomSubcategory,
   isActivewearTopSubcategory,
@@ -18,7 +17,6 @@ import {
 
 type BuilderMode = 'generate' | 'manual';
 type GeneratedOutfitSaveState = 'idle' | 'saving' | 'saved' | 'failed';
-type BuilderProcessingKind = 'loadingWardrobe' | 'buildingOutfits' | 'savingGeneratedOutfit' | 'savingManualOutfit';
 
 interface BuilderItemCard {
   item: WardrobeItemDto;
@@ -74,8 +72,6 @@ export class BuilderPage {
   isLoadingWardrobe = true;
   isBuildingOutfits = false;
   isSavingManualOutfit = false;
-  processingKind: BuilderProcessingKind | null = null;
-  processingStepIndex = 0;
   private lastGeneratedPrompt = '';
   private readonly savingGeneratedOutfitKeys = new Set<string>();
   private readonly savedGeneratedOutfitKeys = new Set<string>();
@@ -89,12 +85,6 @@ export class BuilderPage {
   private itemById = new Map<string, WardrobeItemDto>();
   private itemNameById = new Map<string, string>();
   private manualItemIdSet = new Set<string>();
-  private readonly processingStepsByKind: Record<BuilderProcessingKind, string[]> = {
-    loadingWardrobe: ['Loading wardrobe items', 'Loading outfit options', 'Preparing builder'],
-    buildingOutfits: ['Reading request', 'Matching wardrobe items', 'Building outfit combinations', 'Loading outfit images', 'Preparing suggestions'],
-    savingGeneratedOutfit: ['Collecting selected item images', 'Composing outfit preview', 'Generating outfit image', 'Saving outfit'],
-    savingManualOutfit: ['Collecting selected item images', 'Composing outfit preview', 'Generating outfit image', 'Saving outfit']
-  };
 
   get isBusy(): boolean {
     return this.isLoadingWardrobe
@@ -150,69 +140,18 @@ export class BuilderPage {
     void lightImpact();
   }
 
-  get isFullPageProcessing(): boolean {
-    return false;
-  }
-
-  get processingTitle(): string {
-    switch (this.processingKind) {
-      case 'loadingWardrobe':
-        return 'Loading wardrobe';
-      case 'buildingOutfits':
-        return 'Building outfit ideas';
-      case 'savingGeneratedOutfit':
-      case 'savingManualOutfit':
-        return 'Generating outfit image';
-      default:
-        return '';
-    }
-  }
-
-  get processingDetail(): string {
-    switch (this.processingKind) {
-      case 'loadingWardrobe':
-        return 'Loading the items and options needed for the builder.';
-      case 'buildingOutfits':
-        return this.loadingStatus;
-      case 'savingGeneratedOutfit':
-        return 'Using the selected clothing item images to generate the saved outfit preview.';
-      case 'savingManualOutfit':
-        return 'Using your selected clothing item images to generate the saved outfit preview.';
-      default:
-        return '';
-    }
-  }
-
-  get processingSteps(): string[] {
-    return this.processingKind ? this.processingStepsByKind[this.processingKind] : [];
-  }
-
   get messageKind(): NoticeKind {
     return noticeKind(this.message);
-  }
-
-  processingStepState(index: number): string {
-    if (!this.processingKind) {
-      return '';
-    }
-
-    if (index < this.processingStepIndex) {
-      return 'complete';
-    }
-
-    return index === this.processingStepIndex ? 'active' : 'pending';
   }
 
   async ionViewWillEnter(): Promise<void> {
     this.message = '';
     this.isLoadingWardrobe = true;
-    this.startProcessing('loadingWardrobe');
     try {
       const [lookups, items] = await Promise.all([
         this.lookups ? Promise.resolve(this.lookups) : this.api.getLookups(),
         this.api.getItems()
       ]);
-      this.setProcessingStep(2);
       this.lookups = lookups;
       this.items = items;
       this.rebuildItemIndexes();
@@ -222,7 +161,6 @@ export class BuilderPage {
       this.message = readMessage(error, 'Could not load wardrobe items.');
     } finally {
       this.isLoadingWardrobe = false;
-      this.stopProcessing('loadingWardrobe');
     }
   }
 
@@ -321,7 +259,6 @@ export class BuilderPage {
     }
 
     this.isBuildingOutfits = true;
-    this.startProcessing('buildingOutfits');
     this.message = '';
     this.hasGeneratedSearchRun = true;
     this.results = [];
@@ -333,7 +270,6 @@ export class BuilderPage {
         this.lookups ? Promise.resolve(this.lookups) : this.api.getLookups(),
         this.api.getItems()
       ]);
-      this.setProcessingStep(1);
       this.lookups = lookups;
       this.items = items;
       this.rebuildItemIndexes();
@@ -341,14 +277,11 @@ export class BuilderPage {
       this.updateBuilderItemViews();
       const prompt = this.buildOutfitQuery();
       this.lastGeneratedPrompt = prompt;
-      this.setProcessingStep(2);
       const generatedOutfits = await this.api.searchOutfits(prompt, this.requiredItemId);
       const readyOutfits = generatedOutfits.filter((outfit) => !!outfit.displayImageUrl || !!outfit.imageUrl);
       if (readyOutfits.length) {
-        this.setProcessingStep(3);
         void this.preloadGeneratedOutfitImages(readyOutfits);
       }
-      this.setProcessingStep(4);
       this.results = readyOutfits;
       this.updateGeneratedOutfitCards();
       if (!this.results.length) {
@@ -364,7 +297,6 @@ export class BuilderPage {
       void warningFeedback();
     } finally {
       this.isBuildingOutfits = false;
-      this.stopProcessing('buildingOutfits');
     }
   }
 
@@ -375,17 +307,13 @@ export class BuilderPage {
     }
 
     this.isSavingManualOutfit = true;
-    this.startProcessing('savingManualOutfit');
     this.message = '';
     try {
       const selected = this.selectedManualItems();
-      this.setProcessingStep(1);
       const explanation = this.isValidManualOutfit(selected)
         ? 'Built manually from selected wardrobe items.'
         : `Saved as a partial manual look from selected wardrobe items. ${this.manualHint}`;
-      this.setProcessingStep(2);
       await this.api.saveOutfit(this.manualName.trim() || 'Manual outfit', null, explanation.trim(), this.manualItemIds);
-      this.setProcessingStep(3);
       this.message = 'Outfit saved.';
       void successFeedback();
     } catch (error) {
@@ -393,7 +321,6 @@ export class BuilderPage {
       void warningFeedback();
     } finally {
       this.isSavingManualOutfit = false;
-      this.stopProcessing('savingManualOutfit');
     }
   }
 
@@ -404,22 +331,17 @@ export class BuilderPage {
     }
 
     this.savingGeneratedOutfitKeys.add(key);
-    this.updateGeneratedOutfitCards();
-    this.startProcessing('savingGeneratedOutfit');
     this.savedGeneratedOutfitKeys.delete(key);
     this.failedGeneratedOutfitKeys.delete(key);
     this.updateGeneratedOutfitCards();
     this.message = '';
     try {
-      this.setProcessingStep(1);
-      this.setProcessingStep(2);
       await this.api.saveOutfit(
         outfit.title,
         this.lastGeneratedPrompt || this.buildOutfitQuery(),
         outfit.explanation,
         outfit.itemIds,
         outfit.imageUrl || outfit.displayImageUrl || null);
-      this.setProcessingStep(3);
       this.savedGeneratedOutfitKeys.add(key);
       this.updateGeneratedOutfitCards();
       void successFeedback();
@@ -431,7 +353,6 @@ export class BuilderPage {
     } finally {
       this.savingGeneratedOutfitKeys.delete(key);
       this.updateGeneratedOutfitCards();
-      this.stopProcessing('savingGeneratedOutfit');
     }
   }
 
@@ -457,9 +378,6 @@ export class BuilderPage {
     return [item.primaryColourId, ...item.secondaryColourIds].filter(Boolean).slice(0, 4);
   }
 
-  colourSwatch(id: string): string {
-    return colourSwatch(id);
-  }
 
   isManualSelected(id: string): boolean {
     return this.manualItemIdSet.has(id);
@@ -783,27 +701,5 @@ export class BuilderPage {
       default:
         return '';
     }
-  }
-
-  private startProcessing(kind: BuilderProcessingKind): void {
-    this.processingKind = kind;
-    this.processingStepIndex = 0;
-  }
-
-  private setProcessingStep(index: number): void {
-    if (!this.processingKind) {
-      return;
-    }
-
-    this.processingStepIndex = Math.min(index, this.processingSteps.length - 1);
-  }
-
-  private stopProcessing(kind: BuilderProcessingKind): void {
-    if (this.processingKind !== kind) {
-      return;
-    }
-
-    this.processingKind = null;
-    this.processingStepIndex = 0;
   }
 }

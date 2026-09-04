@@ -61,7 +61,6 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   bottomShapeId: string | null = null;
   riseId: string | null = null;
   includeArchived = false;
-  filtersExpanded = false;
   search = '';
   isLoading = true;
   message = '';
@@ -152,17 +151,6 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
     this.isFilterModalOpen = false;
   }
 
-  get processingTitle(): string {
-    return 'Deleting items';
-  }
-
-  get processingDetail(): string {
-    const count = this.selectedCount;
-    return count === 1
-      ? 'Deleting 1 wardrobe item. It will no longer appear in your wardrobe or outfit builder.'
-      : `Deleting ${count} wardrobe items. They will no longer appear in your wardrobe or outfit builder.`;
-  }
-
   get messageKind(): NoticeKind {
     return noticeKind(this.message);
   }
@@ -247,12 +235,6 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
     this.clearItemLongPress();
     this.stopItemImageGenerationStreaming();
     this.stopItemImageGenerationPolling();
-  }
-
-  toggleFilters(): void {
-    this.filtersExpanded = !this.filtersExpanded;
-    this.scheduleVirtualMetricsSync();
-    void lightImpact();
   }
 
   async refreshWardrobe(event: Event): Promise<void> {
@@ -682,7 +664,6 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
     this.riseId = null;
     this.includeArchived = false;
     this.search = '';
-    this.filtersExpanded = false;
     this.updateFilterDerivedState();
     this.scheduleVirtualMetricsSync();
     this.scheduleLoad();
@@ -704,10 +685,6 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
 
   colourSwatch(id: string): string {
     return colourSwatch(id);
-  }
-
-  trackById(_: number, item: WardrobeItemDto): string {
-    return item.id;
   }
 
   trackByCardId(_: number, card: WardrobeItemCard): string {
@@ -740,13 +717,6 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
 
   clearSelection(): void {
     this.selectedItemIds.clear();
-    this.updateVisibleItemCards();
-  }
-
-  selectVisibleItems(): void {
-    for (const item of this.visibleItems) {
-      this.selectedItemIds.add(item.id);
-    }
     this.updateVisibleItemCards();
   }
 

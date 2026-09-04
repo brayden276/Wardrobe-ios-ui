@@ -1,7 +1,7 @@
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { Preferences } from '@capacitor/preferences';
 import type { AlertController } from '@ionic/angular';
-import { ApiMessage, UpdateWardrobeItemRequest, WardrobeLookupsDto } from '../models';
+import { UpdateWardrobeItemRequest, WardrobeLookupsDto } from '../models';
 
 export function emptyItemForm(): UpdateWardrobeItemRequest {
   return {
