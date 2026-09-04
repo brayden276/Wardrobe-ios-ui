@@ -1,34 +1,288 @@
-.wardrobe-grid--virtual {
-  align-items: start;
+.ios-wardrobe-header {
+  --background: var(--app-header-bg);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border-bottom: 0.5px solid var(--app-border);
 }
 
-.wardrobe-skeleton {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.wardrobe-grid__spacer {
-  grid-column: 1 / -1;
-}
-
-.item-card__image-wrap {
-  overflow: hidden;
-}
-
-.item-card__image-wrap::before {
-  position: absolute;
-  inset: 10px;
-  border-radius: 10px;
-  background: linear-gradient(90deg, rgba(185, 170, 150, 0.16), rgba(255, 250, 243, 0.86), rgba(185, 170, 150, 0.16));
-  content: '';
-}
-
-.item-card img {
+.filter-header-btn {
   position: relative;
-  opacity: 0;
-  transition: opacity 160ms ease;
+  font-size: 20px;
+  color: var(--app-olive);
 }
 
-.item-card img.image-loaded,
-.item-card img.image-failed {
-  opacity: 1;
+.filter-badge-pill {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--app-olive);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.done-btn {
+  font-weight: 600;
+  color: var(--app-olive);
+}
+
+.search-toolbar {
+  --padding-top: 0;
+  --padding-bottom: 4px;
+}
+
+.ios-searchbar {
+  --background: var(--app-segment-bg);
+  --border-radius: 10px;
+  --box-shadow: none;
+  --placeholder-color: var(--app-muted);
+  --icon-color: var(--app-muted);
+  --color: var(--app-ink);
+  min-height: 40px;
+  padding: 0 12px 6px;
+}
+
+/* Category Capsule Strip */
+.category-capsule-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 16px 10px;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  .capsule-pill {
+    flex: 0 0 auto;
+    border: 1px solid var(--app-border);
+    border-radius: 999px;
+    background: var(--app-surface);
+    color: var(--app-muted);
+    font-size: 13px;
+    font-weight: 550;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+
+    &:active {
+      background: var(--app-surface-pressed);
+    }
+
+    &.active {
+      background: var(--app-olive);
+      border-color: var(--app-olive);
+      color: #ffffff;
+    }
+  }
+}
+
+.wardrobe-screen {
+  padding-top: 12px;
+}
+
+.active-filter-token-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-border);
+
+  .token-label {
+    font-size: 12px;
+    font-weight: 550;
+    color: var(--app-olive);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .token-clear-btn {
+    border: none;
+    background: transparent;
+    color: var(--app-olive);
+    font-size: 18px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+}
+
+/* Card Badges */
+.card-wear-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(36, 31, 26, 0.65);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 8px;
+  z-index: 2;
+}
+
+.card-archive-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(138, 48, 42, 0.85);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 6px;
+  border-radius: 6px;
+  z-index: 2;
+  text-transform: uppercase;
+}
+
+/* iOS Bottom Selection Bar */
+.ios-bulk-bar {
+  position: fixed;
+  bottom: calc(52px + var(--ion-safe-area-bottom));
+  left: 16px;
+  right: 16px;
+  height: 52px;
+  border-radius: 16px;
+  background: var(--app-header-bg);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--app-border);
+  box-shadow: 0 4px 18px rgba(36, 31, 26, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 40;
+
+  .bulk-count {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--app-ink);
+  }
+
+  .bulk-destructive-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    background: transparent;
+    color: var(--app-danger);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+
+    ion-icon {
+      font-size: 18px;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+    }
+  }
+}
+
+/* Empty State */
+.ios-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 24px;
+
+  .empty-icon-wrap {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: rgba(91, 96, 64, 0.1);
+    display: grid;
+    place-items: center;
+    margin-bottom: 16px;
+
+    ion-icon {
+      font-size: 36px;
+      color: var(--app-olive);
+    }
+  }
+
+  h2 {
+    font-family: var(--app-heading-font);
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 8px;
+    color: var(--app-ink);
+  }
+
+  p {
+    margin: 0 0 20px;
+    font-size: 14px;
+    max-width: 280px;
+  }
+}
+
+/* Filter Modal Content */
+.filter-modal-content {
+  --background: var(--app-bg);
+}
+
+.modal-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 50px;
+  padding: 0 16px;
+  border-bottom: 0.5px solid var(--app-border);
+  background: var(--app-surface);
+
+  .modal-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--app-ink);
+  }
+
+  .text-btn {
+    border: none;
+    background: transparent;
+    font-size: 16px;
+    color: var(--app-muted);
+    cursor: pointer;
+
+    &.primary {
+      color: var(--app-olive);
+      font-weight: 600;
+    }
+  }
+}
+
+.modal-body-scroll {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.filter-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  .section-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: var(--app-muted);
+    text-transform: uppercase;
+    padding-left: 4px;
+  }
 }

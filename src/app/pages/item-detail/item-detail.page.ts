@@ -1,9 +1,10 @@
 import { Component, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AlertController } from '@ionic/angular';
+import { ActionSheetController, AlertController } from '@ionic/angular';
 import { ImageGenerationStreamUpdate, UpdateWardrobeItemRequest, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
 import { ImageGenerationStatusStream, WardrobeApiService } from '../../wardrobe-api.service';
 import {
+  colourSwatch,
   confirmAction,
   emptyItemForm,
   lightImpact,
@@ -28,6 +29,7 @@ export class ItemDetailPage implements OnDestroy {
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
   private readonly alertController = inject(AlertController);
+  private readonly actionSheetController = inject(ActionSheetController);
   item: WardrobeItemDto | null = null;
   lookups: WardrobeLookupsDto | null = null;
   form: UpdateWardrobeItemRequest = emptyItemForm();
@@ -37,6 +39,8 @@ export class ItemDetailPage implements OnDestroy {
   isMarkingWorn = false;
   isArchiving = false;
   isOriginalImageOpen = false;
+  isEditModalOpen = false;
+  activeImageLayer: 'display' | 'original' = 'display';
   itemMode: ItemDetailMode = 'view';
   isDeleting = false;
   private imageGenerationStatusStream: ImageGenerationStatusStream | null = null;
@@ -68,6 +72,72 @@ export class ItemDetailPage implements OnDestroy {
 
   get messageKind(): NoticeKind {
     return noticeKind(this.message);
+  }
+
+  label(id: string | null): string {
+    if (!id || !this.lookups) return '';
+    return lookupLabel(this.lookups, id);
+  }
+
+  colourSwatch(id: string): string {
+    return colourSwatch(id);
+  }
+
+  formatLastWorn(dateString: string | null): string {
+    if (!dateString) return 'Never';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return 'Never';
+    const diffMs = Date.now() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  openEditModal(): void {
+    if (this.item) {
+      this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
+    }
+    this.isEditModalOpen = true;
+    void lightImpact();
+  }
+
+  closeEditModal(): void {
+    this.isEditModalOpen = false;
+  }
+
+  async openMoreMenu(): Promise<void> {
+    if (!this.item) return;
+    void lightImpact();
+    const isArchived = this.item.isArchived;
+    const actionSheet = await this.actionSheetController.create({
+      header: this.item.name,
+      buttons: [
+        {
+          text: isArchived ? 'Unarchive Item' : 'Archive Item (Hide from Outfits)',
+          icon: isArchived ? 'archive-outline' : 'archive',
+          handler: () => {
+            void this.toggleArchive();
+          }
+        },
+        {
+          text: 'Delete Permanently',
+          role: 'destructive',
+          icon: 'trash-outline',
+          handler: () => {
+            void this.deleteItemPermanently();
+          }
+        },
+        {
+          text: 'Cancel',
+          role: 'cancel',
+          icon: 'close'
+        }
+      ]
+    });
+    await actionSheet.present();
   }
 
   async ionViewWillEnter(): Promise<void> {
@@ -121,7 +191,7 @@ export class ItemDetailPage implements OnDestroy {
       ]);
       this.lookups = lookups;
       this.item = item;
-      this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
+      this.form = this.toFormState(item);
       this.startImageGenerationStreaming();
     } catch (error) {
       this.message = readMessage(error, 'Could not load item.');
@@ -148,7 +218,7 @@ export class ItemDetailPage implements OnDestroy {
     const stream = this.api.streamImageGenerationStatuses(
       [this.item.id],
       [],
-      (updates) => this.applyImageGenerationStreamUpdates(updates),
+      (updates: ImageGenerationStreamUpdate[]) => this.applyImageGenerationStreamUpdates(updates),
       () => {
         this.imageGenerationStatusStream = null;
         this.startImageGenerationPolling();
@@ -311,7 +381,7 @@ export class ItemDetailPage implements OnDestroy {
       try {
         const latestItem = await this.api.getItem(itemId);
         this.item = latestItem;
-        this.form = { ...latestItem, secondaryColourIds: latestItem.secondaryColourIds.slice() };
+        this.form = this.toFormState(latestItem);
       } catch {
         const fallbackItem = this.item ?? currentItem;
         const now = new Date().toISOString();
@@ -321,7 +391,7 @@ export class ItemDetailPage implements OnDestroy {
           lastWornAt: now,
           updatedAt: now
         };
-        this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
+        this.form = this.toFormState(this.item);
       }
       this.message = '✓ Marked as worn today!';
       void successFeedback();
@@ -331,6 +401,25 @@ export class ItemDetailPage implements OnDestroy {
     } finally {
       this.isMarkingWorn = false;
     }
+  }
+
+  private toFormState(item: WardrobeItemDto): UpdateWardrobeItemRequest {
+    return {
+      name: item.name,
+      categoryId: item.categoryId,
+      subcategoryId: item.subcategoryId,
+      primaryColourId: item.primaryColourId,
+      secondaryColourIds: item.secondaryColourIds ? item.secondaryColourIds.slice() : [],
+      patternId: item.patternId,
+      visibleMaterialId: item.visibleMaterialId,
+      necklineId: item.necklineId,
+      sleeveLengthId: item.sleeveLengthId,
+      fitId: item.fitId,
+      lengthId: item.lengthId,
+      bottomShapeId: item.bottomShapeId,
+      riseId: item.riseId,
+      isArchived: item.isArchived
+    };
   }
 
   syncSubcategory(): void {
@@ -345,8 +434,9 @@ export class ItemDetailPage implements OnDestroy {
     this.message = 'Saving item details...';
     try {
       this.item = await this.api.updateItem(this.item.id, this.form);
-      this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
+      this.form = this.toFormState(this.item);
       this.message = 'Details saved.';
+      this.closeEditModal();
       this.setItemMode('view');
       void successFeedback();
     } catch (error) {
@@ -367,7 +457,7 @@ export class ItemDetailPage implements OnDestroy {
         ...this.form,
         isArchived: willArchive
       });
-      this.form = { ...this.item, secondaryColourIds: this.item.secondaryColourIds.slice() };
+      this.form = this.toFormState(this.item);
       this.message = willArchive ? 'Item archived and hidden from outfit builder.' : 'Item unarchived and active in wardrobe.';
       void successFeedback();
     } catch (error) {

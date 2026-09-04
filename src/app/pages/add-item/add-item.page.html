@@ -1,68 +1,112 @@
-    <ion-content class="app-content">
-      <section class="screen processing-screen" *ngIf="isFullPageProcessing; else addItemContent" aria-live="polite" aria-busy="true">
-        <header class="nav-header">
-          <button type="button" class="nav-button" routerLink="/tabs/wardrobe" aria-label="Back to wardrobe" [disabled]="isFullPageProcessing">
-            <ion-icon name="chevron-back-outline"></ion-icon>
-          </button>
-          <h1>{{ processingTitle }}</h1>
-          <span></span>
-        </header>
-        <article class="panel processing-panel">
+<ion-header translucent="true" class="ion-no-border ios-nav-header">
+  <ion-toolbar>
+    <ion-title>Add Garment</ion-title>
+    <ion-buttons slot="end" *ngIf="batchFiles.length && !isScanning">
+      <ion-button fill="clear" color="primary" (click)="clearBatchSelection()">Clear</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="app-content" [fullscreen]="true">
+  <div class="screen add-item-screen">
+    <!-- Hidden file inputs for web fallback -->
+    <input #cameraInput class="file-input" type="file" accept="image/*" capture="environment" (change)="handleCameraFileSelection($event)">
+    <input #batchInput class="file-input" type="file" accept="image/*" multiple (change)="handlePhotoSelection($event)">
+
+    <!-- STATE 1: Empty Viewfinder / Hero Capture Zone -->
+    <section class="capture-zone" *ngIf="!batchFiles.length">
+      <div class="viewfinder-card" (click)="openAddPhotoOptions()">
+        <div class="viewfinder-icon-pulse">
+          <ion-icon name="camera-outline"></ion-icon>
+        </div>
+        <h2>Add Garment</h2>
+        <p class="muted">Take a photo or choose from library</p>
+        <div class="guide-chips">
+          <span>☀️ Good lighting</span>
+          <span>🔲 Plain background</span>
+          <span>👕 Single item</span>
+        </div>
+      </div>
+
+      <!-- Quick Action Row -->
+      <div class="quick-action-row">
+        <ion-button class="primary-button olive-button flex-1" expand="block" (click)="captureCamera()">
+          <ion-icon name="camera-outline" slot="start"></ion-icon>
+          Take Photo
+        </ion-button>
+        <ion-button class="secondary-button flex-1" expand="block" fill="outline" (click)="openPhotoLibrary()">
+          <ion-icon name="images-outline" slot="start"></ion-icon>
+          Photo Library
+        </ion-button>
+      </div>
+
+      <!-- Privacy & AI Pill -->
+      <div class="ai-status-pill">
+        <ion-icon name="sparkles-outline"></ion-icon>
+        <span>Gemini AI Auto-Classification & Cutout</span>
+      </div>
+    </section>
+
+    <!-- STATE 2 & 3: Hero Photo Stage (Visible during selection & scanning!) -->
+    <section class="stage-zone" *ngIf="batchFiles.length">
+      <div class="photo-stage-card" [class.is-scanning]="isScanning">
+        <!-- Active Garment Image -->
+        <img [src]="activePreviewUrl" alt="Garment preview" class="stage-image">
+
+        <!-- Laser Scanning Beam (Active during AI processing) -->
+        <div class="laser-scanner" *ngIf="isScanning">
+          <div class="laser-beam"></div>
+          <div class="laser-glow"></div>
+        </div>
+
+        <!-- Floating Status Pill during Scan -->
+        <div class="scanning-status-pill" *ngIf="isScanning">
           <ion-spinner name="crescent"></ion-spinner>
-          <p class="muted">{{ processingDetail }}</p>
-          <ol class="processing-steps">
-            <li *ngFor="let step of processingSteps; let index = index" [class]="processingStepState(index)">
-              <span></span>{{ step }}
-            </li>
-          </ol>
-        </article>
-      </section>
-      <ng-template #addItemContent>
-      <section class="screen add-item-screen">
-        <header class="nav-header">
-          <button type="button" class="nav-button" routerLink="/tabs/wardrobe" aria-label="Back to wardrobe">
-            <ion-icon name="chevron-back-outline"></ion-icon>
+          <span>{{ scanningStatusText }}</span>
+        </div>
+
+        <!-- Retake / Remove Button -->
+        <button type="button" class="retake-button" *ngIf="!isScanning" (click)="removeActiveFile()" aria-label="Remove photo">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </div>
+
+      <!-- Batch Carousel (If multiple photos queued) -->
+      <div class="batch-carousel" *ngIf="batchFiles.length > 1 && !isScanning">
+        <div
+          class="batch-thumb"
+          *ngFor="let file of batchFiles; let i = index"
+          [class.active]="activePreviewIndex === i"
+          (click)="selectActivePreview(i)">
+          <img [src]="batchPreviewUrls[i]" [alt]="file.name">
+          <button type="button" class="batch-thumb-remove" (click)="removeBatchFile(i); $event.stopPropagation()" aria-label="Remove photo">
+            <ion-icon name="close-circle"></ion-icon>
           </button>
-          <h1>Add item</h1>
-          <span></span>
-        </header>
-        <p class="page-meta center-message">{{ batchFiles.length ? batchSummary : 'No photos selected' }}</p>
-        <input #cameraInput class="file-input" type="file" accept="image/*" capture="environment" (change)="handleCameraFileSelection($event)">
-        <input #batchInput class="file-input" type="file" accept="image/*" multiple (change)="handlePhotoSelection($event)">
-        <article class="intent-surface form-stack batch-panel upload-panel" [class.has-queue]="batchFiles.length">
-          <ion-button class="primary-button olive-button capture-button" expand="block" (click)="openAddPhotoOptions()" [disabled]="isSaving || isPreparing || isBatchSaving">
-            <ion-icon name="images-outline" slot="start"></ion-icon>
-            {{ batchFiles.length ? 'Add more photos' : 'Add photos' }}
-          </ion-button>
-          <div class="batch-summary" *ngIf="batchFiles.length">
-            <span>{{ batchSummary }}</span>
-            <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="clearBatchSelection()" [disabled]="isSaving || isBatchSaving || isPreparing">Clear</ion-button>
-          </div>
-          <div class="batch-grid review-grid" *ngIf="batchFiles.length">
-            <div class="batch-item" *ngFor="let file of batchFiles; let index = index">
-              <button type="button" class="icon-button batch-item__remove" aria-label="Remove photo" (click)="removeBatchFile(index)" [disabled]="isSaving || isBatchSaving || isPreparing">
-                <ion-icon name="close-outline"></ion-icon>
-              </button>
-              <img [src]="batchPreviewUrls[index]" [alt]="file.name">
-              <div class="batch-item__body">
-                <strong>Ready</strong>
-                <span>{{ file.name }}</span>
-              </div>
-            </div>
-          </div>
-          <p class="muted" *ngIf="!batchFiles.length">Take a photo or select up to {{ maxBatchUploadCount }} photos.</p>
-          <div class="provider-note">
-            <span class="ai-active-pill" *ngIf="hasAiConsent">
-              <ion-icon name="sparkles-outline"></ion-icon>
-              Gemini AI scanning enabled
-            </span>
-            <p class="muted consent-note">Wardrobe AI sends uploaded wardrobe photos to Google Gemini to classify items and generate cleaned display images.</p>
-            <p class="muted consent-note">Only upload clothing photos you are comfortable sharing with that provider.</p>
-          </div>
-          <p class="status-note" *ngIf="statusMessage && !isSaving && !isBatchSaving" [class.status-note--success]="statusKind === 'success'" aria-live="polite">{{ statusMessage }}</p>
-          <p class="status-note status-note--multiline" *ngIf="message" [class.status-note--success]="messageKind === 'success'" [class.status-note--error]="messageKind === 'error'" [class.status-note--offline]="messageKind === 'offline'" aria-live="polite">{{ message }}</p>
-          <ion-button class="primary-button" expand="block" (click)="uploadSelectedPhotos()" [disabled]="isSaving || isBatchSaving || !batchFiles.length || isPreparing">{{ uploadButtonLabel }}</ion-button>
-        </article>
-      </section>
-      </ng-template>
-    </ion-content>
+        </div>
+      </div>
+
+      <!-- Error Guidance Card with Direct Recovery -->
+      <div class="error-guidance-card" *ngIf="uploadError && message">
+        <ion-icon name="alert-circle-outline"></ion-icon>
+        <div class="error-info">
+          <h4>Could not scan garment</h4>
+          <p>{{ message }}</p>
+        </div>
+        <ion-button size="small" fill="outline" (click)="openAddPhotoOptions()">Retake</ion-button>
+      </div>
+
+      <!-- Action Footer: Analyze Garment -->
+      <div class="action-footer" *ngIf="!isScanning">
+        <ion-button class="primary-button" expand="block" (click)="uploadSelectedPhotos()" [disabled]="isSaving || isBatchSaving || isPreparing">
+          <ion-icon name="sparkles-outline" slot="start"></ion-icon>
+          {{ uploadButtonLabel }}
+        </ion-button>
+      </div>
+
+      <!-- Status note if any -->
+      <p class="status-note center-message" *ngIf="statusMessage && !isScanning" [class.status-note--success]="statusKind === 'success'" aria-live="polite">
+        {{ statusMessage }}
+      </p>
+    </section>
+  </div>
+</ion-content>

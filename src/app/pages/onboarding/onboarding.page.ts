@@ -15,11 +15,13 @@ type PersonalDetailsKey = keyof UpdatePersonalDetailsRequest;
 interface PersonalDetailsOption {
   value: string;
   label: string;
+  description: string;
 }
 
 interface PersonalDetailsStep {
   key: PersonalDetailsKey;
   title: string;
+  subtitle: string;
   options: PersonalDetailsOption[];
 }
 
@@ -33,43 +35,48 @@ export class OnboardingPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+
   readonly steps: PersonalDetailsStep[] = [
     {
       key: 'gender',
       title: 'Wardrobe direction',
+      subtitle: 'Calibrates standard garment sizing and silhouette recommendations.',
       options: [
-        { value: 'male', label: 'Male' },
-        { value: 'female', label: 'Female' }
+        { value: 'female', label: 'Womenswear', description: 'Curated silhouettes, styling, and cuts tailored for women.' },
+        { value: 'male', label: 'Menswear', description: 'Structured shoulders, tailored proportions, and menswear staples.' }
       ]
     },
     {
       key: 'fitPreference',
       title: 'Fit preference',
+      subtitle: 'Defines how clothes drape over your silhouette.',
       options: [
-        { value: 'tailored', label: 'Tailored' },
-        { value: 'balanced', label: 'Balanced' },
-        { value: 'relaxed', label: 'Relaxed' }
+        { value: 'tailored', label: 'Tailored', description: 'Streamlined lines, contouring seams, and sharp definition.' },
+        { value: 'balanced', label: 'Balanced', description: 'Standard proportional ease with comfortable, natural movement.' },
+        { value: 'relaxed', label: 'Relaxed', description: 'Generous volume, drop shoulders, and effortless casual drape.' }
       ]
     },
     {
       key: 'stylePreference',
       title: 'Style lean',
+      subtitle: 'Select the primary aesthetic formula for daily outfit suggestions.',
       options: [
-        { value: 'minimal', label: 'Minimal' },
-        { value: 'classic', label: 'Classic' },
-        { value: 'polished', label: 'Polished' },
-        { value: 'casual', label: 'Casual' },
-        { value: 'creative', label: 'Creative' }
+        { value: 'minimal', label: 'Minimal', description: 'Neutral palettes, clean lines, and unadorned architectural cuts.' },
+        { value: 'classic', label: 'Classic', description: 'Timeless sartorial staples, heritage fabrics, and refined balance.' },
+        { value: 'polished', label: 'Polished', description: 'Sharp coordination, elevated footwear, and sharp sophistication.' },
+        { value: 'casual', label: 'Casual', description: 'Unstructured comfort, tactile textures, and relaxed versatility.' },
+        { value: 'creative', label: 'Creative', description: 'Expressive silhouette pairings, texture play, and bold contrasts.' }
       ]
     },
     {
       key: 'dailyContext',
       title: 'Usual context',
+      subtitle: 'Where you spend the majority of your dressed hours.',
       options: [
-        { value: 'work', label: 'Work' },
-        { value: 'weekend', label: 'Weekend' },
-        { value: 'evening', label: 'Evening' },
-        { value: 'active', label: 'Active' }
+        { value: 'work', label: 'Work & Professional', description: 'Smart offices, meetings, and corporate dressing.' },
+        { value: 'weekend', label: 'Weekend & Leisure', description: 'Off-duty outings, dining, travel, and social events.' },
+        { value: 'evening', label: 'Evening & Occasion', description: 'Dinner dates, gallery openings, and formal evening gatherings.' },
+        { value: 'active', label: 'Active & Transit', description: 'High-movement schedules, outdoor routines, and athleisure utility.' }
       ]
     }
   ];
@@ -78,6 +85,7 @@ export class OnboardingPage {
   values: Partial<Record<PersonalDetailsKey, string>> = {};
   message = '';
   isBusy = false;
+  animationDirection: 'slide-forward' | 'slide-backward' = 'slide-forward';
   private returnUrl = '/tabs/wardrobe';
 
   ionViewWillEnter(): void {
@@ -131,11 +139,25 @@ export class OnboardingPage {
     void lightImpact();
   }
 
+  selectAndAdvance(key: PersonalDetailsKey, value: string): void {
+    this.choose(key, value);
+  }
+
+  handleBack(): void {
+    if (this.stepIndex > 0) {
+      this.animationDirection = 'slide-backward';
+      this.previous();
+    } else if (this.canLeave) {
+      void this.close();
+    }
+  }
+
   previous(): void {
     if (this.stepIndex === 0 || this.isBusy) {
       return;
     }
 
+    this.animationDirection = 'slide-backward';
     this.stepIndex -= 1;
     this.message = '';
     void lightImpact();
@@ -148,6 +170,7 @@ export class OnboardingPage {
     }
 
     if (!this.isFinalStep) {
+      this.animationDirection = 'slide-forward';
       this.stepIndex += 1;
       this.message = '';
       void lightImpact();

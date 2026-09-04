@@ -1,67 +1,141 @@
-  <ion-content class="app-content">
-    <section class="screen login-screen auth-workspace">
-        <div class="page-title-stack">
-          <h1 class="plain-title">Wardrobe AI</h1>
-          <p class="muted">Your private wardrobe catalogue and outfit builder.</p>
-          <p class="muted">{{ authModeHint }}</p>
-        </div>
-      <div class="mode-bar" role="tablist" aria-label="Authentication intent">
-        <button type="button" [class.active]="mode === 'login'" [attr.aria-selected]="mode === 'login'" (click)="setAuthMode('login')" role="tab">Sign in</button>
-        <button type="button" [class.active]="mode === 'register'" [attr.aria-selected]="mode === 'register'" (click)="setAuthMode('register')" role="tab">Create account</button>
+<ion-content class="app-content" [fullscreen]="true">
+  <div class="login-viewport">
+    <header class="login-brand-header">
+      <div class="brand-badge" aria-hidden="true">
+        <ion-icon name="shirt-outline"></ion-icon>
       </div>
-      <form class="intent-surface form-stack" (ngSubmit)="submit()">
-        <label>
-          Email
-          <ion-input
-            class="field"
-            type="email"
-            [(ngModel)]="email"
-            name="email"
-            autocomplete="email"
-            autocapitalize="none"
-            (ionBlur)="emailBlurred = true"
-            [attr.aria-describedby]="showEmailValidationMessage && emailValidationMessage ? 'email-error' : null"
-            [attr.aria-invalid]="showEmailValidationMessage && !!emailValidationMessage">
-          </ion-input>
-        </label>
-        <p id="email-error" class="muted field-error" *ngIf="showEmailValidationMessage && emailValidationMessage" role="alert">{{ emailValidationMessage }}</p>
-        <label>
-          Password
-          <div class="password-field-wrap">
+      <h1 class="brand-title">Wardrobe AI</h1>
+      <p class="brand-subtitle">{{ authModeHint }}</p>
+    </header>
+
+    <!-- Native iOS Segmented Control -->
+    <div class="ios-segmented-control" role="tablist" aria-label="Authentication mode">
+      <div class="segmented-thumb" [class.register]="mode === 'register'"></div>
+      <button
+        type="button"
+        class="segmented-item"
+        [class.active]="mode === 'login'"
+        [attr.aria-selected]="mode === 'login'"
+        (click)="setAuthMode('login')"
+        role="tab">
+        Sign In
+      </button>
+      <button
+        type="button"
+        class="segmented-item"
+        [class.active]="mode === 'register'"
+        [attr.aria-selected]="mode === 'register'"
+        (click)="setAuthMode('register')"
+        role="tab">
+        Create Account
+      </button>
+    </div>
+
+    <!-- Grouped Form Card -->
+    <form class="ios-form" (ngSubmit)="submit()" novalidate>
+      <div class="ios-grouped-card">
+        <!-- Display Name (Register Mode Only) -->
+        <div class="ios-form-row" *ngIf="mode === 'register'">
+          <label class="ios-field-label" for="displayNameInput">Name</label>
+          <div class="ios-field-wrap">
             <ion-input
-              class="field"
-              [type]="showPassword ? 'text' : 'password'"
+              id="displayNameInput"
+              class="ios-field-input"
+              [(ngModel)]="displayName"
+              name="displayName"
+              type="text"
+              autocomplete="name"
+              autocapitalize="words"
+              spellcheck="false"
+              enterkeyhint="next"
+              placeholder="Your full name"
+              (keyup.enter)="focusInput(emailInputRef)"
+              [disabled]="isBusy">
+            </ion-input>
+          </div>
+        </div>
+
+        <!-- Email Field -->
+        <div class="ios-form-row" [class.has-error]="showEmailValidationMessage && emailValidationMessage">
+          <label class="ios-field-label" for="emailInput">Email</label>
+          <div class="ios-field-wrap">
+            <ion-input
+              #emailInputRef
+              id="emailInput"
+              class="ios-field-input"
+              [(ngModel)]="email"
+              name="email"
+              type="email"
+              inputmode="email"
+              autocomplete="email"
+              autocapitalize="none"
+              spellcheck="false"
+              enterkeyhint="next"
+              placeholder="name@example.com"
+              (ionBlur)="emailBlurred = true"
+              (keyup.enter)="focusInput(passwordInputRef)"
+              [disabled]="isBusy">
+            </ion-input>
+            <ion-icon
+              *ngIf="showEmailValidationMessage && emailValidationMessage"
+              name="alert-circle-outline"
+              class="field-status-icon error"
+              aria-hidden="true">
+            </ion-icon>
+          </div>
+        </div>
+
+        <!-- Password Field -->
+        <div class="ios-form-row" [class.has-error]="showPasswordValidationMessage && passwordValidationMessage">
+          <label class="ios-field-label" for="passwordInput">Password</label>
+          <div class="ios-field-wrap">
+            <ion-input
+              #passwordInputRef
+              id="passwordInput"
+              class="ios-field-input password-input"
               [(ngModel)]="password"
               name="password"
+              [type]="showPassword ? 'text' : 'password'"
               [autocomplete]="mode === 'login' ? 'current-password' : 'new-password'"
               autocapitalize="none"
-              [attr.aria-describedby]="showPasswordValidationMessage && passwordValidationMessage ? 'password-error' : null"
-              [attr.aria-invalid]="showPasswordValidationMessage && !!passwordValidationMessage">
+              spellcheck="false"
+              enterkeyhint="go"
+              placeholder="Required"
+              (keyup.enter)="submit()"
+              [disabled]="isBusy">
             </ion-input>
-            <button type="button" class="password-toggle-button" (click)="toggleShowPassword()" [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'">
+            <button
+              type="button"
+              class="ios-accessory-button"
+              (click)="toggleShowPassword()"
+              [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'"
+              tabindex="-1">
               <ion-icon [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
             </button>
           </div>
-        </label>
-        <p id="password-error" class="muted field-error" *ngIf="showPasswordValidationMessage && passwordValidationMessage" role="alert">{{ passwordValidationMessage }}</p>
-        <label *ngIf="mode === 'register'">
-          Name
-          <ion-input
-            class="field"
-            [(ngModel)]="displayName"
-            name="displayName"
-            autocomplete="name"
-            [attr.aria-describedby]="showDisplayNameValidationMessage && displayNameValidationMessage ? 'display-name-error' : null"
-            [attr.aria-invalid]="showDisplayNameValidationMessage && !!displayNameValidationMessage">
-          </ion-input>
-        </label>
-        <p id="display-name-error" class="muted field-error" *ngIf="showDisplayNameValidationMessage && displayNameValidationMessage" role="alert">{{ displayNameValidationMessage }}</p>
-        <ion-button class="primary-button" expand="block" type="submit" [disabled]="isBusy || !canSubmit">{{ authSubmitLabel }}</ion-button>
-        <div class="status-line" *ngIf="isBusy" aria-live="polite">
-          <ion-spinner name="crescent"></ion-spinner>
-          <span>{{ authStatusMessage }}</span>
         </div>
-        <p class="status-note" *ngIf="message" [class.status-note--success]="messageKind === 'success'" [class.status-note--error]="messageKind === 'error'" [class.status-note--offline]="messageKind === 'offline'" aria-live="polite">{{ message }}</p>
-      </form>
-    </section>
-  </ion-content>
+      </div>
+
+      <!-- Stable Inline Feedback Area (No Layout Shift) -->
+      <div class="ios-form-feedback" aria-live="polite">
+        <p *ngIf="activeErrorMessage" class="ios-feedback-text error">
+          <ion-icon name="alert-circle"></ion-icon>
+          <span>{{ activeErrorMessage }}</span>
+        </p>
+        <p *ngIf="!activeErrorMessage && message" class="ios-feedback-text" [class.success]="messageKind === 'success'" [class.error]="messageKind === 'error'">
+          <span>{{ message }}</span>
+        </p>
+      </div>
+
+      <!-- Native iOS Primary Action Button -->
+      <ion-button
+        class="ios-primary-button"
+        expand="block"
+        type="submit"
+        [disabled]="isBusy">
+        <ion-spinner *ngIf="isBusy" name="crescent" color="light" class="button-spinner"></ion-spinner>
+        <span *ngIf="!isBusy">{{ authSubmitLabel }}</span>
+      </ion-button>
+    </form>
+  </div>
+</ion-content>

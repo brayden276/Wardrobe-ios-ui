@@ -1,73 +1,305 @@
-.personal-detail-list {
-  display: grid;
-  gap: 8px;
-}
-
-.personal-detail-list div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.personal-detail-list span {
-  color: var(--app-muted);
-  font-size: 13px;
-}
-
-.personal-detail-list strong {
-  color: var(--app-ink);
-  font-size: 14px;
-  font-weight: 650;
-  text-align: right;
-}
-
-.inline-details-editor {
-  margin-top: 12px;
-}
-
-.inline-details-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-top: 12px;
-}
-
-.included-tier-badge {
-  display: inline-block;
-  font-size: 13px;
-  font-weight: 600;
-  color: #3b5a32;
-  background: rgba(85, 120, 75, 0.12);
-  padding: 4px 10px;
-  border-radius: 999px;
-}
-
-.ai-activity-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin: 14px 0;
-}
-
-.activity-metric {
+.settings-viewport {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 12px 6px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.03);
+  gap: 24px;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: calc(var(--ion-safe-area-top) + 16px) 16px calc(var(--ion-safe-area-bottom) + 32px);
+  box-sizing: border-box;
+}
 
-  strong {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--app-ink, #222);
+.settings-header {
+  padding: 0 4px;
+}
+
+.ios-large-title {
+  margin: 0;
+  font-family: var(--app-heading-font);
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--app-ink);
+}
+
+.ios-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ios-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--app-muted);
+
+  .section-action-btn {
+    border: none;
+    background: transparent;
+    color: var(--app-olive);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: none;
+  }
+}
+
+.ios-section-footer {
+  margin: 4px 16px 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--app-muted);
+
+  &.center {
+    text-align: center;
+  }
+}
+
+.ios-grouped-card {
+  border-radius: 14px;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(36, 31, 26, 0.04);
+}
+
+/* Profile Card */
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+}
+
+.profile-avatar {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(91, 96, 64, 0.14);
+  color: var(--app-olive);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.profile-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+
+  .profile-name {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--app-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  span {
-    font-size: 11px;
-    color: var(--app-muted, #666);
-    margin-top: 4px;
+  .profile-email {
+    margin: 0;
+    font-size: 14px;
+    color: var(--app-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Table Rows */
+.ios-table-row,
+.ios-form-row,
+.ios-action-row,
+.ios-link-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 10px 16px;
+  box-sizing: border-box;
+
+  &:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 16px;
+    right: 0;
+    height: 0.5px;
+    background: var(--app-border);
+  }
+}
+
+.row-label {
+  font-size: 15px;
+  color: var(--app-ink);
+}
+
+.row-value {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--app-muted);
+}
+
+.row-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  .row-subtext {
+    font-size: 12px;
+    color: var(--app-muted);
+  }
+}
+
+.row-action-link {
+  border: none;
+  background: transparent;
+  color: var(--app-danger);
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+/* AI Metrics */
+.ai-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 14px 12px;
+  border-bottom: 0.5px solid var(--app-border);
+  text-align: center;
+  background: var(--app-surface-muted);
+
+  .metric-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+
+    .metric-num {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--app-olive);
+    }
+
+    .metric-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--app-muted);
+      text-transform: uppercase;
+    }
+  }
+}
+
+/* Style Editor */
+.style-editor-card {
+  .ios-select {
+    --padding-start: 0;
+    --padding-end: 0;
+    font-size: 15px;
+    color: var(--app-olive);
+    font-weight: 600;
+  }
+
+  .editor-actions-row {
+    display: flex;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--app-surface-muted);
+
+    ion-button {
+      margin: 0;
+    }
+  }
+}
+
+/* Action Rows & Links */
+.ios-action-row {
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+
+  &:active {
+    background: var(--app-surface-pressed);
+  }
+
+  .action-label {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--app-ink);
+  }
+
+  .action-icon {
+    font-size: 18px;
+    color: var(--app-muted);
+  }
+
+  &.centered {
+    justify-content: center;
+
+    .action-label {
+      color: var(--app-olive);
+      font-weight: 600;
+    }
+  }
+
+  &.destructive .action-label {
+    color: var(--app-danger);
+    font-weight: 600;
+  }
+}
+
+.ios-link-row {
+  text-decoration: none;
+  color: inherit;
+
+  &:active {
+    background: var(--app-surface-pressed);
+  }
+
+  .link-label {
+    font-size: 15px;
+    color: var(--app-ink);
+  }
+
+  .link-icon {
+    font-size: 16px;
+    color: var(--app-muted);
+  }
+}
+
+.danger-section {
+  margin-top: 10px;
+}
+
+.settings-status-toast {
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  text-align: center;
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+
+    &.success {
+      color: var(--app-olive);
+    }
+
+    &.error {
+      color: var(--app-danger);
+    }
   }
 }

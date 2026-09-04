@@ -98,8 +98,48 @@ export class AddItemPage implements OnDestroy {
     return noticeKind(this.statusMessage);
   }
 
+  activePreviewIndex = 0;
+
+  get activePreviewUrl(): string {
+    return this.batchPreviewUrls[this.activePreviewIndex] || this.batchPreviewUrls[0] || '';
+  }
+
+  get isScanning(): boolean {
+    return this.isSaving || this.isBatchSaving || this.isPreparing;
+  }
+
+  get scanningStatusText(): string {
+    if (this.isPreparing) {
+      return 'Optimising photo for analysis...';
+    }
+    if (this.isSaving || this.isBatchSaving) {
+      return '✨ Gemini analyzing fabric, cut & color...';
+    }
+    return 'Scanning garment...';
+  }
+
+  selectActivePreview(index: number): void {
+    this.activePreviewIndex = index;
+    void lightImpact();
+  }
+
+  removeActiveFile(): void {
+    this.removeBatchFile(this.activePreviewIndex);
+    if (this.activePreviewIndex >= this.batchFiles.length) {
+      this.activePreviewIndex = Math.max(0, this.batchFiles.length - 1);
+    }
+  }
+
+  captureCamera(): void {
+    void this.capture(CameraSource.Camera);
+  }
+
+  openPhotoLibrary(): void {
+    void this.capture(CameraSource.Photos);
+  }
+
   get isFullPageProcessing(): boolean {
-    return this.processingKind !== null;
+    return false;
   }
 
   get processingTitle(): string {

@@ -1,15 +1,16 @@
 import { Component, HostListener, inject } from '@angular/core';
-import { AlertController } from '@ionic/angular';
+import { ActionSheetController, AlertController, ToastController } from '@ionic/angular';
 import { OutfitDto, WardrobeLookupsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import { confirmAction, lightImpact, lookupLabel, noticeKind, NoticeKind, readMessage, successFeedback, warningFeedback } from '../page-helpers';
 
-interface OutfitCard {
+export interface OutfitCard {
   outfit: OutfitDto;
   imageUrl: string | null;
   isSelected: boolean;
   isMarking: boolean;
   isRemoving: boolean;
+  isFavorite: boolean;
   actionMessage: string;
 }
 
@@ -22,6 +23,11 @@ interface OutfitCard {
 export class OutfitsPage {
   private readonly api = inject(WardrobeApiService);
   private readonly alertController = inject(AlertController);
+  private readonly actionSheetController = inject(ActionSheetController);
+  private readonly toastController = inject(ToastController);
+
+  private readonly FAVORITES_STORAGE_KEY = 'wb_favorite_outfits';
+
   outfits: OutfitDto[] = [];
   lookups: WardrobeLookupsDto | null = null;
   selectedOutfit: OutfitDto | null = null;
@@ -30,6 +36,8 @@ export class OutfitsPage {
   isSelectionMode = false;
   isDeletingSelected = false;
   selectedOutfitIds = new Set<string>();
+  favoriteOutfitIds = new Set<string>();
+
   private readonly markingOutfitIds = new Set<string>();
   private readonly deletingOutfitIds = new Set<string>();
   private readonly outfitRenderIncrement = 20;
@@ -39,12 +47,13 @@ export class OutfitsPage {
   private activeLoad: Promise<void> | null = null;
   private hasPendingLoad = false;
   private hasPendingForceRefresh = false;
+
   readonly skeletonPlaceholders = [0, 1, 2];
   visibleOutfitCount = this.outfitRenderIncrement;
   visibleOutfits: OutfitCard[] = [];
 
   outfitSearch = '';
-  outfitFilter: 'all' | 'recent' | 'worn' = 'all';
+  outfitFilter: 'all' | 'favorites' | 'worn' | 'recent' = 'all';
 
   get filteredOutfits(): OutfitDto[] {
     let list = this.outfits;
@@ -56,7 +65,9 @@ export class OutfitsPage {
         o.items.some((item) => item.name.toLowerCase().includes(query)));
     }
 
-    if (this.outfitFilter === 'worn') {
+    if (this.outfitFilter === 'favorites') {
+      list = list.filter((o) => this.favoriteOutfitIds.has(o.id));
+    } else if (this.outfitFilter === 'worn') {
       list = list.slice().sort((a, b) => b.wearCount - a.wearCount);
     } else if (this.outfitFilter === 'recent') {
       list = list.slice().sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
@@ -65,7 +76,7 @@ export class OutfitsPage {
     return list;
   }
 
-  setOutfitFilter(filter: 'all' | 'recent' | 'worn'): void {
+  setOutfitFilter(filter: 'all' | 'favorites' | 'worn' | 'recent'): void {
     this.outfitFilter = filter;
     this.visibleOutfitCount = this.outfitRenderIncrement;
     this.updateVisibleOutfits();
@@ -111,11 +122,12 @@ export class OutfitsPage {
   }
 
   showMoreOutfits(): void {
-    this.visibleOutfitCount = Math.min(this.outfits.length, this.visibleOutfitCount + this.outfitRenderIncrement);
+    this.visibleOutfitCount = Math.min(this.filteredOutfits.length, this.visibleOutfitCount + this.outfitRenderIncrement);
     this.updateVisibleOutfits();
   }
 
   async ionViewWillEnter(): Promise<void> {
+    this.loadFavorites();
     await this.load();
   }
 
@@ -175,6 +187,47 @@ export class OutfitsPage {
     }
   }
 
+  loadFavorites(): void {
+    try {
+      const raw = localStorage.getItem(this.FAFavoritesKey());
+      if (raw) {
+        const ids: string[] = JSON.parse(raw);
+        this.favoriteOutfitIds = new Set(ids);
+      }
+    } catch {
+      // Ignore local storage error
+    }
+  }
+
+  saveFavorites(): void {
+    try {
+      localStorage.setItem(this.FAFavoritesKey(), JSON.stringify(Array.from(this.favoriteOutfitIds)));
+    } catch {
+      // Ignore local storage error
+    }
+  }
+
+  private FAFavoritesKey(): string {
+    return this.FAVORITES_STORAGE_KEY;
+  }
+
+  toggleFavorite(outfit: OutfitDto, event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (this.favoriteOutfitIds.has(outfit.id)) {
+      this.favoriteOutfitIds.delete(outfit.id);
+    } else {
+      this.favoriteOutfitIds.add(outfit.id);
+    }
+    this.saveFavorites();
+    this.updateVisibleOutfits();
+    void lightImpact();
+  }
+
+  isFavorite(outfitId: string): boolean {
+    return this.favoriteOutfitIds.has(outfitId);
+  }
+
   formatSubcategory(subcategoryId: string | null): string {
     if (!subcategoryId) return '';
     if (this.lookups) {
@@ -213,7 +266,6 @@ export class OutfitsPage {
     if (this.markingOutfitIds.has(outfit.id)) return;
     this.markingOutfitIds.add(outfit.id);
     this.updateVisibleOutfits();
-    this.message = `Marking "${outfit.name}" as worn...`;
     try {
       await this.api.markWorn(outfit.id);
       try {
@@ -225,8 +277,8 @@ export class OutfitsPage {
       } catch {
         this.updateOutfitAfterWear(outfit.id);
       }
-      this.message = 'Marked as worn.';
       void successFeedback();
+      void this.showToast(`Logged wear for "${outfit.name}"!`);
     } catch (error) {
       this.message = readMessage(error, 'Could not mark outfit as worn.');
       void warningFeedback();
@@ -234,6 +286,54 @@ export class OutfitsPage {
       this.markingOutfitIds.delete(outfit.id);
       this.updateVisibleOutfits();
     }
+  }
+
+  async openOutfitMenu(outfit: OutfitDto, event?: Event): Promise<void> {
+    event?.preventDefault();
+    event?.stopPropagation();
+    void lightImpact();
+
+    const isFav = this.isFavorite(outfit.id);
+    const actionSheet = await this.actionSheetController.create({
+      header: outfit.name,
+      buttons: [
+        {
+          text: 'Wear This Outfit Today',
+          icon: 'checkmark-circle-outline',
+          handler: () => {
+            void this.markWorn(outfit);
+          }
+        },
+        {
+          text: isFav ? 'Remove from Favorites' : 'Add to Favorites',
+          icon: isFav ? 'heart-dislike-outline' : 'heart-outline',
+          handler: () => {
+            this.toggleFavorite(outfit);
+          }
+        },
+        {
+          text: 'View Garment Details',
+          icon: 'shirt-outline',
+          handler: () => {
+            this.open(outfit);
+          }
+        },
+        {
+          text: 'Delete Outfit',
+          role: 'destructive',
+          icon: 'trash-outline',
+          handler: () => {
+            void this.remove(outfit);
+          }
+        },
+        {
+          text: 'Cancel',
+          role: 'cancel',
+          icon: 'close'
+        }
+      ]
+    });
+    await actionSheet.present();
   }
 
   async remove(outfit: OutfitDto): Promise<void> {
@@ -253,7 +353,6 @@ export class OutfitsPage {
 
     this.deletingOutfitIds.add(outfit.id);
     this.updateVisibleOutfits();
-    this.message = `Deleting "${outfit.name}"...`;
     try {
       await this.api.deleteOutfit(outfit.id);
       if (this.selectedOutfit?.id === outfit.id) {
@@ -261,6 +360,7 @@ export class OutfitsPage {
       }
       await this.load(true);
       void successFeedback();
+      void this.showToast(`Deleted "${outfit.name}".`, 'trash-outline');
     } catch (error) {
       this.message = readMessage(error, 'Could not delete outfit.');
       void warningFeedback();
@@ -360,16 +460,13 @@ export class OutfitsPage {
     }
 
     this.isDeletingSelected = true;
-    this.message = '';
     try {
       const result = await this.api.deleteOutfits(ids);
       this.selectedOutfitIds.clear();
       this.isSelectionMode = false;
       await this.load(true);
-      this.message = result.deletedCount === 1
-        ? 'Deleted 1 outfit.'
-        : `Deleted ${result.deletedCount} outfits.`;
       void successFeedback();
+      void this.showToast(result.deletedCount === 1 ? 'Deleted 1 outfit.' : `Deleted ${result.deletedCount} outfits.`, 'trash-outline');
     } catch (error) {
       this.message = readMessage(error, 'Could not delete selected outfits.');
       void warningFeedback();
@@ -397,6 +494,17 @@ export class OutfitsPage {
 
   outfitItemImageUrl(item: OutfitDto['items'][number]): string {
     return item.image.thumbnailUrl || item.image.displayUrl;
+  }
+
+  private async showToast(message: string, icon = 'checkmark-circle-outline'): Promise<void> {
+    const toast = await this.toastController.create({
+      message,
+      duration: 2200,
+      position: 'bottom',
+      icon,
+      cssClass: 'ios-toast'
+    });
+    await toast.present();
   }
 
   private updateOutfitAfterWear(outfitId: string): void {
@@ -438,6 +546,7 @@ export class OutfitsPage {
         isSelected: this.selectedOutfitIds.has(outfit.id),
         isMarking,
         isRemoving,
+        isFavorite: this.favoriteOutfitIds.has(outfit.id),
         actionMessage: isMarking
           ? `Marking "${outfit.name}" as worn...`
           : isRemoving

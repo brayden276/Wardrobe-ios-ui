@@ -1,163 +1,298 @@
-    <ion-content class="app-content">
-      <section class="screen processing-screen" *ngIf="isFullPageProcessing; else builderContent" aria-live="polite" aria-busy="true">
-        <header class="nav-header">
-          <button type="button" class="nav-button" routerLink="/tabs/wardrobe" aria-label="Back to wardrobe" [disabled]="isBusy">
-            <ion-icon name="chevron-back-outline"></ion-icon>
-          </button>
-          <h1>{{ processingTitle }}</h1>
-          <span></span>
-        </header>
-        <article class="panel processing-panel">
-          <ion-spinner name="crescent"></ion-spinner>
-          <p class="muted">{{ processingDetail }}</p>
-          <ol class="processing-steps">
-            <li *ngFor="let step of processingSteps; let index = index" [class]="processingStepState(index)">
-              <span></span>{{ step }}
-            </li>
-          </ol>
-        </article>
-      </section>
-      <ng-template #builderContent>
-      <section class="screen">
-        <header class="nav-header">
-          <button type="button" class="nav-button" routerLink="/tabs/wardrobe" aria-label="Back to wardrobe">
-            <ion-icon name="chevron-back-outline"></ion-icon>
-          </button>
-          <h1>Build an outfit</h1>
-          <span></span>
-        </header>
-        <p class="page-meta center-message">{{ isLoadingWardrobe ? 'Loading wardrobe' : (items.length + (items.length === 1 ? ' wardrobe item available' : ' wardrobe items available')) }}</p>
-        <div class="mode-bar" role="tablist" aria-label="Outfit builder mode">
-          <button type="button" [class.active]="builderMode === 'generate'" [attr.aria-selected]="builderMode === 'generate'" (click)="setBuilderMode('generate')" role="tab">Generate</button>
-          <button type="button" [class.active]="builderMode === 'manual'" [attr.aria-selected]="builderMode === 'manual'" (click)="setBuilderMode('manual')" role="tab">Manual</button>
+<ion-header translucent="true" class="ion-no-border ios-builder-header">
+  <ion-toolbar>
+    <ion-title>Outfit Studio</ion-title>
+  </ion-toolbar>
+
+  <!-- iOS Mode Switcher -->
+  <div class="builder-segment-wrap">
+    <ion-segment [(ngModel)]="builderMode" mode="ios">
+      <ion-segment-button value="generate">
+        <ion-label>✨ AI Stylist</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="manual">
+        <ion-label>👔 Canvas</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </div>
+</ion-header>
+
+<ion-content class="app-content" [fullscreen]="true">
+  <div class="screen builder-screen">
+    <!-- MODE 1: AI GENERATE -->
+    <ng-container *ngIf="builderMode === 'generate'">
+      <!-- Prompt & Controls Card (Hidden or collapsible when results exist) -->
+      <section class="ai-prompt-surface" *ngIf="!resultCards.length || isBuildingOutfits">
+        <!-- Occasion Chips -->
+        <div class="intent-block">
+          <span class="intent-label">OCCASION</span>
+          <div class="chip-carousel">
+            <button
+              type="button"
+              class="vibe-chip"
+              *ngFor="let opt of occasionOptions"
+              [class.active]="occasion === opt"
+              (click)="setOccasion(opt)">
+              {{ opt }}
+            </button>
+          </div>
         </div>
-        <ng-container *ngIf="!isLoadingWardrobe && builderMode === 'generate'">
-          <article class="intent-surface form-stack generate-panel" *ngIf="!resultCards.length">
-            <div class="intent-group">
-              <span>Occasion</span>
-              <div class="option-row">
-                <button type="button" class="option-button" *ngFor="let option of occasionOptions" [class.active]="occasion === option" [attr.aria-pressed]="occasion === option" (click)="setOccasion(option)">{{ option }}</button>
+
+        <!-- Dress Code Chips -->
+        <div class="intent-block">
+          <span class="intent-label">FORMALITY</span>
+          <div class="chip-carousel">
+            <button
+              type="button"
+              class="vibe-chip"
+              *ngFor="let opt of dressCodeOptions"
+              [class.active]="dressCode === opt"
+              (click)="setDressCode(opt)">
+              {{ opt }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Avoid Chips -->
+        <div class="intent-block">
+          <span class="intent-label">PREFERENCES</span>
+          <div class="chip-carousel">
+            <button
+              type="button"
+              class="vibe-chip"
+              *ngFor="let opt of avoidOptions"
+              [class.active]="isAvoidSelected(opt)"
+              (click)="toggleAvoid(opt)">
+              {{ opt }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Anchor Item Pill -->
+        <div class="intent-block" *ngIf="items.length">
+          <span class="intent-label">ANCHOR PIECE (OPTIONAL)</span>
+          <div class="anchor-zone">
+            <button
+              type="button"
+              class="anchor-pill-empty"
+              *ngIf="!requiredItemId"
+              (click)="openAnchorPicker()">
+              <ion-icon name="add-circle-outline"></ion-icon>
+              <span>Style look around a specific piece...</span>
+            </button>
+
+            <div class="anchor-pill-selected" *ngIf="requiredItemId && requiredItem">
+              <img [src]="itemImageUrl(requiredItem)" [alt]="requiredItem.name">
+              <div class="anchor-info">
+                <strong>{{ requiredItem.name }}</strong>
+                <span>{{ label(requiredItem.subcategoryId) }}</span>
               </div>
-            </div>
-            <div class="intent-group">
-              <span>Dress code</span>
-              <div class="option-row">
-                <button type="button" class="option-button" *ngFor="let option of dressCodeOptions" [class.active]="dressCode === option" [attr.aria-pressed]="dressCode === option" (click)="setDressCode(option)">{{ option }}</button>
-              </div>
-            </div>
-            <div class="intent-group">
-              <span>Avoid</span>
-              <div class="option-row">
-                <button type="button" class="option-button" *ngFor="let option of avoidOptions" [class.active]="isAvoidSelected(option)" [attr.aria-pressed]="isAvoidSelected(option)" (click)="toggleAvoid(option)">{{ option }}</button>
-              </div>
-            </div>
-            <div class="must-include" *ngIf="items.length">
-              <div class="panel-heading">
-                <h2 class="section-title">Must include</h2>
-                <button type="button" class="text-link" *ngIf="requiredItemId" (click)="clearRequiredItem()">Clear</button>
-              </div>
-              <div class="include-strip">
-                <button type="button" class="include-item include-any" [class.selected]="!requiredItemId" [attr.aria-pressed]="!requiredItemId" (click)="selectRequiredItem(null)">Any item</button>
-                <button type="button" class="include-item" *ngFor="let card of includeItems; trackBy: trackByItemCardId" [class.selected]="card.isRequired" [attr.aria-pressed]="card.isRequired" (click)="selectRequiredItem(card.item.id)">
-                  <img [appLazyImage]="card.imageUrl" [alt]="card.item.name" decoding="async">
-                  <span>{{ card.item.name }}</span>
-                </button>
-              </div>
-              <ion-button class="quiet-button compact-button" fill="clear" size="small" *ngIf="canShowMoreBuilderItems" (click)="showMoreBuilderItems()">Show more items</ion-button>
-            </div>
-            <div class="textarea-wrap">
-              <ion-textarea class="field outfit-query" rows="3" maxlength="160" [(ngModel)]="query" placeholder="Add anything specific, like using black jeans or no heels"></ion-textarea>
-              <button type="button" class="clear-button" aria-label="Clear outfit request" (click)="clearQuery()" *ngIf="query">
-                <ion-icon name="close-outline"></ion-icon>
+              <button type="button" class="anchor-dismiss-btn" (click)="clearRequiredItem()" aria-label="Clear anchor">
+                <ion-icon name="close-circle"></ion-icon>
               </button>
-              <span class="character-count">{{ query.length }}/160</span>
             </div>
-            <ion-button class="primary-button" expand="block" (click)="search()" [disabled]="isBusy || !canGenerate">{{ isBuildingOutfits ? 'Building...' : 'Build outfits' }}</ion-button>
-            <p class="muted consent-note">Wardrobe AI sends your outfit request and wardrobe item details to Google Gemini to generate outfit suggestions.</p>
-          </article>
-          <div class="panel-heading" *ngIf="resultCards.length">
-            <h2 class="section-title">Outfit ideas</h2>
-            <button type="button" class="quiet-button compact-button" (click)="clearResults()">Edit search</button>
           </div>
-          <article class="outfit-card idea-card generated-outfit-card" *ngFor="let card of resultCards; trackBy: trackByGeneratedOutfitKey">
-            <img class="outfit-hero-image" *ngIf="card.imageUrl" [appLazyImage]="card.imageUrl" [appLazyImagePriority]="card.isPriority" [alt]="card.outfit.title" [attr.loading]="card.isPriority ? 'eager' : null" [attr.fetchpriority]="card.isPriority ? 'high' : null" decoding="async">
-            <div class="outfit-copy">
-              <h3>{{ card.outfit.title }}</h3>
-              <p class="muted">{{ card.outfit.explanation }}</p>
-              <p class="fit-note" *ngIf="!card.outfit.isComplete && card.missingCategorySummary">
-                Missing: {{ card.missingCategorySummary }}
-              </p>
-              <p class="fit-note" *ngIf="card.relaxedConstraintSummary">
-                {{ card.relaxedConstraintSummary }}
-              </p>
-              <div class="outfit-item-list">
-                <span *ngFor="let name of card.itemNames; trackBy: trackByValue">{{ name }}</span>
-              </div>
-              <div class="generated-actions">
-                <ion-button class="primary-button small-action" (click)="save(card.outfit)" [disabled]="card.saveState === 'saving' || card.saveState === 'saved'">
-                  {{ card.saveLabel }}
-                </ion-button>
-                <div class="status-line" *ngIf="card.saveState === 'saving'" aria-live="polite">
-                  <ion-spinner name="crescent"></ion-spinner>
-                  <span>{{ card.saveStatusMessage }}</span>
-                </div>
-                <span class="save-state" *ngIf="card.saveState === 'saved'">{{ card.saveStatusMessage }}</span>
-                <span class="save-state failed" *ngIf="card.saveState === 'failed'">{{ card.saveStatusMessage }}</span>
-              </div>
-            </div>
-          </article>
-          <article class="panel empty-results" *ngIf="hasGeneratedSearchRun && !isBuildingOutfits && !message && !results.length">
-            <h2 class="plain-title">No complete outfit could be formed</h2>
-            <p class="muted">Your active wardrobe items or search filters didn't leave enough matching pieces to style a look for this occasion.</p>
-            <div class="recovery-actions">
-              <button type="button" class="option-button" *ngIf="selectedAvoids.length" (click)="clearAvoids()">Allow avoided items</button>
-              <button type="button" class="option-button" *ngIf="requiredItemId" (click)="clearRequiredItem()">Remove required item restriction</button>
-              <button type="button" class="option-button" *ngIf="query" (click)="clearQuery()">Clear custom notes</button>
-              <ion-button class="primary-button" expand="block" routerLink="/tabs/add" fill="outline">
-                <ion-icon name="add-outline" slot="start"></ion-icon>
-                Add items to your wardrobe
-              </ion-button>
-            </div>
-          </article>
-        </ng-container>
-        <article class="intent-surface form-stack manual-builder" *ngIf="!isLoadingWardrobe && builderMode === 'manual'">
-          <div class="panel-heading">
-            <h2 class="section-title">{{ manualItemIds.length ? 'Selected outfit' : 'Pick items' }}</h2>
-            <button type="button" class="icon-button" aria-label="Clear selected manual items" (click)="clearManualSelection()" [disabled]="!manualItemIds.length || isBusy">
-              <ion-icon name="close-outline"></ion-icon>
-            </button>
+        </div>
+
+        <!-- Apple Intelligence Prompt Area -->
+        <div class="ai-input-wrap">
+          <ion-textarea
+            class="ai-textarea"
+            rows="2"
+            maxlength="160"
+            [(ngModel)]="query"
+            placeholder="Add specific notes, e.g. 'Chilly evening, pair with Chelsea boots'"></ion-textarea>
+          
+          <div class="prompt-quick-tags" *ngIf="!query">
+            <span (click)="applyPromptInspiration('Warm layers, tailored outerwear')">🧥 Layered</span>
+            <span (click)="applyPromptInspiration('Monochrome minimalist tones')">🖤 Monochrome</span>
+            <span (click)="applyPromptInspiration('Rainy day, water-resistant footwear')">🌧️ Rainy day</span>
           </div>
-          <label *ngIf="manualItemIds.length">
-            Outfit name
-            <ion-input class="field" [(ngModel)]="manualName" name="manualName"></ion-input>
-          </label>
-          <div class="manual-summary">
-            <span>{{ manualItemIds.length }} selected</span>
-            <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="selectAllItems()" [disabled]="!items.length || isBusy">Select all</ion-button>
-          </div>
-          <div class="manual-grid" *ngIf="items.length">
-            <button type="button" class="item-card manual-item" *ngFor="let card of manualItems; trackBy: trackByItemCardId" [class.selected]="card.isManualSelected" [attr.aria-pressed]="card.isManualSelected" (click)="toggleManualItem(card.item.id)">
-              <div class="item-card__image-wrap manual-item__image-wrap">
-                <img [appLazyImage]="card.imageUrl" [alt]="card.item.name" decoding="async">
-                <span class="manual-item__check">
-                  <ion-icon [name]="card.isManualSelected ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
-                </span>
-              </div>
-              <div class="item-card__body">
-                <h3>{{ card.item.name }}</h3>
-                <div class="meta-line"><span>{{ card.label }}</span></div>
-                <div class="colour-dots" [attr.aria-label]="'Item colours: ' + (card.colours.join(', ') || 'none')">
-                  <span class="colour-dot" *ngFor="let colour of card.colours; trackBy: trackByValue" [style.background]="colourSwatch(colour)" [attr.aria-label]="label(colour) || colour"></span>
-                </div>
-              </div>
-            </button>
-          </div>
-          <ion-button class="secondary-button" fill="outline" expand="block" *ngIf="canShowMoreBuilderItems" (click)="showMoreBuilderItems()">Show more wardrobe items</ion-button>
-          <p class="muted" *ngIf="!items.length">Load wardrobe items to build a manual outfit.</p>
-          <p class="muted" *ngIf="manualItemIds.length && manualHint">{{ manualHint }}</p>
-          <ion-button class="primary-button" expand="block" *ngIf="manualItemIds.length" (click)="saveManual()" [disabled]="isBusy">{{ isSavingManualOutfit ? 'Saving...' : 'Save outfit' }}</ion-button>
-        </article>
-        <p class="status-note" *ngIf="message" [class.status-note--success]="messageKind === 'success'" [class.status-note--error]="messageKind === 'error'" [class.status-note--offline]="messageKind === 'offline'" aria-live="polite">{{ message }}</p>
+        </div>
+
+        <ion-button
+          class="primary-button ai-generate-btn"
+          expand="block"
+          (click)="search()"
+          [disabled]="isBusy || !canGenerate">
+          <ion-icon name="sparkles" slot="start"></ion-icon>
+          {{ isBuildingOutfits ? 'Designing Looks...' : 'Generate Outfits' }}
+        </ion-button>
       </section>
-      </ng-template>
+
+      <!-- Inline AI Loading Shimmer (No Full Page Blocker!) -->
+      <section class="ai-loading-shimmer-stage" *ngIf="isBuildingOutfits">
+        <div class="ai-shimmer-pill">
+          <ion-spinner name="crescent"></ion-spinner>
+          <span>✨ Gemini styling looks from your wardrobe...</span>
+        </div>
+        <div class="outfit-card skeleton-card shimmer-card">
+          <div class="skeleton-image hero-skeleton"></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line short"></div>
+        </div>
+      </section>
+
+      <!-- Generated Results Header -->
+      <div class="results-header" *ngIf="resultCards.length && !isBuildingOutfits">
+        <div>
+          <h2>Styling Suggestions</h2>
+          <p class="muted">{{ resultCards.length }} looks tailored for {{ occasion }}</p>
+        </div>
+        <button type="button" class="text-link-btn" (click)="clearResults()">New Search</button>
+      </div>
+
+      <!-- Generated Look Cards -->
+      <article class="outfit-card generated-look-card" *ngFor="let card of resultCards; trackBy: trackByGeneratedOutfitKey">
+        <div class="hero-image-stage" *ngIf="card.imageUrl">
+          <img
+            [appLazyImage]="card.imageUrl"
+            [appLazyImagePriority]="card.isPriority"
+            [alt]="card.outfit.title"
+            [attr.loading]="card.isPriority ? 'eager' : null"
+            [attr.fetchpriority]="card.isPriority ? 'high' : null"
+            decoding="async">
+        </div>
+
+        <div class="look-copy-body">
+          <h3 class="look-title">{{ card.outfit.title }}</h3>
+          <p class="look-explanation">{{ card.outfit.explanation }}</p>
+
+          <p class="fit-note" *ngIf="!card.outfit.isComplete && card.missingCategorySummary">
+            Missing: {{ card.missingCategorySummary }}
+          </p>
+
+          <!-- Component Rail with Real Garment Thumbnails -->
+          <div class="component-rail" *ngIf="card.items?.length">
+            <span class="rail-title">PIECES IN THIS LOOK</span>
+            <div class="rail-scroll">
+              <div class="piece-disc" *ngFor="let item of card.items">
+                <img [src]="itemImageUrl(item)" [alt]="item.name">
+                <span class="piece-name">{{ item.name }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dual Direct Actions -->
+          <div class="look-actions-row">
+            <ion-button
+              class="primary-button flex-1"
+              (click)="wearGeneratedOutfit(card)"
+              [disabled]="card.saveState === 'saving' || card.isWornToday">
+              <ion-icon name="shirt-outline" slot="start"></ion-icon>
+              {{ card.isWornToday ? 'Worn Today ✓' : 'Wear Today' }}
+            </ion-button>
+
+            <ion-button
+              class="secondary-button flex-1"
+              fill="outline"
+              (click)="save(card.outfit)"
+              [disabled]="card.saveState === 'saving' || card.saveState === 'saved'">
+              <ion-icon name="bookmark-outline" slot="start"></ion-icon>
+              {{ card.saveState === 'saved' ? 'Saved ✓' : 'Save Look' }}
+            </ion-button>
+          </div>
+
+          <p class="status-note" *ngIf="card.saveStatusMessage">{{ card.saveStatusMessage }}</p>
+        </div>
+      </article>
+
+      <!-- Empty / Recovery State -->
+      <article class="panel empty-results" *ngIf="hasGeneratedSearchRun && !isBuildingOutfits && !message && !results.length">
+        <h2 class="plain-title">No matching looks could be styled</h2>
+        <p class="muted">Your active wardrobe items or search filters didn't leave enough pieces for this occasion.</p>
+        <div class="recovery-actions">
+          <button type="button" class="vibe-chip" *ngIf="selectedAvoids.length" (click)="clearAvoids()">Allow avoided items</button>
+          <button type="button" class="vibe-chip" *ngIf="requiredItemId" (click)="clearRequiredItem()">Remove anchor restriction</button>
+          <button type="button" class="vibe-chip" *ngIf="query" (click)="clearQuery()">Clear custom notes</button>
+          <ion-button class="primary-button" expand="block" routerLink="/tabs/add">
+            <ion-icon name="camera-outline" slot="start"></ion-icon>
+            Add More Pieces to Wardrobe
+          </ion-button>
+        </div>
+      </article>
+    </ng-container>
+
+    <!-- MODE 2: MANUAL CANVAS -->
+    <ng-container *ngIf="builderMode === 'manual'">
+      <article class="ios-grouped-card manual-builder-card">
+        <div class="manual-top-header">
+          <div>
+            <h3>Select Outfit Pieces</h3>
+            <p class="muted">{{ manualItemIds.length }} pieces chosen</p>
+          </div>
+          <button type="button" class="text-link-btn" (click)="selectAllItems()" [disabled]="!items.length || isBusy">Select all</button>
+        </div>
+
+        <div class="ios-form-row" *ngIf="manualItemIds.length">
+          <label class="row-label">Outfit Name</label>
+          <ion-input class="ios-name-input" [(ngModel)]="manualName" placeholder="Outfit title"></ion-input>
+        </div>
+
+        <div class="manual-grid" *ngIf="items.length">
+          <button
+            type="button"
+            class="item-card manual-item"
+            *ngFor="let card of manualItems; trackBy: trackByItemCardId"
+            [class.selected]="card.isManualSelected"
+            (click)="toggleManualItem(card.item.id)">
+            <div class="item-card__image-wrap">
+              <img [appLazyImage]="card.imageUrl" [alt]="card.item.name" decoding="async">
+              <span class="manual-check-badge">
+                <ion-icon [name]="card.isManualSelected ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+              </span>
+            </div>
+            <div class="item-card__body">
+              <h3>{{ card.item.name }}</h3>
+              <div class="meta-line"><span>{{ card.label }}</span></div>
+            </div>
+          </button>
+        </div>
+
+        <ion-button class="secondary-button" fill="outline" expand="block" *ngIf="canShowMoreBuilderItems" (click)="showMoreBuilderItems()">
+          Show more items
+        </ion-button>
+
+        <p class="manual-hint-text" *ngIf="manualItemIds.length && manualHint">{{ manualHint }}</p>
+
+        <ion-button class="primary-button" expand="block" *ngIf="manualItemIds.length" (click)="saveManual()" [disabled]="isBusy">
+          <ion-icon name="checkmark-outline" slot="start"></ion-icon>
+          {{ isSavingManualOutfit ? 'Saving...' : 'Save Outfit to Lookbook' }}
+        </ion-button>
+      </article>
+    </ng-container>
+
+    <p class="status-note" *ngIf="message" [class.status-note--success]="messageKind === 'success'" [class.status-note--error]="messageKind === 'error'" aria-live="polite">{{ message }}</p>
+  </div>
+</ion-content>
+
+<!-- Anchor Item Picker Sheet Modal -->
+<ion-modal
+  [isOpen]="isAnchorPickerOpen"
+  (didDismiss)="closeAnchorPicker()"
+  [breakpoints]="[0, 0.75, 1.0]"
+  [initialBreakpoint]="0.75"
+  [handle]="true">
+  <ng-template>
+    <ion-content class="anchor-modal-content">
+      <header class="modal-nav-bar">
+        <button type="button" class="text-btn" (click)="closeAnchorPicker()">Cancel</button>
+        <span class="modal-title">Select Anchor Piece</span>
+        <span class="header-action-spacer"></span>
+      </header>
+
+      <div class="anchor-picker-grid">
+        <button
+          type="button"
+          class="anchor-pick-card"
+          *ngFor="let item of items"
+          (click)="selectAnchorItem(item)">
+          <img [src]="itemImageUrl(item)" [alt]="item.name">
+          <div class="pick-meta">
+            <strong>{{ item.name }}</strong>
+            <span>{{ label(item.subcategoryId) }}</span>
+          </div>
+        </button>
+      </div>
     </ion-content>
+  </ng-template>
+</ion-modal>

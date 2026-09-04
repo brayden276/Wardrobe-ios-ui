@@ -1,12 +1,13 @@
 :root {
   --ion-font-family: Avenir Next, Optima, Candara, sans-serif;
-  --ion-background-color: #f8f1e8;
+  --ion-background-color: #f7efe6;
   --ion-text-color: #241f1a;
-  --ion-color-primary: #7b5f45;
+  --ion-color-primary: #5b6040;
+  --ion-color-primary-rgb: 91, 96, 64;
   --ion-color-primary-contrast: #fffaf3;
   --ion-color-secondary: #7f9277;
   --ion-color-tertiary: #b9856b;
-  --ion-color-medium: #786c60;
+  --ion-color-medium: #5c5246;
   --ion-color-light: #fffaf3;
 }
 
@@ -14,11 +15,13 @@
   :root {
     --ion-background-color: #181512;
     --ion-text-color: #f5ede4;
-    --ion-color-primary: #bfa791;
+    --ion-color-primary: #8ea06a;
+    --ion-color-primary-rgb: 142, 160, 106;
     --ion-color-primary-contrast: #181512;
     --ion-color-secondary: #8da484;
     --ion-color-tertiary: #c8957e;
     --ion-color-medium: #a89d91;
-    --ion-color-light: #26211c;
+    --ion-color-light: #24201b;
   }
 }
+

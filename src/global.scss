@@ -10,18 +10,23 @@
   color-scheme: light;
   --app-bg: #f7efe6;
   --app-surface: #fffaf3;
+  --app-header-bg: rgba(255, 250, 243, 0.88);
   --app-ink: #241f1a;
   --app-muted: #5c5246;
   --app-border: rgba(61, 49, 40, 0.13);
   --app-border-strong: rgba(61, 49, 40, 0.22);
   --app-surface-muted: #f1e7db;
   --app-surface-pressed: #f3eadf;
+  --app-stage-bg: #ffffff;
+  --app-stage-shadow: 0 4px 16px rgba(36, 31, 26, 0.08);
   --app-danger: #8a302a;
   --app-danger-bg: #fff4f1;
   --app-olive: #5b6040;
   --app-olive-pressed: #4b5035;
   --app-taupe: #b9aa96;
   --app-shadow: 0 3px 10px rgba(36, 31, 26, 0.08);
+  --app-segment-bg: rgba(61, 49, 40, 0.08);
+  --app-segment-thumb: #ffffff;
   --app-heading-font: Optima, "Iowan Old Style", Georgia, serif;
 }
 
@@ -94,28 +99,36 @@ ion-toolbar {
 }
 
 ion-tab-bar {
-  --background: #fffaf3;
-  --border: 1px solid var(--app-border);
-  height: calc(66px + var(--ion-safe-area-bottom));
-  padding: 4px 8px var(--ion-safe-area-bottom);
+  --background: rgba(255, 250, 243, 0.88);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  --border: none;
+  border-top: 0.5px solid var(--app-border);
+  height: calc(52px + var(--ion-safe-area-bottom));
+  padding: 2px 4px var(--ion-safe-area-bottom);
+  box-shadow: 0 -1px 4px rgba(36, 31, 26, 0.03);
 }
 
 ion-tab-button {
-  --color: #766b5f;
+  --color: #8c8275;
   --color-selected: var(--app-olive);
-  min-height: 52px;
-  border-radius: 10px;
-  font-size: 11px;
-  transition: background 160ms ease, color 160ms ease;
+  min-height: 48px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: -0.1px;
+  background: transparent;
+  border-radius: 0;
+  transition: color 150ms ease;
 }
 
 ion-tab-button ion-icon {
-  font-size: 22px;
+  font-size: 24px;
+  margin-bottom: 2px;
 }
 
 ion-tab-button.tab-selected,
 ion-tab-button[aria-selected="true"] {
-  background: rgba(91, 96, 64, 0.1);
+  background: transparent;
   color: var(--app-olive);
   font-weight: 600;
 }
@@ -1743,51 +1756,86 @@ ion-select.field {
     color-scheme: dark;
     --app-bg: #181512;
     --app-surface: #24201b;
+    --app-header-bg: rgba(24, 21, 18, 0.88);
     --app-ink: #f5ede4;
     --app-muted: #a89d91;
     --app-border: rgba(245, 237, 228, 0.14);
     --app-border-strong: rgba(245, 237, 228, 0.25);
     --app-surface-muted: #2c2722;
     --app-surface-pressed: #352f29;
+    --app-stage-bg: #201b17;
+    --app-stage-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     --app-danger: #e26f66;
     --app-danger-bg: #321c1a;
     --app-olive: #8ea06a;
     --app-olive-pressed: #a5b880;
     --app-taupe: #8a7c6c;
     --app-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+    --app-segment-bg: rgba(245, 237, 228, 0.1);
+    --app-segment-thumb: #383129;
   }
 
   ion-tab-bar {
-    --background: #24201b;
+    --background: rgba(36, 32, 27, 0.88);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    border-top: 0.5px solid rgba(245, 237, 228, 0.14);
   }
 
   ion-tab-button {
     --color: #a89d91;
+    --color-selected: #f5ede4;
   }
 
   .panel,
   .outfit-card,
+  .lookbook-card,
   .intent-surface,
-  .inline-sheet {
-    background: rgba(36, 32, 27, 0.92);
+  .inline-sheet,
+  .ios-grouped-card,
+  .ios-selection-group {
+    background: rgba(36, 32, 27, 0.94);
   }
 
-  .chip {
+  .chip,
+  .capsule-pill,
+  .vibe-chip {
     background: rgba(36, 32, 27, 0.8);
     color: #f5ede4;
+    border-color: rgba(245, 237, 228, 0.14);
   }
 
   .icon-button,
   .nav-button,
   .filter-button,
-  .clear-button {
+  .clear-button,
+  .action-btn-menu {
     background: rgba(36, 32, 27, 0.85);
+    color: #f5ede4;
   }
 
-  ion-searchbar.wardrobe-search {
-    --background: rgba(36, 32, 27, 0.85);
+  ion-searchbar.wardrobe-search,
+  .ios-searchbar {
+    --background: rgba(245, 237, 228, 0.1);
     --icon-color: #a89d91;
     --placeholder-color: #a89d91;
+    --color: #f5ede4;
+  }
+
+  ion-modal {
+    --background: #181512;
+  }
+
+  ion-action-sheet {
+    --background: rgba(36, 32, 27, 0.95);
+    --button-color: #f5ede4;
+    --button-color-destructive: #e26f66;
+  }
+
+  ion-toast.ios-toast {
+    --background: rgba(44, 39, 34, 0.95);
+    --color: #f5ede4;
+    --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   }
 }
 

@@ -1,226 +1,266 @@
-    <ion-content class="app-content" [scrollEvents]="true">
-      <ion-refresher slot="fixed" (ionRefresh)="refreshWardrobe($event)">
-        <ion-refresher-content></ion-refresher-content>
-      </ion-refresher>
-      <section class="screen processing-screen" *ngIf="isDeletingSelected; else wardrobeContent" aria-live="polite" aria-busy="true">
-        <header class="nav-header">
-          <span></span>
-          <h1>{{ processingTitle }}</h1>
-          <span></span>
-        </header>
-        <article class="panel processing-panel">
-          <ion-spinner name="crescent"></ion-spinner>
-          <p class="muted">{{ processingDetail }}</p>
-          <ol class="processing-steps">
-            <li class="complete"><span></span>Confirming selected items</li>
-            <li class="active"><span></span>Updating wardrobe records</li>
-            <li><span></span>Refreshing your wardrobe</li>
-          </ol>
-        </article>
-      </section>
-      <ng-template #wardrobeContent>
-      <section class="screen page-workspace" [class.intent-active]="filtersExpanded || isSelectionMode">
-        <header class="page-header">
-          <div class="page-title-stack">
-            <h1>{{ isSelectionMode ? selectedCount + ' selected' : 'Wardrobe' }}</h1>
-            <p class="page-meta" *ngIf="!isSelectionMode">{{ isLoading ? loadingMessage : (items.length + (items.length === 1 ? ' item' : ' items')) }}{{ hasFilters ? ' after filters' : '' }}</p>
-            <p class="page-meta" *ngIf="isSelectionMode">Tap items to adjust the selection.</p>
+<ion-header translucent="true" class="ion-no-border ios-wardrobe-header">
+  <ion-toolbar>
+    <ion-buttons slot="start" *ngIf="isSelectionMode">
+      <ion-button fill="clear" (click)="toggleSelectAll()">
+        {{ isAllVisibleSelected ? 'Deselect All' : 'Select All' }}
+      </ion-button>
+    </ion-buttons>
+
+    <ion-title *ngIf="!isSelectionMode" size="large">Wardrobe</ion-title>
+    <ion-title *ngIf="isSelectionMode">{{ selectedCount }} Selected</ion-title>
+
+    <ion-buttons slot="end">
+      <ng-container *ngIf="!isSelectionMode">
+        <ion-button fill="clear" class="filter-header-btn" (click)="openFilterModal()" aria-label="Filter wardrobe">
+          <ion-icon name="options-outline"></ion-icon>
+          <span class="filter-badge-pill" *ngIf="activeFilterCount">{{ activeFilterCount }}</span>
+        </ion-button>
+        <ion-button fill="clear" (click)="enterSelectionMode()" [disabled]="isLoading || !items.length">
+          Select
+        </ion-button>
+      </ng-container>
+
+      <ion-button *ngIf="isSelectionMode" fill="clear" class="done-btn" (click)="cancelSelectionMode()">
+        Done
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+
+  <!-- Search Toolbar -->
+  <ion-toolbar class="search-toolbar" *ngIf="!isSelectionMode">
+    <ion-searchbar
+      class="ios-searchbar"
+      [(ngModel)]="search"
+      placeholder="Search clothes, colours..."
+      (ionInput)="scheduleLoad()"
+      [debounce]="250"
+      showCancelButton="focus">
+    </ion-searchbar>
+  </ion-toolbar>
+
+  <!-- Category Capsule Strip -->
+  <div class="category-capsule-strip" *ngIf="!isSelectionMode && lookups?.categories?.length">
+    <button
+      type="button"
+      class="capsule-pill"
+      [class.active]="!categoryId"
+      (click)="setCategory(null)">
+      All
+    </button>
+    <button
+      type="button"
+      class="capsule-pill"
+      *ngFor="let cat of lookups?.categories; trackBy: trackByOptionId"
+      [class.active]="categoryId === cat.id"
+      (click)="setCategory(cat.id)">
+      {{ cat.label }}
+    </button>
+  </div>
+</ion-header>
+
+<ion-content class="app-content" [scrollEvents]="true" [fullscreen]="true">
+  <ion-refresher slot="fixed" (ionRefresh)="refreshWardrobe($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <section class="screen wardrobe-screen">
+    <!-- Active Filters Token Pill (if advanced filters are on) -->
+    <div class="active-filter-token-bar" *ngIf="!isSelectionMode && activeFilterCount">
+      <span class="token-label">{{ activeFilterSummary }}</span>
+      <button type="button" class="token-clear-btn" (click)="clearFilters()">
+        <ion-icon name="close-circle"></ion-icon>
+      </button>
+    </div>
+
+    <!-- Skeletons -->
+    <div class="wardrobe-grid" *ngIf="isLoading && !items.length" aria-label="Loading wardrobe items" aria-busy="true">
+      <article class="skeleton-card" *ngFor="let placeholder of skeletonPlaceholders; trackBy: trackByValue">
+        <div class="skeleton-image"></div>
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line short"></div>
+      </article>
+    </div>
+
+    <!-- Error State Panel -->
+    <article class="panel state-panel" *ngIf="!isLoading && message && canRetryMessage" [class.state-panel--error]="messageKind === 'error'" [class.state-panel--offline]="messageKind === 'offline'" aria-live="polite">
+      <p class="muted">{{ message }}</p>
+      <ion-button class="secondary-button" fill="outline" size="small" (click)="load(true)">Try again</ion-button>
+    </article>
+
+    <!-- Virtual Grid -->
+    <div #wardrobeGrid class="wardrobe-grid wardrobe-grid--virtual" *ngIf="items.length; else emptyWardrobe">
+      <div class="wardrobe-grid__spacer" [style.height.px]="virtualTopSpacerHeight"></div>
+      <button
+        type="button"
+        class="item-card"
+        *ngFor="let card of visibleItemCards; trackBy: trackByCardId"
+        [class.selection-mode]="isSelectionMode"
+        [class.selected]="card.isSelected"
+        [attr.aria-pressed]="isSelectionMode ? card.isSelected : null"
+        (pointerdown)="beginItemPress(card.item, $event)"
+        (pointermove)="onItemPointerMove($event)"
+        (pointerup)="endItemPress()"
+        (pointerleave)="cancelItemPress()"
+        (pointercancel)="cancelItemPress()"
+        (contextmenu)="openItemContextMenu(card.item); $event.preventDefault()"
+        (click)="onItemCardClick(card.item)">
+        <div class="item-card__image-wrap">
+          <img
+            [appLazyImage]="card.imageUrl"
+            [appLazyImagePriority]="card.isPriorityImage"
+            [alt]="card.item.name"
+            [attr.loading]="card.isPriorityImage ? 'eager' : null"
+            [attr.fetchpriority]="card.isPriorityImage ? 'high' : null"
+            decoding="async">
+
+          <!-- Overlays: Wear Count & Archive Status -->
+          <span class="card-wear-badge" *ngIf="card.item.wearCount">
+            {{ card.item.wearCount }}x
+          </span>
+          <span class="card-archive-badge" *ngIf="card.item.isArchived">
+            Archived
+          </span>
+
+          <span class="selection-marker" *ngIf="isSelectionMode">
+            <ion-icon [name]="card.isSelected ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+          </span>
+
+          <div class="image-generation-overlay" *ngIf="card.statusMessage as status" [class.failed]="!card.isStatusInProgress">
+            <ion-spinner *ngIf="card.isStatusInProgress" name="crescent"></ion-spinner>
+            <span>{{ status }}</span>
           </div>
-          <div class="header-actions">
-            <button type="button" class="icon-button" *ngIf="!isSelectionMode" aria-label="Refresh wardrobe" (click)="load(true)" [disabled]="isLoading">
-              <ion-icon name="refresh-outline"></ion-icon>
-            </button>
-            <button type="button" class="icon-button" *ngIf="!isSelectionMode" aria-label="Select wardrobe items" (click)="enterSelectionMode()" [disabled]="isLoading || !items.length">
-              <ion-icon name="checkmark-circle-outline"></ion-icon>
-            </button>
-            <button type="button" class="icon-button" *ngIf="isSelectionMode" aria-label="Cancel selection" (click)="cancelSelectionMode()">
-              <ion-icon name="close-outline"></ion-icon>
-            </button>
-          </div>
-        </header>
-        <div class="search-row" *ngIf="!isSelectionMode">
-          <ion-searchbar class="wardrobe-search" [(ngModel)]="search" placeholder="Search black jeans, blazers..." (ionInput)="scheduleLoad()"></ion-searchbar>
-          <button type="button" class="filter-button" [class.active]="filtersExpanded || hasFilters" [attr.aria-label]="filtersExpanded ? 'Hide wardrobe filters' : 'Show wardrobe filters'" (click)="toggleFilters()">
-            <ion-icon [name]="filtersExpanded ? 'close-outline' : 'options-outline'"></ion-icon>
-          </button>
         </div>
-        <article class="intent-banner selection-summary" *ngIf="isSelectionMode">
-          <p class="muted">{{ selectedCount ? 'Selected items will be removed from wardrobe results and outfit generation.' : 'Tap items to select them.' }}</p>
-          <div class="selection-inline-actions">
-            <button type="button" class="text-link" (click)="selectVisibleItems()">Select visible</button>
-            <button type="button" class="text-link" (click)="clearSelection()" [disabled]="!selectedCount">Clear</button>
+
+        <div class="item-card__body">
+          <h3>{{ card.item.name }}</h3>
+          <div class="meta-line"><span>{{ card.label }}</span></div>
+          <div class="colour-dots" [attr.aria-label]="'Item colours: ' + (card.colours.join(', ') || 'none')">
+            <span class="colour-dot" *ngFor="let colour of card.colours; trackBy: trackByValue" [style.background]="colourSwatch(colour)" [attr.aria-label]="label(colour) || colour"></span>
           </div>
-        </article>
-        <article class="intent-banner filter-summary" *ngIf="!isSelectionMode && !filtersExpanded && hasFilters">
-          <div class="filter-group">
-            <span class="filter-label">Active filters</span>
-            <p class="muted">{{ activeFilterSummary }}</p>
-            <ion-button class="quiet-button compact-button" fill="clear" size="small" (click)="toggleFilters()">Edit filters</ion-button>
+        </div>
+      </button>
+      <div class="wardrobe-grid__spacer" [style.height.px]="virtualBottomSpacerHeight"></div>
+    </div>
+
+    <ion-infinite-scroll threshold="280px" *ngIf="canLoadMore && !canRetryMessage" (ionInfinite)="loadMore($event)">
+      <ion-infinite-scroll-content loadingSpinner="crescent" loadingText="Loading more wardrobe items..."></ion-infinite-scroll-content>
+    </ion-infinite-scroll>
+
+    <!-- Empty State -->
+    <ng-template #emptyWardrobe>
+      <article class="ios-empty-state" *ngIf="!isLoading && !canRetryMessage">
+        <div class="empty-icon-wrap">
+          <ion-icon [name]="hasFilters ? 'funnel-outline' : 'shirt-outline'"></ion-icon>
+        </div>
+        <h2>{{ hasFilters ? 'No matching items found' : 'Your wardrobe is empty' }}</h2>
+        <p class="muted">{{ hasFilters ? 'Clear active filters to view all your pieces.' : 'Add your first piece of clothing to start styling outfits.' }}</p>
+        <ion-button *ngIf="hasFilters" class="secondary-button compact-button" fill="outline" (click)="clearFilters()">Clear filters</ion-button>
+        <ion-button *ngIf="!hasFilters" class="primary-button" routerLink="/tabs/add">
+          <ion-icon name="camera-outline" slot="start"></ion-icon>
+          Add First Item
+        </ion-button>
+      </article>
+    </ng-template>
+
+    <!-- Native iOS Bottom Selection Bar -->
+    <div class="ios-bulk-bar" *ngIf="isSelectionMode">
+      <span class="bulk-count">{{ selectedCount }} selected</span>
+      <button type="button" class="bulk-destructive-btn" (click)="deleteSelectedItems()" [disabled]="!selectedCount || isDeletingSelected">
+        <ion-icon name="trash-outline"></ion-icon>
+        <span>{{ isDeletingSelected ? 'Deleting...' : 'Delete' }}</span>
+      </button>
+    </div>
+  </section>
+</ion-content>
+
+<!-- Native iOS Filter Sheet Modal -->
+<ion-modal
+  [isOpen]="isFilterModalOpen"
+  (didDismiss)="closeFilterModal()"
+  [breakpoints]="[0, 0.7, 0.95]"
+  [initialBreakpoint]="0.7"
+  [handle]="true">
+  <ng-template>
+    <ion-content class="filter-modal-content">
+      <header class="modal-nav-bar">
+        <button type="button" class="text-btn" (click)="clearFilters(); closeFilterModal()">Reset</button>
+        <span class="modal-title">Filters</span>
+        <button type="button" class="text-btn primary" (click)="closeFilterModal()">Done</button>
+      </header>
+
+      <div class="modal-body-scroll">
+        <!-- Subcategory Filter -->
+        <div class="filter-modal-section" *ngIf="subcategoryOptions.length">
+          <span class="section-title">SUBCATEGORY</span>
+          <div class="chip-row">
+            <button type="button" class="chip" [class.active]="!subcategoryId" (click)="setSubcategory(null)">All</button>
+            <button type="button" class="chip" *ngFor="let opt of subcategoryOptions" [class.active]="subcategoryId === opt.id" (click)="setSubcategory(opt.id)">{{ opt.label }}</button>
           </div>
-        </article>
-        <article class="inline-sheet filter-panel" *ngIf="!isSelectionMode && filtersExpanded">
-          <div class="panel-heading">
-            <h2 class="section-title">Filters</h2>
-            <button type="button" class="icon-button" aria-label="Close filters" (click)="toggleFilters()">
-              <ion-icon name="close-outline"></ion-icon>
-            </button>
+        </div>
+
+        <!-- Colour Filter -->
+        <div class="filter-modal-section">
+          <span class="section-title">COLOUR</span>
+          <div class="chip-row">
+            <button type="button" class="chip" [class.active]="!colourId" (click)="setColour(null)">All</button>
+            <button type="button" class="chip" *ngFor="let opt of lookups?.colours" [class.active]="colourId === opt.id" (click)="setColour(opt.id)">{{ opt.label }}</button>
           </div>
-          <div class="filter-group">
-            <span class="filter-label">Category</span>
-            <div class="chip-row">
-              <button type="button" class="chip" [class.active]="!categoryId" [attr.aria-pressed]="!categoryId" (click)="setCategory(null)">All</button>
-              <button type="button" class="chip" *ngFor="let category of lookups?.categories || []; trackBy: trackByOptionId" [class.active]="categoryId === category.id" [attr.aria-pressed]="categoryId === category.id" (click)="setCategory(category.id)">{{ category.label }}</button>
+        </div>
+
+        <!-- Pattern Filter -->
+        <div class="filter-modal-section">
+          <span class="section-title">PATTERN</span>
+          <div class="chip-row">
+            <button type="button" class="chip" [class.active]="!patternId" (click)="setPattern(null)">All</button>
+            <button type="button" class="chip" *ngFor="let opt of lookups?.patterns" [class.active]="patternId === opt.id" (click)="setPattern(opt.id)">{{ opt.label }}</button>
+          </div>
+        </div>
+
+        <!-- Inset Grouped Selects for Detailed Tailoring -->
+        <div class="filter-modal-section">
+          <span class="section-title">GARMENT SPECIFICATIONS</span>
+          <div class="ios-grouped-card">
+            <div class="ios-form-row">
+              <label class="row-label">Material</label>
+              <ion-select class="ios-select" [(ngModel)]="visibleMaterialId" (ionChange)="onAdvancedFilterChanged()" interface="action-sheet">
+                <ion-select-option [value]="null">Any</ion-select-option>
+                <ion-select-option *ngFor="let opt of lookups?.visibleMaterials" [value]="opt.id">{{ opt.label }}</ion-select-option>
+              </ion-select>
+            </div>
+            <div class="ios-form-row">
+              <label class="row-label">Fit</label>
+              <ion-select class="ios-select" [(ngModel)]="fitId" (ionChange)="onAdvancedFilterChanged()" interface="action-sheet">
+                <ion-select-option [value]="null">Any</ion-select-option>
+                <ion-select-option *ngFor="let opt of lookups?.fits" [value]="opt.id">{{ opt.label }}</ion-select-option>
+              </ion-select>
+            </div>
+            <div class="ios-form-row">
+              <label class="row-label">Neckline</label>
+              <ion-select class="ios-select" [(ngModel)]="necklineId" (ionChange)="onAdvancedFilterChanged()" interface="action-sheet">
+                <ion-select-option [value]="null">Any</ion-select-option>
+                <ion-select-option *ngFor="let opt of lookups?.necklines" [value]="opt.id">{{ opt.label }}</ion-select-option>
+              </ion-select>
+            </div>
+            <div class="ios-form-row">
+              <label class="row-label">Sleeve</label>
+              <ion-select class="ios-select" [(ngModel)]="sleeveLengthId" (ionChange)="onAdvancedFilterChanged()" interface="action-sheet">
+                <ion-select-option [value]="null">Any</ion-select-option>
+                <ion-select-option *ngFor="let opt of lookups?.sleeveLengths" [value]="opt.id">{{ opt.label }}</ion-select-option>
+              </ion-select>
             </div>
           </div>
-          <div class="filter-group subcategory-quick-group" *ngIf="categoryId && subcategoryOptions.length">
-            <span class="filter-label">Subcategory</span>
-            <div class="chip-row">
-              <button type="button" class="chip" [class.active]="!subcategoryId" [attr.aria-pressed]="!subcategoryId" (click)="setSubcategory(null)">All</button>
-              <button type="button" class="chip" *ngFor="let option of subcategoryOptions; trackBy: trackByOptionId" [class.active]="subcategoryId === option.id" [attr.aria-pressed]="subcategoryId === option.id" (click)="setSubcategory(option.id)">{{ option.label }}</button>
-            </div>
-          </div>
-          <details class="advanced-filter">
-            <summary>
-              <span>Advanced filters</span>
-              <ion-icon name="chevron-down-outline"></ion-icon>
-            </summary>
-            <div class="filter-group">
-              <span class="filter-label">Subcategory</span>
-              <div class="chip-row">
-                <button type="button" class="chip" [class.active]="!subcategoryId" [attr.aria-pressed]="!subcategoryId" (click)="setSubcategory(null)">Any</button>
-                <button type="button" class="chip" *ngFor="let option of subcategoryOptions; trackBy: trackByOptionId" [class.active]="subcategoryId === option.id" [attr.aria-pressed]="subcategoryId === option.id" (click)="setSubcategory(option.id)">{{ option.label }}</button>
-              </div>
-            </div>
-            <div class="filter-group">
-              <span class="filter-label">Colour</span>
-              <div class="chip-row">
-                <button type="button" class="chip" [class.active]="!colourId" [attr.aria-pressed]="!colourId" (click)="setColour(null)">Any</button>
-                <button type="button" class="chip" *ngFor="let option of lookups?.colours || []; trackBy: trackByOptionId" [class.active]="colourId === option.id" [attr.aria-pressed]="colourId === option.id" (click)="setColour(option.id)">{{ option.label }}</button>
-              </div>
-            </div>
-            <div class="filter-group">
-              <span class="filter-label">Pattern</span>
-              <div class="chip-row">
-                <button type="button" class="chip" [class.active]="!patternId" [attr.aria-pressed]="!patternId" (click)="setPattern(null)">Any</button>
-                <button type="button" class="chip" *ngFor="let option of lookups?.patterns || []; trackBy: trackByOptionId" [class.active]="patternId === option.id" [attr.aria-pressed]="patternId === option.id" (click)="setPattern(option.id)">{{ option.label }}</button>
-              </div>
-            </div>
-            <div class="filter-select-grid">
-              <label>
-                Material
-                <ion-select class="field" [(ngModel)]="visibleMaterialId" name="visibleMaterialId" (ionChange)="onAdvancedFilterChanged()">
-                  <ion-select-option [value]="null">Any</ion-select-option>
-                  <ion-select-option *ngFor="let option of lookups?.visibleMaterials || []; trackBy: trackByOptionId" [value]="option.id">{{ option.label }}</ion-select-option>
-                </ion-select>
-              </label>
-              <label>
-                Neckline
-                <ion-select class="field" [(ngModel)]="necklineId" name="necklineId" (ionChange)="onAdvancedFilterChanged()">
-                  <ion-select-option [value]="null">Any</ion-select-option>
-                  <ion-select-option *ngFor="let option of lookups?.necklines || []; trackBy: trackByOptionId" [value]="option.id">{{ option.label }}</ion-select-option>
-                </ion-select>
-              </label>
-              <label>
-                Sleeve
-                <ion-select class="field" [(ngModel)]="sleeveLengthId" name="sleeveLengthId" (ionChange)="onAdvancedFilterChanged()">
-                  <ion-select-option [value]="null">Any</ion-select-option>
-                  <ion-select-option *ngFor="let option of lookups?.sleeveLengths || []; trackBy: trackByOptionId" [value]="option.id">{{ option.label }}</ion-select-option>
-                </ion-select>
-              </label>
-              <label>
-                Fit
-                <ion-select class="field" [(ngModel)]="fitId" name="fitId" (ionChange)="onAdvancedFilterChanged()">
-                  <ion-select-option [value]="null">Any</ion-select-option>
-                  <ion-select-option *ngFor="let option of lookups?.fits || []; trackBy: trackByOptionId" [value]="option.id">{{ option.label }}</ion-select-option>
-                </ion-select>
-              </label>
-              <label>
-                Length
-                <ion-select class="field" [(ngModel)]="lengthId" name="lengthId" (ionChange)="onAdvancedFilterChanged()">
-                  <ion-select-option [value]="null">Any</ion-select-option>
-                  <ion-select-option *ngFor="let option of lookups?.garmentLengths || []; trackBy: trackByOptionId" [value]="option.id">{{ option.label }}</ion-select-option>
-                </ion-select>
-              </label>
-              <label>
-                Shape
-                <ion-select class="field" [(ngModel)]="bottomShapeId" name="bottomShapeId" (ionChange)="onAdvancedFilterChanged()">
-                  <ion-select-option [value]="null">Any</ion-select-option>
-                  <ion-select-option *ngFor="let option of lookups?.bottomShapes || []; trackBy: trackByOptionId" [value]="option.id">{{ option.label }}</ion-select-option>
-                </ion-select>
-              </label>
-              <label>
-                Rise
-                <ion-select class="field" [(ngModel)]="riseId" name="riseId" (ionChange)="onAdvancedFilterChanged()">
-                  <ion-select-option [value]="null">Any</ion-select-option>
-                  <ion-select-option *ngFor="let option of lookups?.rises || []; trackBy: trackByOptionId" [value]="option.id">{{ option.label }}</ion-select-option>
-                </ion-select>
-              </label>
-            </div>
-            <div class="toggle-row">
-              <span>Include archived</span>
+        </div>
+
+        <!-- Include Archived Toggle -->
+        <div class="filter-modal-section">
+          <div class="ios-grouped-card">
+            <div class="ios-table-row">
+              <span class="row-label">Include Archived Items</span>
               <ion-toggle [checked]="includeArchived" (ionChange)="setIncludeArchived($event.detail.checked)"></ion-toggle>
             </div>
-          </details>
-          <ion-button class="secondary-button" fill="outline" expand="block" (click)="clearFilters()" [disabled]="!hasFilters">Clear filters</ion-button>
-        </article>
-        <div class="skeleton-list wardrobe-skeleton" *ngIf="isLoading && !items.length" aria-label="Loading wardrobe items" aria-busy="true">
-          <article class="skeleton-card" *ngFor="let placeholder of skeletonPlaceholders; trackBy: trackByValue">
-            <div class="skeleton-image"></div>
-            <div class="skeleton-line"></div>
-            <div class="skeleton-line short"></div>
-          </article>
+          </div>
         </div>
-        <article class="panel state-panel" *ngIf="!isLoading && message && canRetryMessage" [class.state-panel--error]="messageKind === 'error'" [class.state-panel--offline]="messageKind === 'offline'" aria-live="polite">
-          <p class="muted">{{ message }}</p>
-          <ion-button class="secondary-button" fill="outline" size="small" (click)="load(true)">Try again</ion-button>
-        </article>
-        <p class="status-note" *ngIf="!isLoading && message && !canRetryMessage" [class.status-note--success]="messageKind === 'success'" aria-live="polite">{{ message }}</p>
-        <div #wardrobeGrid class="wardrobe-grid wardrobe-grid--virtual" *ngIf="items.length; else emptyWardrobe">
-          <div class="wardrobe-grid__spacer" [style.height.px]="virtualTopSpacerHeight"></div>
-          <button type="button" class="item-card" *ngFor="let card of visibleItemCards; trackBy: trackByCardId" [class.selection-mode]="isSelectionMode" [class.selected]="card.isSelected" [attr.aria-pressed]="isSelectionMode ? card.isSelected : null" (pointerdown)="beginItemPress(card.item, $event)" (pointermove)="onItemPointerMove($event)" (pointerup)="endItemPress()" (pointerleave)="cancelItemPress()" (pointercancel)="cancelItemPress()" (contextmenu)="suppressContextMenu($event)" (click)="onItemCardClick(card.item)">
-            <div class="item-card__image-wrap">
-              <img [appLazyImage]="card.imageUrl" [appLazyImagePriority]="card.isPriorityImage" [alt]="card.item.name" [attr.loading]="card.isPriorityImage ? 'eager' : null" [attr.fetchpriority]="card.isPriorityImage ? 'high' : null" decoding="async">
-              <span class="selection-marker" *ngIf="isSelectionMode">
-                <ion-icon [name]="card.isSelected ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
-              </span>
-              <div class="image-generation-overlay" *ngIf="card.statusMessage as status" [class.failed]="!card.isStatusInProgress">
-                <ion-spinner *ngIf="card.isStatusInProgress" name="crescent"></ion-spinner>
-                <span>{{ status }}</span>
-              </div>
-            </div>
-            <div class="item-card__body">
-              <h3>{{ card.item.name }}</h3>
-              <div class="meta-line"><span>{{ card.label }}</span></div>
-              <div class="colour-dots" [attr.aria-label]="'Item colours: ' + (card.colours.join(', ') || 'none')">
-                <span class="colour-dot" *ngFor="let colour of card.colours; trackBy: trackByValue" [style.background]="colourSwatch(colour)" [attr.aria-label]="label(colour) || colour"></span>
-              </div>
-            </div>
-          </button>
-          <div class="wardrobe-grid__spacer" [style.height.px]="virtualBottomSpacerHeight"></div>
-        </div>
-        <ion-infinite-scroll threshold="280px" *ngIf="canLoadMore && !canRetryMessage" (ionInfinite)="loadMore($event)">
-          <ion-infinite-scroll-content loadingSpinner="crescent" loadingText="Loading more wardrobe items..."></ion-infinite-scroll-content>
-        </ion-infinite-scroll>
-        <ng-template #emptyWardrobe>
-          <article class="panel" *ngIf="!isLoading && !canRetryMessage">
-            <h2 class="plain-title">{{ hasFilters ? 'No matching items found.' : 'Your wardrobe is empty.' }}</h2>
-            <p class="muted">{{ hasFilters ? 'Clear filters to see more wardrobe items.' : 'Add your first clothing photo to start building outfits.' }}</p>
-            <ion-button *ngIf="hasFilters" class="secondary-button" fill="outline" size="small" (click)="clearFilters()">Clear filters</ion-button>
-            <ion-button *ngIf="!hasFilters" class="primary-button" expand="block" routerLink="/tabs/add">
-              <ion-icon name="camera-outline" slot="start"></ion-icon>
-              Add your first item
-            </ion-button>
-          </article>
-        </ng-template>
-        <div class="bulk-action-bar" *ngIf="isSelectionMode">
-          <button type="button" class="bulk-action-bar__secondary" (click)="cancelSelectionMode()">Cancel</button>
-          <button type="button" class="bulk-action-bar__danger" (click)="deleteSelectedItems()" [disabled]="!selectedCount || isDeletingSelected">
-            {{ selectedCount ? 'Delete selected' : 'Select items' }}
-          </button>
-        </div>
-      </section>
-        <ion-fab vertical="bottom" horizontal="end" slot="fixed" *ngIf="!isSelectionMode">
-          <ion-fab-button class="fab-camera" routerLink="/tabs/add" aria-label="Add item"><ion-icon name="camera-outline"></ion-icon></ion-fab-button>
-        </ion-fab>
-      </ng-template>
-      </ion-content>
+      </div>
+    </ion-content>
+  </ng-template>
+</ion-modal>

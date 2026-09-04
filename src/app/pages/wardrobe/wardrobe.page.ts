@@ -1,6 +1,6 @@
 import { AfterViewChecked, AfterViewInit, Component, ElementRef, HostListener, NgZone, OnDestroy, ViewChild, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { AlertController, IonContent } from '@ionic/angular';
+import { ActionSheetController, AlertController, IonContent, ToastController } from '@ionic/angular';
 import { ImageGenerationStreamUpdate, LookupOptionDto, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
 import { ImageGenerationStatusStream, WardrobeApiService } from '../../wardrobe-api.service';
 import {
@@ -36,11 +36,14 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
   private readonly alertController = inject(AlertController);
+  private readonly actionSheetController = inject(ActionSheetController);
+  private readonly toastController = inject(ToastController);
   private readonly zone = inject(NgZone);
   @ViewChild(IonContent) private readonly content?: IonContent;
   @ViewChild(IonContent, { read: ElementRef }) private readonly contentElement?: ElementRef<HTMLElement>;
   @ViewChild('wardrobeGrid') private readonly wardrobeGrid?: ElementRef<HTMLElement>;
-  readonly skeletonPlaceholders = [0, 1, 2, 3];
+  readonly skeletonPlaceholders = [0, 1, 2, 3, 4, 5];
+  isFilterModalOpen = false;
   items: WardrobeItemDto[] = [];
   visibleItems: WardrobeItemDto[] = [];
   visibleItemCards: WardrobeItemCard[] = [];
@@ -106,6 +109,46 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
 
   get selectedCount(): number {
     return this.selectedItemIds.size;
+  }
+
+  get activeFilterCount(): number {
+    let count = 0;
+    if (this.colourId) count++;
+    if (this.patternId) count++;
+    if (this.visibleMaterialId) count++;
+    if (this.necklineId) count++;
+    if (this.sleeveLengthId) count++;
+    if (this.fitId) count++;
+    if (this.lengthId) count++;
+    if (this.bottomShapeId) count++;
+    if (this.riseId) count++;
+    if (this.includeArchived) count++;
+    return count;
+  }
+
+  get isAllVisibleSelected(): boolean {
+    return this.items.length > 0 && this.items.every((item) => this.selectedItemIds.has(item.id));
+  }
+
+  toggleSelectAll(): void {
+    if (this.isAllVisibleSelected) {
+      this.clearSelection();
+    } else {
+      for (const item of this.items) {
+        this.selectedItemIds.add(item.id);
+      }
+      this.updateVisibleItemCards();
+    }
+    void lightImpact();
+  }
+
+  openFilterModal(): void {
+    this.isFilterModalOpen = true;
+    void lightImpact();
+  }
+
+  closeFilterModal(): void {
+    this.isFilterModalOpen = false;
   }
 
   get processingTitle(): string {
@@ -758,6 +801,150 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   suppressContextMenu(event: Event): void {
     if (this.isSelectionMode || this.suppressNextItemClick) {
       event.preventDefault();
+    }
+  }
+
+  async openItemContextMenu(item: WardrobeItemDto): Promise<void> {
+    void lightImpact();
+    const actionSheet = await this.actionSheetController.create({
+      header: item.name,
+      buttons: [
+        {
+          text: 'View Details',
+          icon: 'eye-outline',
+          handler: () => {
+            void this.router.navigate(['/tabs/wardrobe', item.id]);
+          }
+        },
+        {
+          text: 'Mark Worn Today',
+          icon: 'sparkles-outline',
+          handler: () => {
+            void this.quickMarkWorn(item);
+          }
+        },
+        {
+          text: 'Edit Item',
+          icon: 'create-outline',
+          handler: () => {
+            void this.router.navigate(['/tabs/wardrobe', item.id], { queryParams: { mode: 'edit' } });
+          }
+        },
+        {
+          text: item.isArchived ? 'Unarchive Item' : 'Archive Item',
+          icon: item.isArchived ? 'archive-outline' : 'archive',
+          handler: () => {
+            void this.quickToggleArchive(item);
+          }
+        },
+        {
+          text: 'Delete Item',
+          role: 'destructive',
+          icon: 'trash-outline',
+          handler: () => {
+            void this.quickDeleteItem(item);
+          }
+        },
+        {
+          text: 'Cancel',
+          role: 'cancel',
+          icon: 'close'
+        }
+      ]
+    });
+    await actionSheet.present();
+  }
+
+  async quickMarkWorn(item: WardrobeItemDto): Promise<void> {
+    try {
+      await this.api.markItemWorn(item.id);
+      const index = this.items.findIndex((i) => i.id === item.id);
+      if (index !== -1) {
+        const current = this.items[index];
+        this.items[index] = {
+          ...current,
+          wearCount: current.wearCount + 1,
+          lastWornAt: new Date().toISOString()
+        };
+        this.updateVisibleItemCards();
+      }
+      void successFeedback();
+      const toast = await this.toastController.create({
+        message: `Marked "${item.name}" as worn today.`,
+        duration: 2000,
+        position: 'bottom',
+        cssClass: 'ios-toast'
+      });
+      await toast.present();
+    } catch (error) {
+      this.message = readMessage(error, 'Could not mark item as worn.');
+      void warningFeedback();
+    }
+  }
+
+  async quickToggleArchive(item: WardrobeItemDto): Promise<void> {
+    try {
+      const isArchiving = !item.isArchived;
+      const updated = await this.api.updateItem(item.id, {
+        name: item.name,
+        categoryId: item.categoryId,
+        subcategoryId: item.subcategoryId,
+        primaryColourId: item.primaryColourId,
+        secondaryColourIds: item.secondaryColourIds,
+        patternId: item.patternId,
+        visibleMaterialId: item.visibleMaterialId,
+        necklineId: item.necklineId,
+        sleeveLengthId: item.sleeveLengthId,
+        fitId: item.fitId,
+        lengthId: item.lengthId,
+        bottomShapeId: item.bottomShapeId,
+        riseId: item.riseId,
+        isArchived: isArchiving
+      });
+      const index = this.items.findIndex((i) => i.id === item.id);
+      if (index !== -1) {
+        this.items[index] = { ...this.items[index], isArchived: updated.isArchived };
+        this.updateVisibleItemCards();
+      }
+      void successFeedback();
+      const toast = await this.toastController.create({
+        message: isArchiving ? `Archived "${item.name}".` : `Unarchived "${item.name}".`,
+        duration: 2000,
+        position: 'bottom'
+      });
+      await toast.present();
+    } catch (error) {
+      this.message = readMessage(error, 'Could not update archive status.');
+      void warningFeedback();
+    }
+  }
+
+  async quickDeleteItem(item: WardrobeItemDto): Promise<void> {
+    const confirmed = await confirmAction(this.alertController, {
+      title: 'Delete wardrobe item?',
+      message: `Permanently remove "${item.name}" from your wardrobe and outfit suggestions?`,
+      confirmLabel: 'Delete',
+      destructive: true
+    });
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await this.api.deleteItem(item.id);
+      this.items = this.items.filter((i) => i.id !== item.id);
+      this.pruneSelectedItems();
+      this.resetVirtualWindow();
+      void successFeedback();
+      const toast = await this.toastController.create({
+        message: `Deleted "${item.name}".`,
+        duration: 2000,
+        position: 'bottom'
+      });
+      await toast.present();
+    } catch (error) {
+      this.message = readMessage(error, 'Could not delete item.');
+      void warningFeedback();
     }
   }
 

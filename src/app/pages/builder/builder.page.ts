@@ -40,6 +40,8 @@ interface GeneratedOutfitCard {
   missingCategorySummary: string;
   relaxedConstraintSummary: string;
   itemNames: string[];
+  items: WardrobeItemDto[];
+  isWornToday?: boolean;
 }
 
 @Component({
@@ -122,8 +124,34 @@ export class BuilderPage {
     return 'Building outfit suggestions...';
   }
 
+  isAnchorPickerOpen = false;
+
+  get requiredItem(): WardrobeItemDto | null {
+    return this.requiredItemId ? this.itemById.get(this.requiredItemId) ?? null : null;
+  }
+
+  openAnchorPicker(): void {
+    this.isAnchorPickerOpen = true;
+    void lightImpact();
+  }
+
+  closeAnchorPicker(): void {
+    this.isAnchorPickerOpen = false;
+  }
+
+  selectAnchorItem(item: WardrobeItemDto): void {
+    this.selectRequiredItem(item.id);
+    this.closeAnchorPicker();
+    void lightImpact();
+  }
+
+  applyPromptInspiration(text: string): void {
+    this.query = text;
+    void lightImpact();
+  }
+
   get isFullPageProcessing(): boolean {
-    return this.processingKind !== null;
+    return false;
   }
 
   get processingTitle(): string {
@@ -701,9 +729,36 @@ export class BuilderPage {
         saveStatusMessage: this.generatedSaveStatusMessageForState(outfit, saveState),
         missingCategorySummary: this.missingCategorySummary(outfit),
         relaxedConstraintSummary: this.relaxedConstraintSummary(outfit),
-        itemNames: outfit.itemIds.map((id) => this.nameFor(id))
+        itemNames: outfit.itemIds.map((id) => this.nameFor(id)),
+        items: outfit.itemIds.map((id) => this.itemById.get(id)).filter(Boolean) as WardrobeItemDto[]
       };
     });
+  }
+
+  async wearGeneratedOutfit(card: GeneratedOutfitCard): Promise<void> {
+    if (card.saveState === 'saving' || card.isWornToday) return;
+    try {
+      card.saveState = 'saving';
+      card.saveStatusMessage = 'Saving and logging wear...';
+      const saved = await this.api.saveOutfit(
+        card.outfit.title,
+        this.lastGeneratedPrompt || this.buildOutfitQuery(),
+        card.outfit.explanation,
+        card.outfit.itemIds,
+        card.outfit.imageUrl || card.outfit.displayImageUrl || null
+      );
+      if (saved?.id) {
+        await this.api.markWorn(saved.id);
+      }
+      card.saveState = 'saved';
+      card.isWornToday = true;
+      card.saveStatusMessage = '✓ Worn today!';
+      void successFeedback();
+    } catch (error) {
+      card.saveState = 'failed';
+      this.message = readMessage(error, 'Could not log outfit as worn.');
+      void warningFeedback();
+    }
   }
 
   private generatedSaveLabelForState(outfit: GeneratedOutfitDto, saveState: GeneratedOutfitSaveState): string {

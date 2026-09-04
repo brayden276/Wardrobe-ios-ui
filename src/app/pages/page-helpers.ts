@@ -252,10 +252,60 @@ export async function warningFeedback(): Promise<void> {
 }
 
 export function readMessage(error: unknown, fallback: string): string {
-  const candidate = error as { error?: ApiMessage; status?: number; message?: string };
+  if (!error) {
+    return fallback;
+  }
+
+  const candidate = error as {
+    error?: unknown;
+    status?: number;
+    message?: string;
+  };
+
   if (candidate.status === 0) {
     return 'Could not reach Wardrobe AI. Check your connection and try again.';
   }
 
-  return candidate.error?.message ?? candidate.message ?? fallback;
+  if (typeof candidate.error === 'string' && candidate.error.trim().length > 0) {
+    return candidate.error.trim();
+  }
+
+  if (candidate.error && typeof candidate.error === 'object') {
+    const errObj = candidate.error as Record<string, unknown>;
+    if (typeof errObj['message'] === 'string' && errObj['message'].trim().length > 0) {
+      return errObj['message'].trim();
+    }
+    if (typeof errObj['detail'] === 'string' && errObj['detail'].trim().length > 0) {
+      return errObj['detail'].trim();
+    }
+    if (errObj['errors'] && typeof errObj['errors'] === 'object') {
+      const errorStrings: string[] = [];
+      const values = Object.values(errObj['errors'] as Record<string, unknown>);
+      for (let i = 0; i < values.length; i++) {
+        const val = values[i];
+        if (Array.isArray(val)) {
+          for (let j = 0; j < val.length; j++) {
+            const item = val[j];
+            if (typeof item === 'string' && item.trim().length > 0) {
+              errorStrings.push(item.trim());
+            }
+          }
+        } else if (typeof val === 'string' && val.trim().length > 0) {
+          errorStrings.push(val.trim());
+        }
+      }
+      if (errorStrings.length > 0) {
+        return errorStrings.join(' ');
+      }
+    }
+    if (typeof errObj['title'] === 'string' && errObj['title'].trim().length > 0) {
+      return errObj['title'].trim();
+    }
+  }
+
+  if (candidate.message && !candidate.message.startsWith('Http failure response for')) {
+    return candidate.message;
+  }
+
+  return fallback;
 }

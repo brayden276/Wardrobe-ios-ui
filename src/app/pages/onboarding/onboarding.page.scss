@@ -1,48 +1,269 @@
-.onboarding-screen {
-  justify-content: center;
+.onboarding-viewport {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 520px;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: calc(var(--ion-safe-area-top) + 12px) 20px calc(var(--ion-safe-area-bottom) + 20px);
+  box-sizing: border-box;
 }
 
-.onboarding-progress {
-  height: 5px;
+/* iOS Navigation Bar */
+.ios-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  margin-bottom: 12px;
+}
+
+.ios-nav-back {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: -8px;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--app-olive);
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+
+  ion-icon {
+    font-size: 22px;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+  }
+}
+
+.ios-nav-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.ios-nav-step-badge {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--app-muted);
+  background: var(--app-segment-bg);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+/* Segmented 4-Pill Progress Bar */
+.ios-step-indicators {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 24px;
+}
+
+.step-indicator-pill {
+  height: 4px;
+  border-radius: 4px;
+  background: var(--app-segment-bg);
+  transition: background-color 260ms ease;
+
+  &.active {
+    background: var(--app-olive);
+  }
+
+  &.completed {
+    background: var(--app-olive);
+    opacity: 0.65;
+  }
+}
+
+/* Main Content & Headers */
+.onboarding-main-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.step-header {
+  margin-bottom: 20px;
+}
+
+.step-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--app-olive);
+}
+
+.step-title {
+  margin: 4px 0 6px;
+  font-family: var(--app-heading-font);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--app-ink);
+}
+
+.step-description {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--app-muted);
+}
+
+/* Inset Grouped Selection Rows */
+.ios-selection-group {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
   overflow: hidden;
-  border-radius: 5px;
-  background: rgba(61, 49, 40, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-.onboarding-progress span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--app-olive);
-  transition: width 160ms ease;
+.ios-selection-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 64px;
+  padding: 14px 16px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+
+  &:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 16px;
+    right: 0;
+    height: 0.5px;
+    background: var(--app-border);
+  }
+
+  &:active {
+    background: var(--app-surface-pressed);
+  }
+
+  &.selected {
+    background: rgba(91, 96, 64, 0.08);
+  }
 }
 
-.onboarding-card {
-  gap: 14px;
+@media (prefers-color-scheme: dark) {
+  .ios-selection-row.selected {
+    background: rgba(142, 160, 106, 0.16);
+  }
 }
 
-.personal-option-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+.selection-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-right: 12px;
 }
 
-.personal-option {
-  min-height: 48px;
-  padding: 0 12px;
-  text-align: center;
-  font-weight: 650;
+.selection-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--app-ink);
 }
 
-.onboarding-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
-  gap: 8px;
+.selection-subtitle {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--app-muted);
 }
 
-@media (max-width: 360px) {
-  .personal-option-grid,
-  .onboarding-actions {
-    grid-template-columns: 1fr;
+.selection-accessory {
+  font-size: 22px;
+  color: var(--app-muted);
+  opacity: 0.4;
+  display: flex;
+  align-items: center;
+
+  .checked {
+    color: var(--app-olive);
+    opacity: 1;
+  }
+}
+
+.onboarding-feedback {
+  margin-top: 14px;
+}
+
+.ios-feedback-text {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+
+  &.error {
+    color: var(--app-danger);
+  }
+
+  &.success {
+    color: var(--app-olive);
+  }
+}
+
+/* Pinned Bottom Footer */
+.onboarding-footer {
+  margin-top: auto;
+  padding-top: 24px;
+}
+
+.ios-primary-button {
+  --background: var(--app-olive);
+  --background-activated: var(--app-olive-pressed);
+  --border-radius: 14px;
+  --box-shadow: 0 4px 12px rgba(91, 96, 64, 0.2);
+  min-height: 50px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.button-spinner {
+  width: 22px;
+  height: 22px;
+}
+
+/* Fluid Slide Transitions */
+.onboarding-main-stage.slide-forward {
+  animation: iosSlideInRight 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.onboarding-main-stage.slide-backward {
+  animation: iosSlideInLeft 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes iosSlideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes iosSlideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }

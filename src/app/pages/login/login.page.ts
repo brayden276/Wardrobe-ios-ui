@@ -82,6 +82,20 @@ export class LoginPage {
     return this.mode === 'register' && (this.hasSubmitted || !!this.displayName.trim());
   }
 
+  get activeErrorMessage(): string {
+    if (!this.hasSubmitted) {
+      if (this.emailBlurred && this.email.trim() && this.emailValidationMessage) {
+        return this.emailValidationMessage;
+      }
+      return '';
+    }
+    return this.displayNameValidationMessage || this.emailValidationMessage || this.passwordValidationMessage || '';
+  }
+
+  focusInput(inputRef: any): void {
+    inputRef?.setFocus?.();
+  }
+
   setAuthMode(mode: 'login' | 'register'): void {
     if (this.mode === mode) {
       return;
