@@ -394,6 +394,7 @@ export class AddItemPage implements OnDestroy {
     this.uploadError = false;
 
     try {
+      const created = await this.api.createItem(photo.file, photo.name);
       const itemsCreated = created?.items?.length ? created.items : (created?.id ? [created] : []);
       if (itemsCreated.length > 1) {
         await this.router.navigate(['/tabs/wardrobe'], {

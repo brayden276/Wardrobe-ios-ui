@@ -38,7 +38,7 @@ export class OutfitsPage {
   selectedOutfitIds = new Set<string>();
   favoriteOutfitIds = new Set<string>();
 
-  private readonly markingOutfitIds = new Set<string>();
+  readonly markingOutfitIds = new Set<string>();
   private readonly deletingOutfitIds = new Set<string>();
   private readonly outfitRenderIncrement = 20;
   private outfitLongPressHandle: ReturnType<typeof setTimeout> | null = null;

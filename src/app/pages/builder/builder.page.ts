@@ -75,6 +75,7 @@ export class BuilderPage {
   isLoadingWardrobe = false;
   isBuildingOutfits = false;
   isSavingManualOutfit = false;
+  hasGeneratedSearchRun = false;
   private savingGeneratedOutfitKeys = new Set<string>();
   private savedGeneratedOutfitKeys = new Set<string>();
   private failedGeneratedOutfitKeys = new Set<string>();
