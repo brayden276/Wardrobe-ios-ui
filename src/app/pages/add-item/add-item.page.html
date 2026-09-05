@@ -10,11 +10,21 @@
 <ion-content class="app-content" [fullscreen]="true">
   <div class="screen add-item-screen">
     <!-- Hidden file inputs for web fallback -->
-    <input #cameraInput class="file-input" type="file" accept="image/*" capture="environment" (change)="handleCameraFileSelection($event)">
-    <input #batchInput class="file-input" type="file" accept="image/*" multiple (change)="handlePhotoSelection($event)">
+    <input #cameraInput class="file-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*" capture="environment" (change)="handleCameraFileSelection($event)">
+    <input #batchInput class="file-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*" multiple (change)="handlePhotoSelection($event)">
 
     <!-- STATE 1: Empty Viewfinder / Hero Capture Zone -->
     <section class="capture-zone" *ngIf="!batchFiles.length">
+      <!-- Error Guidance Card in Capture Zone (e.g. Single incompatible photo selected) -->
+      <div class="error-guidance-card capture-error-card" *ngIf="uploadError && message">
+        <ion-icon name="alert-circle-outline"></ion-icon>
+        <div class="error-info">
+          <h4>Could not use photo</h4>
+          <p>{{ message }}</p>
+        </div>
+        <ion-button size="small" fill="outline" (click)="dismissError()">Dismiss</ion-button>
+      </div>
+
       <div class="viewfinder-card" role="button" tabindex="0" (click)="openAddPhotoOptions()" (keydown.enter)="openAddPhotoOptions()">
         <div class="viewfinder-icon-pulse">
           <ion-icon name="camera-outline"></ion-icon>

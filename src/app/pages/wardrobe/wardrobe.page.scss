@@ -246,9 +246,21 @@
     background: rgba(35, 32, 28, 0.92);
   }
 
+  .image-generation-overlay {
+    background: rgba(35, 32, 28, 0.88);
+    border-color: rgba(155, 176, 120, 0.3);
+    color: var(--app-olive);
+  }
+
   .category-capsule-strip .filter-capsule-btn.has-active {
     background: rgba(155, 176, 120, 0.2);
   }
+}
+
+.item-card.selection-mode .image-generation-overlay {
+  top: auto;
+  bottom: 8px;
+  right: 8px;
 }
 
 

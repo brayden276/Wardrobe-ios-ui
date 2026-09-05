@@ -98,6 +98,12 @@ export class AddItemPage implements OnDestroy {
     void lightImpact();
   }
 
+  dismissError(): void {
+    this.uploadError = false;
+    this.message = '';
+    void lightImpact();
+  }
+
   removeActiveFile(): void {
     this.removeBatchFile(this.activePreviewIndex);
     if (this.activePreviewIndex >= this.batchFiles.length) {
@@ -499,7 +505,7 @@ export class AddItemPage implements OnDestroy {
     for (const file of files) {
       const validationMessage = this.validateImageFile(file);
       if (validationMessage) {
-        skippedMessages.push(`${file.name}: ${validationMessage}`);
+        skippedMessages.push(files.length === 1 ? validationMessage : `${file.name}: ${validationMessage}`);
         continue;
       }
 
@@ -507,7 +513,8 @@ export class AddItemPage implements OnDestroy {
         const entry = await this.prepareImageForUpload(file);
         prepared.push(entry);
       } catch (error) {
-        skippedMessages.push(`${file.name}: ${error instanceof Error ? error.message : 'Could not prepare image.'}`);
+        const errText = error instanceof Error ? error.message : 'Could not prepare image.';
+        skippedMessages.push(files.length === 1 ? errText : `${file.name}: ${errText}`);
       }
     }
 
@@ -535,12 +542,20 @@ export class AddItemPage implements OnDestroy {
   }
 
   private validateImageFile(file: File): string | null {
-    if (!file.type.startsWith('image/')) {
-      return 'Please upload an image file.';
+    if (!file) {
+      return 'No file was selected.';
+    }
+
+    const type = (file.type || '').toLowerCase();
+    const name = (file.name || '').toLowerCase();
+    const hasImageExtension = /\.(jpe?g|png|webp|heic|heif|bmp|tiff?)$/i.test(name);
+
+    if (!type.startsWith('image/') && !hasImageExtension) {
+      return 'Unsupported file format. Please select a photo (JPEG, PNG, WebP, or HEIC).';
     }
 
     if (!file.size) {
-      return 'The selected file is empty.';
+      return 'The selected photo file is empty or unreadable.';
     }
 
     return null;
@@ -558,7 +573,7 @@ export class AddItemPage implements OnDestroy {
     try {
       const image = await this.decodeImage(sourceUrl);
       if (image.naturalWidth < IMAGE_MIN_SIDE || image.naturalHeight < IMAGE_MIN_SIDE) {
-        throw new Error('Images must be at least 600x600 for reliable classification.');
+        throw new Error(`Photo is too small (${image.naturalWidth}×${image.naturalHeight}px). Please select a photo at least 600×600 pixels for garment classification.`);
       }
 
       if (originalBytes <= IMAGE_COMPRESSION_TRIGGER_BYTES) {
@@ -624,7 +639,7 @@ export class AddItemPage implements OnDestroy {
     return new Promise((resolve, reject) => {
       const image = new Image();
       image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error('Could not read image file.'));
+      image.onerror = () => reject(new Error('Could not decode or display this image format. Please select a JPEG, PNG, or WebP photo.'));
       image.src = url;
     });
   }

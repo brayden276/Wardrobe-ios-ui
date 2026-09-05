@@ -601,6 +601,12 @@ ion-searchbar.wardrobe-search {
   height: 100%;
   object-fit: contain;
   padding: 10px;
+  opacity: 0;
+  transition: opacity 0.35s cubic-bezier(0.2, 0, 0, 1);
+
+  &.image-loaded {
+    opacity: 1;
+  }
 }
 
 .item-card__body {
@@ -690,36 +696,61 @@ ion-searchbar.wardrobe-search {
 
 .image-generation-overlay,
 .item-generation-state {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: #665a4f;
-  font-size: 12px;
-  line-height: 1.25;
+  gap: 5px;
+  color: var(--app-ink);
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.2;
 }
 
 .image-generation-overlay {
   position: absolute;
+  top: 8px;
   right: 8px;
-  bottom: 8px;
-  left: 8px;
-  justify-content: center;
-  border: 1px solid rgba(61, 49, 40, 0.12);
-  border-radius: 10px;
-  background: rgba(255, 250, 243, 0.94);
-  padding: 7px 9px;
-  text-align: center;
+  bottom: auto;
+  left: auto;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: var(--app-radius-pill);
+  background: rgba(255, 255, 255, 0.88);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 0.5px solid rgba(109, 115, 82, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  color: var(--app-olive);
+  pointer-events: none;
+  animation: subtleAmbientPulse 2.4s ease-in-out infinite alternate;
 }
 
 .image-generation-overlay.failed {
-  color: #7a3d34;
+  color: var(--app-danger);
+  border-color: rgba(158, 50, 42, 0.25);
+  background: rgba(255, 255, 255, 0.92);
+  animation: none;
+}
+
+@keyframes subtleAmbientPulse {
+  0% {
+    opacity: 0.82;
+    transform: scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .image-generation-overlay ion-spinner,
 .item-generation-state ion-spinner {
-  width: 14px;
-  height: 14px;
-  --color: #6d7352;
+  width: 12px;
+  height: 12px;
+  --color: currentColor;
+  color: currentColor;
 }
 
 .image-status-line {

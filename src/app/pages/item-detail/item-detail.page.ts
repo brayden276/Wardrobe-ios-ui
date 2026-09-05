@@ -330,11 +330,11 @@ export class ItemDetailPage implements OnDestroy {
   imageGenerationMessage(status: string | null): string | null {
     switch (status) {
       case 'queued':
-        return 'Image generation queued...';
+        return 'Polishing look...';
       case 'generating':
-        return 'Generating polished image...';
+        return 'Polishing look...';
       case 'failed':
-        return 'Image generation failed.';
+        return 'Cutout failed';
       default:
         return null;
     }
