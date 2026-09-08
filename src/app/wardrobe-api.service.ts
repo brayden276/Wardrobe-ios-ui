@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom, timeout } from 'rxjs';
 import { apiBaseUrl } from './api-url';
 import { AuthService } from './auth.service';
 import { DeviceImageCacheService } from './device-image-cache.service';
@@ -55,6 +55,20 @@ private readonly offlineData = inject(OfflineDataService);
   private readonly outfitsCache = new Map<string, CachedApiResponse<OutfitDto[]>>();
   private readonly searchOutfitsCache = new Map<string, CachedApiResponse<GeneratedOutfitDto[]>>();
   private onlineStatus = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  private lastSessionUserId: string | null | undefined;
+
+  constructor() {
+    // Drop user-scoped in-memory caches on sign-out / sign-in / account switch
+    // so the next user can never read the previous user's wardrobe or outfits.
+    const sessionChanges = (this.auth as unknown as { session$?: Observable<{ user: { id: string } } | null> }).session$;
+    sessionChanges?.subscribe((session) => {
+      const userId = session?.user.id ?? null;
+      if (this.lastSessionUserId !== undefined && this.lastSessionUserId !== userId) {
+        this.clearAllUserCaches();
+      }
+      this.lastSessionUserId = userId;
+    });
+  }
 
   get isOnline(): boolean {
     return typeof navigator !== 'undefined' ? navigator.onLine && this.onlineStatus : this.onlineStatus;
@@ -72,7 +86,7 @@ async getLookups(): Promise<WardrobeLookupsDto> {
   }
   this.lookupsPromise ??= this.authorized(() => firstValueFrom(this.http.get<WardrobeLookupsDto>(this.url('/api/lookups/wardrobe'), this.authOptions())))
     .then(async (lookups) => {
-      if (userId) await this.offlineData.write(userId, 'lookups', lookups);
+      if (userId && this.auth.session?.user.id === userId) await this.offlineData.write(userId, 'lookups', lookups);
       return lookups;
     })
       .catch((error) => {
@@ -101,7 +115,7 @@ async getItems(
   return this.setCached(this.itemsCache, cacheKey, async () => {
       const response = await this.authorized(() => firstValueFrom(this.http.get<{ items: WardrobeItemDto[] }>(this.url(`/api/wardrobe/items${query ? `?${query}` : ''}`), this.authOptions())));
     const items = await Promise.all(response.items.map((item) => this.normaliseItem(item, false)));
-    if (userId && Object.keys(params).length === 0) await this.offlineData.write(userId, 'items', items);
+    if (userId && Object.keys(params).length === 0 && this.auth.session?.user.id === userId) await this.offlineData.write(userId, 'items', items);
     return items;
     });
   }
@@ -112,11 +126,16 @@ async getItems(
   }
 
   async createItem(image: Blob, fileName: string): Promise<CreateWardrobeItemResponse> {
+    this.requireOnline();
     const body = new FormData();
     body.append('image', image, fileName);
-    const response = await this.authorized(() => firstValueFrom(this.http.post<{ item: WardrobeItemDto; items?: WardrobeItemDto[] }>(this.url('/api/wardrobe/items'), body, this.authOptions())));
+    const response = await this.authorized(() => firstValueFrom(this.http.post<{ item?: WardrobeItemDto; items?: WardrobeItemDto[] }>(this.url('/api/wardrobe/items'), body, this.authOptions())));
     this.clearWardrobeCaches();
-    const item = await this.normaliseItem(response.item);
+    const rawItem = response.item ?? response.items?.[0];
+    if (!rawItem) {
+      throw new Error('Wardrobe item response was not in the expected format.');
+    }
+    const item = await this.normaliseItem(rawItem);
     const items = response.items?.length
       ? await Promise.all(response.items.map((entry) => this.normaliseItem(entry)))
       : [item];
@@ -124,6 +143,7 @@ async getItems(
   }
 
   async createItems(images: File[]): Promise<BatchWardrobeItemsResponse> {
+    this.requireOnline();
     const body = new FormData();
     for (const image of images) {
       body.append('images', image, image.name);
@@ -133,28 +153,34 @@ async getItems(
     this.clearWardrobeCaches();
     return {
       ...response,
-      results: await Promise.all(response.results.map(async (result) => ({
-        ...result,
-        item: result.item ? await this.normaliseItem(result.item) : null,
-        items: result.items?.length
-          ? await Promise.all(result.items.map((i) => this.normaliseItem(i)))
-          : (result.item ? [await this.normaliseItem(result.item)] : null)
-      })))
+      results: await Promise.all(response.results.map(async (result) => {
+        const item = result.item ? await this.normaliseItem(result.item) : null;
+        return {
+          ...result,
+          item,
+          items: result.items?.length
+            ? await Promise.all(result.items.map((i) => this.normaliseItem(i)))
+            : (item ? [item] : null)
+        };
+      }))
     };
   }
 
   async updateItem(id: string, request: UpdateWardrobeItemRequest): Promise<WardrobeItemDto> {
+    this.requireOnline();
     const response = await this.authorized(() => firstValueFrom(this.http.put<{ item: WardrobeItemDto }>(this.url(`/api/wardrobe/items/${id}`), request, this.authOptions())));
     this.clearWardrobeCaches();
     return this.normaliseItem(response.item);
   }
 
   async deleteItem(id: string): Promise<void> {
+    this.requireOnline();
     await this.authorized(() => firstValueFrom(this.http.delete<void>(this.url(`/api/wardrobe/items/${id}`), this.authOptions())));
     this.clearWardrobeCaches();
   }
 
   async deleteItems(ids: string[]): Promise<BulkDeleteResponse> {
+    this.requireOnline();
     const response = await this.authorized(() => firstValueFrom(this.http.post<BulkDeleteResponse>(this.url('/api/wardrobe/items/bulk-delete'), { ids }, this.authOptions())));
     this.clearWardrobeCaches();
     return response;
@@ -186,6 +212,7 @@ async getItems(
   }
 
   async saveOutfit(name: string, prompt: string | null, explanation: string | null, itemIds: string[], imageUrl: string | null = null): Promise<OutfitDto> {
+    this.requireOnline();
     const response = await this.authorized(() => firstValueFrom(this.http.post<{ outfit: OutfitDto }>(this.url('/api/outfits'), { name, prompt, explanation, itemIds, imageUrl }, this.authOptions())));
     this.clearOutfitCaches();
     const outfit = await this.normaliseOutfit(response.outfit);
@@ -208,7 +235,7 @@ async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
       const query = options.includePending ? '?includePending=true' : '';
       const response = await this.authorized(() => firstValueFrom(this.http.get<{ outfits: OutfitDto[] }>(this.url(`/api/outfits${query}`), this.authOptions())));
     const outfits = await Promise.all(response.outfits.map((outfit) => this.normaliseOutfit(outfit)));
-    if (userId && !options.includePending) await this.offlineData.write(userId, 'outfits', outfits);
+    if (userId && !options.includePending && this.auth.session?.user.id === userId) await this.offlineData.write(userId, 'outfits', outfits);
     return outfits;
     });
   }
@@ -265,22 +292,26 @@ async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
   }
 
   async deleteOutfit(id: string): Promise<void> {
+    this.requireOnline();
     await this.authorized(() => firstValueFrom(this.http.delete<void>(this.url(`/api/outfits/${id}`), this.authOptions())));
     this.clearOutfitCaches();
   }
 
   async deleteOutfits(ids: string[]): Promise<BulkDeleteResponse> {
+    this.requireOnline();
     const response = await this.authorized(() => firstValueFrom(this.http.post<BulkDeleteResponse>(this.url('/api/outfits/bulk-delete'), { ids }, this.authOptions())));
     this.clearOutfitCaches();
     return response;
   }
 
   async markWorn(id: string): Promise<void> {
+    this.requireOnline();
     await this.authorized(() => firstValueFrom(this.http.post(this.url(`/api/outfits/${id}/wear-logs`), {}, this.authOptions())));
     this.clearOutfitCaches();
   }
 
   async markItemWorn(id: string): Promise<void> {
+    this.requireOnline();
     await this.authorized(() => firstValueFrom(this.http.post(this.url(`/api/wardrobe/items/${id}/wear-logs`), {}, this.authOptions())));
     this.clearWardrobeCaches();
   }
@@ -297,8 +328,20 @@ async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
         )
       )
     );
-    const normaliseMetrics = (metrics?: WardrobeAnalyticsMetricsDto): WardrobeAnalyticsMetricsDto => {
-      if (!metrics) return metrics!;
+    const normaliseMetrics = (metrics?: WardrobeAnalyticsMetricsDto | null): WardrobeAnalyticsMetricsDto => {
+      if (!metrics) {
+        return {
+          totalItems: 0,
+          activeItems: 0,
+          archivedItems: 0,
+          totalOutfits: 0,
+          outfitsWithImages: 0,
+          totalWearCount: 0,
+          itemsByCategory: {},
+          itemsByColour: {},
+          topWornItems: []
+        };
+      }
       return {
         ...metrics,
         topWornItems: (metrics.topWornItems ?? []).map((item) => ({
@@ -332,7 +375,8 @@ async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
   }
 
 private authOptions(): { headers: HttpHeaders } {
-    return { headers: new HttpHeaders({ Authorization: `Bearer ${this.auth.token ?? ''}` }) };
+    const token = this.auth.token;
+    return { headers: token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : new HttpHeaders() };
   }
 
   private getCached<T>(cache: Map<string, CachedApiResponse<T>>, key: string): Promise<T> | null {
@@ -361,6 +405,13 @@ private authOptions(): { headers: HttpHeaders } {
     });
 
     return promise;
+  }
+
+  /** Clears every user-scoped in-memory cache. Call on sign-out / user switch. */
+  clearAllUserCaches(): void {
+    this.lookupsPromise = null;
+    this.itemsCache.clear();
+    this.clearOutfitCaches();
   }
 
   private clearWardrobeCaches(): void {
@@ -605,7 +656,7 @@ async getFavourites(): Promise<FavouriteDto[]> {
   const userId = this.auth.session?.user.id;
   if (!this.isOnline && userId) return (await this.offlineData.read<FavouriteDto[]>(userId, 'favourites')) ?? [];
   const response = await this.authorized(() => firstValueFrom(this.http.get<{ favourites: FavouriteDto[] }>(this.url('/api/wardrobe/favourites'), this.authOptions())));
-  if (userId) await this.offlineData.write(userId, 'favourites', response.favourites);
+  if (userId && this.auth.session?.user.id === userId) await this.offlineData.write(userId, 'favourites', response.favourites);
   return response.favourites;
 }
 

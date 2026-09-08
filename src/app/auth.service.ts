@@ -43,7 +43,9 @@ export class AuthService {
       return this.restorePromise;
     }
 
-    this.restorePromise = this.restoreCore();
+    this.restorePromise = this.restoreCore().finally(() => {
+      this.restorePromise = null;
+    });
     return this.restorePromise;
   }
 
@@ -157,7 +159,11 @@ export class AuthService {
     const session = this.session;
     try {
       if (session?.refreshToken && typeof navigator !== 'undefined' && navigator.onLine) {
-        await firstValueFrom(this.http.post(`${this.apiBaseUrl}/api/auth/logout`, { refreshToken: session.refreshToken }));
+        try {
+          await firstValueFrom(this.http.post(`${this.apiBaseUrl}/api/auth/logout`, { refreshToken: session.refreshToken }));
+        } catch {
+          // Best effort: local sign-out must succeed even if the server revoke call fails.
+        }
       }
     } finally {
       if (session?.user.id) await this.offlineData.clearUser(session.user.id);
@@ -167,18 +173,18 @@ export class AuthService {
   }
 
   async deleteAccount(): Promise<void> {
+    const userId = this.session?.user.id;
     const token = this.token;
-    if (!token) {
-      await this.deviceImageCache.clearCache();
-      await this.clearSession();
-      return;
-    }
-
     try {
-      await firstValueFrom(this.http.delete(`${this.apiBaseUrl}/api/auth/account`, {
-        headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
-      }));
+      if (token) {
+        await firstValueFrom(this.http.delete(`${this.apiBaseUrl}/api/auth/account`, {
+          headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
+        }));
+      }
     } finally {
+      if (userId) {
+        await this.offlineData.clearUser(userId);
+      }
       await this.deviceImageCache.clearCache();
       await this.clearSession();
     }
@@ -186,7 +192,7 @@ export class AuthService {
 
   async handleUnauthorized(error: unknown): Promise<void> {
     if (this.isUnauthorized(error)) {
-      await this.clearSession();
+      await this.clearLocalSession();
     }
   }
 
@@ -241,7 +247,8 @@ export class AuthService {
   }
 
   private authOptions(): { headers: HttpHeaders } {
-    return { headers: new HttpHeaders({ Authorization: `Bearer ${this.token ?? ''}` }) };
+    const token = this.token;
+    return { headers: token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : new HttpHeaders() };
   }
 
   private async clearLocalSession(): Promise<void> {

@@ -7,16 +7,25 @@ interface OfflineEnvelope<T> {
   value: T;
 }
 
+/** Offline snapshots older than this are treated as stale and ignored (7 days). */
+export const OFFLINE_DATA_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 @Injectable({ providedIn: 'root' })
 export class OfflineDataService {
   private readonly prefix = 'wardrobe-offline-v1';
 
-  async read<T>(userId: string, resource: string): Promise<T | null> {
+  async read<T>(userId: string, resource: string, maxAgeMs = OFFLINE_DATA_TTL_MS): Promise<T | null> {
     const stored = await Preferences.get({ key: this.key(userId, resource) });
     if (!stored.value) return null;
     try {
       const parsed = JSON.parse(stored.value) as OfflineEnvelope<T>;
-      return parsed.userId === userId ? parsed.value : null;
+      if (parsed.userId !== userId) return null;
+      const savedAt = Date.parse(parsed.savedAt);
+      if (!Number.isNaN(savedAt) && Date.now() - savedAt > maxAgeMs) {
+        await Preferences.remove({ key: this.key(userId, resource) });
+        return null;
+      }
+      return parsed.value;
     } catch {
       await Preferences.remove({ key: this.key(userId, resource) });
       return null;
