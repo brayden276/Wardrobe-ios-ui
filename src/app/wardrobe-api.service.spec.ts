@@ -533,6 +533,32 @@ describe('WardrobeApiService', () => {
   });
 
   describe('401 retry handling in authorized()', () => {
+    it('renews an expired image-status connection without logging out', async () => {
+      const fetchSpy = spyOn(window, 'fetch').and.returnValues(
+        Promise.resolve(new Response(null, { status: 401 })),
+        Promise.resolve(new Response(null, { status: 503 }))
+      );
+      const onError = jasmine.createSpy('onError');
+      const stream = service.streamImageGenerationStatuses(['item-1'], [], () => {}, onError);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(mockAuthService.refreshSession).toHaveBeenCalledTimes(1);
+      expect(mockAuthService.handleUnauthorized).toHaveBeenCalledWith(jasmine.objectContaining({ status: 503 }));
+      expect(onError).toHaveBeenCalledTimes(1);
+      stream?.close();
+    });
+
+    it('handles a genuine rejection of the renewed token', async () => {
+      const pending = service.getAnalyticsSummary();
+      httpTesting.expectOne(`${baseUrl}/api/analytics`)
+        .flush({}, { status: 401, statusText: 'Unauthorized' });
+      await new Promise(resolve => setTimeout(resolve, 0));
+      httpTesting.expectOne(`${baseUrl}/api/analytics`)
+        .flush({}, { status: 401, statusText: 'Unauthorized' });
+      await expectAsync(pending).toBeRejected();
+      expect(mockAuthService.handleUnauthorized).toHaveBeenCalledWith(jasmine.objectContaining({ status: 401 }));
+    });
+
     it('should retry request when 401 is received and token refresh succeeds', async () => {
       const p = service.getAiUsageCostSummary();
 
@@ -557,7 +583,7 @@ describe('WardrobeApiService', () => {
       expect(result.totalCostUsd).toBe(0.5);
     });
 
-    it('should handle unauthorized and throw when token refresh fails on 401', async () => {
+    it('should preserve the session when token refresh is temporarily unavailable', async () => {
       mockAuthService.refreshSession.and.returnValue(Promise.resolve(false));
 
       const p = service.getAiUsageCostSummary();
@@ -567,7 +593,7 @@ describe('WardrobeApiService', () => {
 
       await expectAsync(p).toBeRejected();
       expect(mockAuthService.refreshSession).toHaveBeenCalled();
-      expect(mockAuthService.handleUnauthorized).toHaveBeenCalled();
+      expect(mockAuthService.handleUnauthorized).not.toHaveBeenCalled();
     });
   });
 

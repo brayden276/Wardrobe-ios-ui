@@ -101,6 +101,35 @@ describe('AuthService', () => {
   });
 
   describe('restore()', () => {
+    it('restores once across repeated page visits without replacing a renewed session', async () => {
+      await Preferences.set({ key: 'wardrobe-session', value: JSON.stringify(mockAuthResponse) });
+      const restore = service.restore();
+      await tick();
+      httpTesting.expectOne(`${baseUrl}/api/auth/me`).flush(mockUser);
+      await restore;
+
+      const refresh = service.refreshSession();
+      // Navigation while renewal is in flight must not reload stored credentials.
+      await service.restore();
+      httpTesting.expectNone(`${baseUrl}/api/auth/me`);
+      httpTesting.expectOne(`${baseUrl}/api/auth/refresh`).flush({
+        ...mockAuthResponse, accessToken: 'renewed-access', refreshToken: 'renewed-refresh'
+      });
+      await refresh;
+      await service.restore();
+      expect(service.token).toBe('renewed-access');
+      httpTesting.expectNone(`${baseUrl}/api/auth/me`);
+    });
+
+    it('does not revalidate an already signed-in session on first restore', async () => {
+      const login = service.login('test@example.com', 'Pass123');
+      httpTesting.expectOne(`${baseUrl}/api/auth/login`).flush(mockAuthResponse);
+      await login;
+      await service.restore();
+      expect(service.token).toBe(mockAuthResponse.accessToken);
+      httpTesting.expectNone(`${baseUrl}/api/auth/me`);
+    });
+
     it('should do nothing if no session is stored in Preferences', async () => {
       await service.restore();
 

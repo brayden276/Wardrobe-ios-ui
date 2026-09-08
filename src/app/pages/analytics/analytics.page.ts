@@ -25,6 +25,7 @@ export class AnalyticsPage implements OnInit {
   lastRefreshed: Date | null = null;
   pingLatencyMs: number | null = null;
   private activeLoad: Promise<void> | null = null;
+  private categoryLoadId = 0;
 
   // Category inspection drilldown modal
   selectedCategory: { id: string; label: string; count: number } | null = null;
@@ -58,11 +59,7 @@ export class AnalyticsPage implements OnInit {
         // Ensure the stored session is loaded before firing the request:
         // without this, a first visit can send the call with no token,
         // take a 401, and get bounced to /login instead of seeing feedback.
-        try {
-          await this.auth.restore();
-        } catch {
-          // Fall through: the analytics call below surfaces auth status.
-        }
+        await this.auth.restore();
         this.analytics = await this.api.getAnalyticsSummary();
         this.pingLatencyMs = Math.round(performance.now() - startPing);
         this.lastRefreshed = new Date();
@@ -82,6 +79,7 @@ export class AnalyticsPage implements OnInit {
   }
 
   setScope(scope: AnalyticsScope): void {
+    this.closeCategoryModal();
     this.scope = scope;
   }
 
@@ -90,22 +88,28 @@ export class AnalyticsPage implements OnInit {
   }
 
   async openCategoryItems(category: { id: string; label: string; count: number }): Promise<void> {
+    // The item endpoint only returns the signed-in user's wardrobe.
+    if (this.scope !== 'user') return;
+
+    const loadId = ++this.categoryLoadId;
     this.selectedCategory = category;
     this.categoryItems = [];
     this.categoryItemsError = '';
     this.isLoadingCategoryItems = true;
     try {
       // Fetch garments for this category
-      const items = await this.api.getItems({ categoryId: category.id });
-      this.categoryItems = items;
+      const items = await this.api.getItems({ categoryId: category.id, includeArchived: true });
+      if (loadId === this.categoryLoadId) this.categoryItems = items;
     } catch (err) {
-      this.categoryItemsError = readMessage(err, 'Failed to load garments for this category.');
+      if (loadId === this.categoryLoadId) this.categoryItemsError = readMessage(err, 'Failed to load garments for this category.');
     } finally {
-      this.isLoadingCategoryItems = false;
+      if (loadId === this.categoryLoadId) this.isLoadingCategoryItems = false;
     }
   }
 
   closeCategoryModal(): void {
+    this.categoryLoadId++;
+    this.isLoadingCategoryItems = false;
     this.selectedCategory = null;
     this.categoryItems = [];
     this.categoryItemsError = '';

@@ -43,13 +43,20 @@ export class AuthService {
       return this.restorePromise;
     }
 
-    this.restorePromise = this.restoreCore().finally(() => {
+    // Restore storage once. Re-reading it on navigation can race token rotation
+    // and replace the current session with credentials that have been revoked.
+    this.restorePromise = this.restoreCore().catch((error) => {
       this.restorePromise = null;
+      throw error;
     });
     return this.restorePromise;
   }
 
   private async restoreCore(): Promise<void> {
+    if (this.session) {
+      return;
+    }
+
     const stored = await Preferences.get({ key: 'wardrobe-session' });
     if (!stored.value) {
       return;

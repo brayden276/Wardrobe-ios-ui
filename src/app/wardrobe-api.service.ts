@@ -271,13 +271,12 @@ async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
     const controller = new AbortController();
     let closed = false;
 
-    void this.readImageGenerationStatusStream(
+    void this.authorized(() => this.readImageGenerationStatusStream(
       `${this.url('/api/wardrobe/image-generation/stream')}?${query.toString()}`,
-      accessToken,
+      this.auth.token ?? '',
       controller.signal,
-      onUpdate)
-      .catch(async (error) => {
-        await this.auth.handleUnauthorized(error);
+      onUpdate))
+      .catch(() => {
         if (!closed) {
           onError?.();
         }
@@ -477,7 +476,8 @@ private authOptions(): { headers: HttpHeaders } {
           }
         }
 
-        await this.auth.handleUnauthorized(error);
+        // refreshSession owns invalid-refresh-token handling. A failed refresh
+        // can also mean a temporary network/server failure, not a lost session.
         throw error;
       }
 
@@ -727,4 +727,3 @@ async exportUserData(): Promise<WardrobeExportDto> {
   return this.authorized(() => firstValueFrom(this.http.get<WardrobeExportDto>(this.url('/api/wardrobe/export'), this.authOptions())));
 }
 }
-

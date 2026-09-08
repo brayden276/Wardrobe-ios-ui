@@ -1,4 +1,7 @@
 import { TestBed } from '@angular/core/testing';
+import { CommonModule } from '@angular/common';
+import { IonicModule } from '@ionic/angular';
+import { RouterTestingModule } from '@angular/router/testing';
 import { Router } from '@angular/router';
 import { AnalyticsPage } from './analytics.page';
 import { AuthService } from '../../auth.service';
@@ -69,7 +72,8 @@ describe('AnalyticsPage', () => {
   };
 
   beforeEach(() => {
-    mockApi = jasmine.createSpyObj<WardrobeApiService>('WardrobeApiService', ['getAnalyticsSummary']);
+    mockApi = jasmine.createSpyObj<WardrobeApiService>('WardrobeApiService', ['getAnalyticsSummary', 'getItems']);
+    mockApi.getItems.and.resolveTo([]);
     mockApi.getAnalyticsSummary.and.returnValue(Promise.resolve(mockAnalyticsData));
 
     mockRouter = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
@@ -79,6 +83,8 @@ describe('AnalyticsPage', () => {
     mockAuth.restore.and.returnValue(Promise.resolve());
 
     TestBed.configureTestingModule({
+      declarations: [AnalyticsPage],
+      imports: [CommonModule, IonicModule.forRoot(), RouterTestingModule],
       providers: [
         AnalyticsPage,
         { provide: WardrobeApiService, useValue: mockApi },
@@ -134,6 +140,73 @@ describe('AnalyticsPage', () => {
   it('should navigate to settings when openSettings is called', () => {
     component.openSettings();
     expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/tabs/settings');
+  });
+
+  it('does not send an unauthenticated request when session restoration fails', async () => {
+    mockAuth.restore.and.rejectWith(new Error('Session storage unavailable'));
+    await component.loadAnalytics();
+    expect(mockApi.getAnalyticsSummary).not.toHaveBeenCalled();
+    expect(component.error).toBe('Session storage unavailable');
+    expect(component.isLoading).toBeFalse();
+    expect(mockRouter.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('renders system analytics and both scopes using the actual page template', async () => {
+    await TestBed.compileComponents();
+    const fixture = TestBed.createComponent(AnalyticsPage);
+    fixture.detectChanges();
+    await fixture.componentInstance.loadAnalytics();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('PostgreSQL (EF Core)');
+    expect(fixture.nativeElement.textContent).toContain('gemini-2.5-flash-lite');
+    expect(fixture.nativeElement.textContent).toContain('$0.0460');
+    const platformTab = fixture.nativeElement.querySelectorAll('.scope-tab')[1] as HTMLButtonElement;
+    platformTab.click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.scope).toBe('platform');
+    expect(fixture.nativeElement.textContent).toContain('$0.1340');
+    expect(fixture.nativeElement.querySelector('.distribution-row.clickable-row')).toBeNull();
+    fixture.destroy();
+  });
+
+  it('shares overlapping loads and completes each pull-to-refresh', async () => {
+    let resolve!: (summary: AnalyticsSummaryDto) => void;
+    mockApi.getAnalyticsSummary.and.returnValue(new Promise(done => resolve = done));
+    const first = { target: { complete: jasmine.createSpy('firstComplete') } };
+    const second = { target: { complete: jasmine.createSpy('secondComplete') } };
+    const pending = component.loadAnalytics(first);
+    const overlapping = component.loadAnalytics(second);
+    await Promise.resolve();
+    resolve(mockAnalyticsData);
+    await Promise.all([pending, overlapping]);
+    expect(mockApi.getAnalyticsSummary).toHaveBeenCalledTimes(1);
+    expect(first.target.complete).toHaveBeenCalledTimes(1);
+    expect(second.target.complete).toHaveBeenCalledTimes(1);
+    expect(component.isLoading).toBeFalse();
+  });
+
+  it('includes archived garments in personal category totals', async () => {
+    await component.openCategoryItems({ id: 'tops', label: 'Tops', count: 2 });
+    expect(mockApi.getItems).toHaveBeenCalledWith({ categoryId: 'tops', includeArchived: true });
+  });
+
+  it('does not open personal garments for platform category totals', async () => {
+    component.setScope('platform');
+    await component.openCategoryItems({ id: 'tops', label: 'Tops', count: 5 });
+    expect(mockApi.getItems).not.toHaveBeenCalled();
+    expect(component.selectedCategory).toBeNull();
+  });
+
+  it('ignores a category failure after switching scope', async () => {
+    let reject!: (error: Error) => void;
+    mockApi.getItems.and.returnValue(new Promise((_, fail) => reject = fail));
+    const pending = component.openCategoryItems({ id: 'tops', label: 'Tops', count: 2 });
+    component.setScope('platform');
+    reject(new Error('Old category failure'));
+    await pending;
+    expect(component.selectedCategory).toBeNull();
+    expect(component.categoryItemsError).toBe('');
+    expect(component.isLoadingCategoryItems).toBeFalse();
   });
 
   it('should handle error when API call fails', async () => {
