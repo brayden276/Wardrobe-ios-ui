@@ -4,7 +4,8 @@ import { Preferences } from '@capacitor/preferences';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { apiBaseUrl } from './api-url';
 import { DeviceImageCacheService } from './device-image-cache.service';
-import { AuthProviderDto, AuthResponse, AuthUserDto, UpdatePersonalDetailsRequest } from './models';
+import { AuthProviderDto, AuthResponse, AuthUserDto, StatusMessageDto, UpdatePersonalDetailsRequest, UpdateProfileRequest } from './models';
+import { OfflineDataService } from './offline-data.service';
 
 interface Session {
   accessToken: string;
@@ -18,6 +19,7 @@ interface Session {
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly deviceImageCache = inject(DeviceImageCacheService);
+  private readonly offlineData = inject(OfflineDataService);
   private readonly apiBaseUrl = apiBaseUrl();
   private readonly sessionSubject = new BehaviorSubject<Session | null>(null);
   private restorePromise: Promise<void> | null = null;
@@ -129,9 +131,39 @@ export class AuthService {
     return user;
   }
 
+  async requestPasswordReset(email: string): Promise<StatusMessageDto> {
+    return firstValueFrom(this.http.post<StatusMessageDto>(`${this.apiBaseUrl}/api/auth/password/forgot`, { email }));
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<StatusMessageDto> {
+    return firstValueFrom(this.http.post<StatusMessageDto>(`${this.apiBaseUrl}/api/auth/password/reset`, { token, newPassword }));
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<StatusMessageDto> {
+    const response = await firstValueFrom(this.http.put<StatusMessageDto>(`${this.apiBaseUrl}/api/auth/password`,
+      { currentPassword, newPassword }, this.authOptions()));
+    await this.clearLocalSession();
+    return response;
+  }
+
+  async updateProfile(request: UpdateProfileRequest): Promise<AuthUserDto> {
+    const user = await firstValueFrom(this.http.put<AuthUserDto>(`${this.apiBaseUrl}/api/auth/profile`, request, this.authOptions()));
+    const session = this.session;
+    if (session) await this.storeSession({ ...session, user });
+    return user;
+  }
+
   async logout(): Promise<void> {
-    await this.deviceImageCache.clearCache();
-    await this.clearSession();
+    const session = this.session;
+    try {
+      if (session?.refreshToken && typeof navigator !== 'undefined' && navigator.onLine) {
+        await firstValueFrom(this.http.post(`${this.apiBaseUrl}/api/auth/logout`, { refreshToken: session.refreshToken }));
+      }
+    } finally {
+      if (session?.user.id) await this.offlineData.clearUser(session.user.id);
+      await this.deviceImageCache.clearCache();
+      await this.clearSession();
+    }
   }
 
   async deleteAccount(): Promise<void> {
@@ -206,6 +238,17 @@ export class AuthService {
     }
 
     await this.storeSession({ ...session, user });
+  }
+
+  private authOptions(): { headers: HttpHeaders } {
+    return { headers: new HttpHeaders({ Authorization: `Bearer ${this.token ?? ''}` }) };
+  }
+
+  private async clearLocalSession(): Promise<void> {
+    const userId = this.session?.user.id;
+    if (userId) await this.offlineData.clearUser(userId);
+    await this.deviceImageCache.clearCache();
+    await this.clearSession();
   }
 
   private isExpired(session: Session): boolean {

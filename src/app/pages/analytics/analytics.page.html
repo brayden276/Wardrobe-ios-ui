@@ -184,10 +184,13 @@
         </div>
 
         <div class="ios-grouped-card">
-          <div class="distribution-row" *ngFor="let cat of categoryList">
+          <div class="distribution-row clickable-row" *ngFor="let cat of categoryList" (click)="openCategoryItems(cat)">
             <div class="distribution-header">
               <span class="cat-label">{{ cat.label }}</span>
-              <span class="cat-count">{{ cat.count }} <small>({{ cat.percentage }}%)</small></span>
+              <span class="cat-count">
+                {{ cat.count }} <small>({{ cat.percentage }}%)</small>
+                <ion-icon name="chevron-forward" class="row-arrow"></ion-icon>
+              </span>
             </div>
             <div class="progress-bar-bg">
               <div class="progress-bar-fill" [style.width.%]="cat.percentage"></div>
@@ -286,4 +289,60 @@
       </section>
     </ng-container>
   </div>
+
+  <!-- Category Items Drilldown Modal (Testing feature) -->
+  <ion-modal [isOpen]="!!selectedCategory" (didDismiss)="closeCategoryModal()" class="category-items-modal">
+    <ng-template>
+      <ion-header class="ios-header">
+        <ion-toolbar>
+          <ion-title>{{ selectedCategory?.label }} Items ({{ categoryItems.length }})</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="closeCategoryModal()" strong="true">Done</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ios-content">
+        <div class="modal-body-container">
+          <div *ngIf="isLoadingCategoryItems" class="modal-loading-state">
+            <ion-spinner name="crescent"></ion-spinner>
+            <span>Loading category garments...</span>
+          </div>
+
+          <div *ngIf="categoryItemsError" class="ios-feedback error">
+            <ion-icon name="alert-circle-outline"></ion-icon>
+            <span>{{ categoryItemsError }}</span>
+          </div>
+
+          <div *ngIf="!isLoadingCategoryItems && !categoryItemsError && categoryItems.length === 0" class="zero-data-card">
+            <div class="zero-data-icon">
+              <ion-icon name="shirt-outline"></ion-icon>
+            </div>
+            <h3 class="zero-data-title">No items found</h3>
+            <p class="zero-data-text">No garments currently match this category.</p>
+          </div>
+
+          <div *ngIf="!isLoadingCategoryItems && categoryItems.length > 0" class="ios-grouped-card items-drilldown-list">
+            <div
+              *ngFor="let item of categoryItems"
+              class="drilldown-item-row"
+              (click)="openItemDetail(item)"
+            >
+              <div class="drilldown-thumb-box">
+                <img *ngIf="item.thumbnailUrl" [src]="item.thumbnailUrl" alt="{{ item.name }}" />
+                <ion-icon *ngIf="!item.thumbnailUrl" name="shirt-outline"></ion-icon>
+              </div>
+              <div class="drilldown-item-meta">
+                <span class="drilldown-name">{{ item.name }}</span>
+                <span class="drilldown-sub">
+                  {{ item.subcategoryId ? item.subcategoryId : item.categoryId }}
+                  <span *ngIf="item.brand"> • {{ item.brand }}</span>
+                </span>
+              </div>
+              <ion-icon name="chevron-forward" class="drilldown-arrow"></ion-icon>
+            </div>
+          </div>
+        </div>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
 </ion-content>

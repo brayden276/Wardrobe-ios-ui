@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { AnalyticsSummaryDto, AiCostDetailDto, WardrobeAnalyticsMetricsDto } from '../../models';
+import { AnalyticsSummaryDto, AiCostDetailDto, WardrobeAnalyticsMetricsDto, WardrobeItemDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import { readMessage } from '../page-helpers';
 
@@ -22,6 +22,12 @@ export class AnalyticsPage {
   error = '';
   lastRefreshed: Date | null = null;
   pingLatencyMs: number | null = null;
+
+  // Category inspection drilldown modal
+  selectedCategory: { id: string; label: string; count: number } | null = null;
+  categoryItems: WardrobeItemDto[] = [];
+  isLoadingCategoryItems = false;
+  categoryItemsError = '';
 
   async ionViewWillEnter(): Promise<void> {
     await this.loadAnalytics();
@@ -49,6 +55,33 @@ export class AnalyticsPage {
 
   openSettings(): void {
     this.router.navigateByUrl('/tabs/settings');
+  }
+
+  async openCategoryItems(category: { id: string; label: string; count: number }): Promise<void> {
+    this.selectedCategory = category;
+    this.categoryItems = [];
+    this.categoryItemsError = '';
+    this.isLoadingCategoryItems = true;
+    try {
+      // Fetch garments for this category
+      const items = await this.api.getItems({ categoryId: category.id });
+      this.categoryItems = items;
+    } catch (err) {
+      this.categoryItemsError = readMessage(err, 'Failed to load garments for this category.');
+    } finally {
+      this.isLoadingCategoryItems = false;
+    }
+  }
+
+  closeCategoryModal(): void {
+    this.selectedCategory = null;
+    this.categoryItems = [];
+    this.categoryItemsError = '';
+  }
+
+  openItemDetail(item: WardrobeItemDto): void {
+    this.closeCategoryModal();
+    this.router.navigateByUrl(`/tabs/wardrobe/${item.id}`);
   }
 
   get currentCost(): AiCostDetailDto | null {

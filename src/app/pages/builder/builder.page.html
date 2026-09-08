@@ -165,10 +165,15 @@
           <div class="component-rail" *ngIf="card.items?.length">
             <span class="rail-title">PIECES IN THIS LOOK</span>
             <div class="rail-scroll">
-              <div class="piece-disc" *ngFor="let item of card.items">
+              <button
+                type="button"
+                class="piece-disc"
+                *ngFor="let item of card.items"
+                (click)="viewGarmentDetail(item.id)"
+                [attr.aria-label]="'View garment ' + item.name">
                 <img [src]="itemImageUrl(item)" [alt]="item.name">
                 <span class="piece-name">{{ item.name }}</span>
-              </div>
+              </button>
             </div>
           </div>
 

@@ -48,6 +48,7 @@ const requireCompletedPersonalDetails: CanActivateFn = async () => {
 
 const routes: Routes = [
   { path: 'login', component: LoginPage, canActivate: [requireNoSession] },
+  { path: 'reset-password', component: LoginPage, canActivate: [requireNoSession] },
   { path: 'onboarding', component: OnboardingPage, canActivate: [requireSession] },
   {
     path: 'tabs',

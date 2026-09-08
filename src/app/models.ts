@@ -26,6 +26,17 @@ export interface UpdatePersonalDetailsRequest {
   dailyContext: PersonalDetailsDailyContext;
 }
 
+export interface StatusMessageDto {
+  status: string;
+  message: string;
+}
+
+export interface UpdateProfileRequest {
+  displayName: string;
+  email: string;
+  currentPassword?: string;
+}
+
 export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
@@ -169,6 +180,49 @@ export interface OutfitDto {
   lastWornAt: string | null;
   createdAt: string;
   updatedAt: string;
+  isFavorite?: boolean;
+  plannedFor?: string | null;
+}
+
+export interface WearEventDto {
+  id: string;
+  wornAt: string;
+  outfitId: string | null;
+  wardrobeItemId: string | null;
+  outfitName?: string | null;
+  wardrobeItemName?: string | null;
+}
+
+export interface FavouriteDto {
+  targetType: 'item' | 'outfit';
+  targetId: string;
+  createdAt?: string;
+}
+
+export interface ScheduledOutfitDto {
+  id: string;
+  outfitId: string;
+  scheduledDate: string;
+  note: string | null;
+  outfit?: OutfitDto;
+}
+
+export interface LaundryStatusDto {
+  wardrobeItemId: string;
+  isUnavailable: boolean;
+  availableAt: string | null;
+}
+
+export interface WardrobeExportDto {
+  generatedAt: string;
+  user: AuthUserDto;
+  wardrobeItems: WardrobeItemDto[];
+  outfits: OutfitDto[];
+  favourites: FavouriteDto[];
+  wearEvents: WearEventDto[];
+  scheduledOutfits: ScheduledOutfitDto[];
+  laundryStatuses: LaundryStatusDto[];
+  imageExportNote: string;
 }
 
 export interface AiUsageCostSummaryDto {

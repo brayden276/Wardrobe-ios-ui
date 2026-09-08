@@ -1,7 +1,9 @@
 import { Component, HostListener, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { ActionSheetController, AlertController, ToastController } from '@ionic/angular';
 import { OutfitDto, WardrobeLookupsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
+import { AuthService } from '../../auth.service';
 import { confirmAction, lightImpact, lookupLabel, noticeKind, NoticeKind, readMessage, successFeedback, warningFeedback } from '../page-helpers';
 
 export interface OutfitCard {
@@ -22,11 +24,13 @@ export interface OutfitCard {
 })
 export class OutfitsPage {
   private readonly api = inject(WardrobeApiService);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   private readonly alertController = inject(AlertController);
   private readonly actionSheetController = inject(ActionSheetController);
   private readonly toastController = inject(ToastController);
 
-  private readonly FAVORITES_STORAGE_KEY = 'wb_favorite_outfits';
+  private readonly FAVORITES_STORAGE_PREFIX = 'wb_favorite_outfits';
 
   outfits: OutfitDto[] = [];
   lookups: WardrobeLookupsDto | null = null;
@@ -86,6 +90,22 @@ export class OutfitsPage {
   onSearchInput(): void {
     this.visibleOutfitCount = this.outfitRenderIncrement;
     this.updateVisibleOutfits();
+  }
+
+  get isAllVisibleSelected(): boolean {
+    return this.filteredOutfits.length > 0 && this.filteredOutfits.every((outfit) => this.selectedOutfitIds.has(outfit.id));
+  }
+
+  toggleSelectAll(): void {
+    if (this.isAllVisibleSelected) {
+      this.clearSelection();
+    } else {
+      for (const outfit of this.filteredOutfits) {
+        this.selectedOutfitIds.add(outfit.id);
+      }
+      this.updateVisibleOutfits();
+    }
+    void lightImpact();
   }
 
   get canShowMoreOutfits(): boolean {
@@ -189,9 +209,11 @@ export class OutfitsPage {
       if (raw) {
         const ids: string[] = JSON.parse(raw);
         this.favoriteOutfitIds = new Set(ids);
+      } else {
+        this.favoriteOutfitIds = new Set();
       }
     } catch {
-      // Ignore local storage error
+      this.favoriteOutfitIds = new Set();
     }
   }
 
@@ -204,7 +226,8 @@ export class OutfitsPage {
   }
 
   private FAFavoritesKey(): string {
-    return this.FAVORITES_STORAGE_KEY;
+    const userId = this.auth.session?.user?.id;
+    return userId ? `${this.FAVORITES_STORAGE_PREFIX}_${userId}` : this.FAVORITES_STORAGE_PREFIX;
   }
 
   toggleFavorite(outfit: OutfitDto, event?: Event): void {
@@ -230,6 +253,12 @@ export class OutfitsPage {
       return lookupLabel(this.lookups, subcategoryId);
     }
     return subcategoryId.replace(/_/g, ' ');
+  }
+
+  viewGarmentDetail(itemId: string, event?: Event): void {
+    event?.stopPropagation();
+    this.close();
+    void this.router.navigate(['/tabs/wardrobe', itemId]);
   }
 
   open(outfit: OutfitDto, event?: Event): void {
@@ -397,8 +426,8 @@ export class OutfitsPage {
   }
 
   selectVisibleOutfits(): void {
-    for (const card of this.visibleOutfits) {
-      this.selectedOutfitIds.add(card.outfit.id);
+    for (const outfit of this.filteredOutfits) {
+      this.selectedOutfitIds.add(outfit.id);
     }
     this.updateVisibleOutfits();
   }

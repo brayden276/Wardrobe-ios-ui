@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../auth.service';
 import { EMAIL_PATTERN, lightImpact, noticeKind, NoticeKind, readMessage, successFeedback, warningFeedback } from '../page-helpers';
 
@@ -12,9 +12,12 @@ import { EMAIL_PATTERN, lightImpact, noticeKind, NoticeKind, readMessage, succes
 export class LoginPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
-  mode: 'login' | 'register' = 'login';
+  private readonly route = inject(ActivatedRoute);
+  mode: 'login' | 'register' | 'forgot' | 'reset' = 'login';
   email = '';
   password = '';
+  confirmPassword = '';
+  resetToken = '';
   displayName = '';
   message = '';
   isBusy = false;
@@ -24,6 +27,8 @@ export class LoginPage {
   showPassword = false;
 
   async ionViewWillEnter(): Promise<void> {
+    this.resetToken = this.route.snapshot.queryParamMap.get('token')?.trim() ?? this.resetToken;
+    if (this.router.url.startsWith('/reset-password')) this.mode = 'reset';
     await this.auth.restore();
     if (this.auth.session) {
       await this.router.navigateByUrl(this.auth.hasCompletedPersonalDetails ? '/tabs/wardrobe' : '/onboarding');
@@ -43,6 +48,7 @@ export class LoginPage {
   }
 
   get passwordValidationMessage(): string {
+    if (this.mode === 'forgot') return '';
     if (!this.password) {
       return 'Password is required.';
     }
@@ -62,12 +68,21 @@ export class LoginPage {
     return '';
   }
 
+  get resetValidationMessage(): string {
+    if (this.mode !== 'reset') return '';
+    if (!this.resetToken) return 'Paste the reset token from your email.';
+    if (this.password.length < 8) return 'Use at least 8 characters for your new password.';
+    if (this.password !== this.confirmPassword) return 'Passwords do not match.';
+    return '';
+  }
+
   get canSubmit(): boolean {
     return (
       !this.isBusy
       && !this.emailValidationMessage
       && !this.passwordValidationMessage
       && !this.displayNameValidationMessage
+      && !this.resetValidationMessage
     );
   }
 
@@ -110,6 +125,20 @@ export class LoginPage {
     void lightImpact();
   }
 
+  showForgotPassword(): void {
+    this.mode = 'forgot';
+    this.password = '';
+    this.message = '';
+    this.hasSubmitted = false;
+  }
+
+  showLogin(): void {
+    this.mode = 'login';
+    this.confirmPassword = '';
+    this.message = '';
+    this.hasSubmitted = false;
+  }
+
   toggleShowPassword(): void {
     this.showPassword = !this.showPassword;
     void lightImpact();
@@ -120,6 +149,8 @@ export class LoginPage {
   }
 
   get authSubmitLabel(): string {
+    if (this.mode === 'forgot') return 'Send reset email';
+    if (this.mode === 'reset') return 'Reset password';
     return this.mode === 'login' ? 'Sign in' : 'Create account';
   }
 
@@ -147,6 +178,17 @@ export class LoginPage {
     this.isBusy = true;
     this.message = '';
     try {
+      if (this.mode === 'forgot') {
+        const result = await this.auth.requestPasswordReset(email);
+        this.message = result.message;
+        return;
+      }
+      if (this.mode === 'reset') {
+        const result = await this.auth.resetPassword(this.resetToken, this.password);
+        this.showLogin();
+        this.message = result.message;
+        return;
+      }
       if (this.mode === 'login') {
         await this.auth.login(email, this.password);
       } else {

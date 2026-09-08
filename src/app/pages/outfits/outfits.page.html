@@ -1,9 +1,15 @@
 <ion-header [translucent]="true" class="ios-header">
   <ion-toolbar>
+    <ion-buttons slot="start" *ngIf="isSelectionMode">
+      <ion-button fill="clear" (click)="toggleSelectAll()">
+        {{ isAllVisibleSelected ? 'Deselect All' : 'Select All' }}
+      </ion-button>
+    </ion-buttons>
+
     <ion-title>{{ isSelectionMode ? (selectedCount + ' Selected') : 'Outfits' }}</ion-title>
     <ion-buttons slot="end">
       <ion-button *ngIf="!isSelectionMode" (click)="load(true)" [disabled]="isLoading" aria-label="Refresh">
-        <ion-icon slot="icon-only" name="arrow-clockwise"></ion-icon>
+        <ion-icon slot="icon-only" name="refresh-outline"></ion-icon>
       </ion-button>
       <ion-button *ngIf="!isSelectionMode" (click)="enterSelectionMode()" [disabled]="isLoading || !outfits.length">
         Select
@@ -85,7 +91,7 @@
     <div class="lookbook-grid" *ngIf="visibleOutfits.length">
       <article class="lookbook-card" *ngFor="let card of visibleOutfits; trackBy: trackByCardId" [class.selected]="card.isSelected" [class.in-selection-mode]="isSelectionMode" (click)="onCardClick(card.outfit, $event)">
         <!-- Hero Visual Area -->
-        <div class="lookbook-hero" (click)="open(card.outfit, $event)" (pointerdown)="beginOutfitPress(card.outfit)" (pointerup)="endOutfitPress()" (pointerleave)="cancelOutfitPress()" (pointercancel)="cancelOutfitPress()" (contextmenu)="suppressContextMenu($event)">
+        <div class="lookbook-hero" (click)="!isSelectionMode && open(card.outfit, $event)" (pointerdown)="beginOutfitPress(card.outfit)" (pointerup)="endOutfitPress()" (pointerleave)="cancelOutfitPress()" (pointercancel)="cancelOutfitPress()" (contextmenu)="suppressContextMenu($event)">
           <img *ngIf="card.imageUrl" [appLazyImage]="card.imageUrl" [alt]="card.outfit.name" class="hero-image" decoding="async">
           <div class="hero-fallback" *ngIf="!card.imageUrl">
             <ion-icon name="shirt-outline"></ion-icon>
@@ -122,7 +128,7 @@
 
         <!-- Card Body -->
         <div class="lookbook-body">
-          <div class="lookbook-info" (click)="open(card.outfit, $event)">
+          <div class="lookbook-info" (click)="!isSelectionMode && open(card.outfit, $event)">
             <h3 class="lookbook-title">{{ card.outfit.name }}</h3>
             <p class="lookbook-subtitle">{{ card.outfit.explanation || (card.outfit.items.length + ' pieces from your wardrobe') }}</p>
           </div>
@@ -217,12 +223,13 @@
           <div class="sheet-section">
             <h4 class="sheet-section-heading">Pieces in this Look ({{ selectedOutfit.items.length }})</h4>
             <div class="garment-detail-list">
-              <div class="garment-detail-row" *ngFor="let item of selectedOutfit.items; trackBy: trackByOutfitItemId">
+              <div class="garment-detail-row clickable" *ngFor="let item of selectedOutfit.items; trackBy: trackByOutfitItemId" (click)="viewGarmentDetail(item.id, $event)">
                 <img [appLazyImage]="outfitItemImageUrl(item)" [alt]="item.name" class="garment-thumb" decoding="async">
                 <div class="garment-info">
                   <span class="garment-name">{{ item.name }}</span>
                   <span class="garment-sub">{{ formatSubcategory(item.subcategoryId) }}</span>
                 </div>
+                <ion-icon name="chevron-forward-outline" class="garment-row-chevron"></ion-icon>
               </div>
             </div>
           </div>

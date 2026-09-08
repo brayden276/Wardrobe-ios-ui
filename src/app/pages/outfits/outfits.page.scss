@@ -676,6 +676,15 @@
   box-sizing: border-box;
   min-width: 0;
 
+  &.clickable {
+    cursor: pointer;
+    transition: background 140ms ease;
+
+    &:active {
+      background: var(--app-surface-pressed);
+    }
+  }
+
   &:last-child {
     border-bottom: none;
   }
@@ -713,6 +722,12 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+  }
+
+  .garment-row-chevron {
+    font-size: 16px;
+    color: var(--app-muted);
+    flex-shrink: 0;
   }
 }
 

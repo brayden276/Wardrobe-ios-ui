@@ -732,4 +732,9 @@ export class BuilderPage {
         return '';
     }
   }
+
+  viewGarmentDetail(itemId: string): void {
+    void lightImpact();
+    void this.router.navigate(['/tabs/wardrobe', itemId]);
+  }
 }

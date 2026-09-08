@@ -51,7 +51,7 @@ export class AppComponent implements OnInit, OnDestroy {
     });
 
     if (!this.auth.session) {
-      if (!this.router.url.startsWith('/login')) {
+      if (!this.router.url.startsWith('/login') && !this.router.url.startsWith('/reset-password')) {
         await this.router.navigateByUrl('/login');
       }
       return;

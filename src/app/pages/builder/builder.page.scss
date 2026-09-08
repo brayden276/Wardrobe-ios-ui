@@ -367,6 +367,14 @@
     border-radius: var(--app-radius-pill);
     background: var(--app-surface-muted);
     border: 0.5px solid var(--app-border);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 140ms ease, opacity 140ms ease;
+
+    &:active {
+      background: var(--app-surface-pressed);
+      opacity: 0.75;
+    }
 
     img {
       width: 24px;
