@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AnalyticsSummaryDto, AiCostDetailDto, WardrobeAnalyticsMetricsDto, WardrobeItemDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
@@ -12,7 +12,7 @@ export type AnalyticsScope = 'user' | 'platform';
   templateUrl: './analytics.page.html',
   styleUrls: ['./analytics.page.scss']
 })
-export class AnalyticsPage {
+export class AnalyticsPage implements OnInit {
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
 
@@ -22,6 +22,7 @@ export class AnalyticsPage {
   error = '';
   lastRefreshed: Date | null = null;
   pingLatencyMs: number | null = null;
+  private activeLoad: Promise<void> | null = null;
 
   // Category inspection drilldown modal
   selectedCategory: { id: string; label: string; count: number } | null = null;
@@ -29,23 +30,44 @@ export class AnalyticsPage {
   isLoadingCategoryItems = false;
   categoryItemsError = '';
 
+  ngOnInit(): void {
+    void this.loadAnalytics();
+  }
+
   async ionViewWillEnter(): Promise<void> {
     await this.loadAnalytics();
   }
 
   async loadAnalytics(event?: any): Promise<void> {
-    this.isLoading = true;
-    this.error = '';
-    const startPing = performance.now();
+    if (this.activeLoad) {
+      try {
+        await this.activeLoad;
+      } finally {
+        event?.target?.complete?.();
+      }
+      return;
+    }
+
+    this.activeLoad = (async () => {
+      this.isLoading = true;
+      this.error = '';
+      const startPing = performance.now();
+      try {
+        this.analytics = await this.api.getAnalyticsSummary();
+        this.pingLatencyMs = Math.round(performance.now() - startPing);
+        this.lastRefreshed = new Date();
+      } catch (err) {
+        this.error = readMessage(err, 'Failed to load platform analytics.');
+      } finally {
+        this.isLoading = false;
+        event?.target?.complete?.();
+      }
+    })();
+
     try {
-      this.analytics = await this.api.getAnalyticsSummary();
-      this.pingLatencyMs = Math.round(performance.now() - startPing);
-      this.lastRefreshed = new Date();
-    } catch (err) {
-      this.error = readMessage(err, 'Failed to load platform analytics.');
+      await this.activeLoad;
     } finally {
-      this.isLoading = false;
-      event?.target?.complete?.();
+      this.activeLoad = null;
     }
   }
 

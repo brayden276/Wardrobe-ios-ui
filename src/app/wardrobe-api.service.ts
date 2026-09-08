@@ -290,7 +290,13 @@ async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
   }
 
   async getAnalyticsSummary(): Promise<AnalyticsSummaryDto> {
-    const summary = await this.authorized(() => firstValueFrom(this.http.get<AnalyticsSummaryDto>(this.url('/api/analytics'), this.authOptions())));
+    const summary = await this.authorized(() =>
+      firstValueFrom(
+        this.http.get<AnalyticsSummaryDto>(this.url('/api/analytics'), this.authOptions()).pipe(
+          timeout(10000)
+        )
+      )
+    );
     const normaliseMetrics = (metrics?: WardrobeAnalyticsMetricsDto): WardrobeAnalyticsMetricsDto => {
       if (!metrics) return metrics!;
       return {
