@@ -328,14 +328,18 @@
               (click)="openItemDetail(item)"
             >
               <div class="drilldown-thumb-box">
-                <img *ngIf="item.thumbnailUrl" [src]="item.thumbnailUrl" alt="{{ item.name }}" />
-                <ion-icon *ngIf="!item.thumbnailUrl" name="shirt-outline"></ion-icon>
+                <img
+                  *ngIf="item.image?.thumbnailUrl || item.image?.displayUrl"
+                  [src]="item.image?.thumbnailUrl || item.image?.displayUrl"
+                  alt="{{ item.name }}"
+                />
+                <ion-icon *ngIf="!item.image?.thumbnailUrl && !item.image?.displayUrl" name="shirt-outline"></ion-icon>
               </div>
               <div class="drilldown-item-meta">
                 <span class="drilldown-name">{{ item.name }}</span>
                 <span class="drilldown-sub">
-                  {{ item.subcategoryId ? item.subcategoryId : item.categoryId }}
-                  <span *ngIf="item.brand"> • {{ item.brand }}</span>
+                  {{ formatCategoryLabel(item.categoryId) }}
+                  <span *ngIf="item.subcategoryId"> • {{ item.subcategoryId }}</span>
                 </span>
               </div>
               <ion-icon name="chevron-forward" class="drilldown-arrow"></ion-icon>
