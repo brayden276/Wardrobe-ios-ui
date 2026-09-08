@@ -1,12 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { AnalyticsPage } from './analytics.page';
+import { AuthService } from '../../auth.service';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import { AnalyticsSummaryDto } from '../../models';
 
 describe('AnalyticsPage', () => {
   let component: AnalyticsPage;
   let mockApi: jasmine.SpyObj<WardrobeApiService>;
+  let mockAuth: jasmine.SpyObj<AuthService>;
   let mockRouter: jasmine.SpyObj<Router>;
 
   const mockAnalyticsData: AnalyticsSummaryDto = {
@@ -73,10 +75,14 @@ describe('AnalyticsPage', () => {
     mockRouter = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
     mockRouter.navigateByUrl.and.returnValue(Promise.resolve(true));
 
+    mockAuth = jasmine.createSpyObj<AuthService>('AuthService', ['restore']);
+    mockAuth.restore.and.returnValue(Promise.resolve());
+
     TestBed.configureTestingModule({
       providers: [
         AnalyticsPage,
         { provide: WardrobeApiService, useValue: mockApi },
+        { provide: AuthService, useValue: mockAuth },
         { provide: Router, useValue: mockRouter }
       ]
     });
@@ -135,5 +141,26 @@ describe('AnalyticsPage', () => {
     await component.loadAnalytics();
     expect(component.error).toBe('Network error');
     expect(component.isLoading).toBeFalse();
+  });
+
+  it('should restore the session before requesting analytics', async () => {
+    const order: string[] = [];
+    mockAuth.restore.and.callFake(async () => {
+      order.push('restore');
+    });
+    mockApi.getAnalyticsSummary.and.callFake(async () => {
+      order.push('analytics');
+      return mockAnalyticsData;
+    });
+    await component.loadAnalytics();
+    expect(order).toEqual(['restore', 'analytics']);
+  });
+
+  it('should stay on the page with feedback when loading fails', async () => {
+    mockApi.getAnalyticsSummary.and.returnValue(Promise.reject(new Error('Server error')));
+    await component.loadAnalytics();
+    expect(component.error).toBe('Server error');
+    expect(component.analytics).toBeNull();
+    expect(mockRouter.navigateByUrl).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,7 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AnalyticsSummaryDto, AiCostDetailDto, WardrobeAnalyticsMetricsDto, WardrobeItemDto } from '../../models';
+import { AuthService } from '../../auth.service';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import { readMessage } from '../page-helpers';
 
@@ -14,6 +15,7 @@ export type AnalyticsScope = 'user' | 'platform';
 })
 export class AnalyticsPage implements OnInit {
   private readonly api = inject(WardrobeApiService);
+  private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
   scope: AnalyticsScope = 'user';
@@ -53,6 +55,14 @@ export class AnalyticsPage implements OnInit {
       this.error = '';
       const startPing = performance.now();
       try {
+        // Ensure the stored session is loaded before firing the request:
+        // without this, a first visit can send the call with no token,
+        // take a 401, and get bounced to /login instead of seeing feedback.
+        try {
+          await this.auth.restore();
+        } catch {
+          // Fall through: the analytics call below surfaces auth status.
+        }
         this.analytics = await this.api.getAnalyticsSummary();
         this.pingLatencyMs = Math.round(performance.now() - startPing);
         this.lastRefreshed = new Date();

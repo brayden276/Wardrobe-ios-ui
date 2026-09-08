@@ -269,7 +269,12 @@ export class AuthService {
 
   private async clearSession(): Promise<void> {
     await Preferences.remove({ key: 'wardrobe-session' });
-    this.sessionSubject.next(null);
+    // Only emit on a real transition: notifying when there was no session
+    // would bounce the user to /login without anything having changed
+    // (e.g. a 401 fired before restore() finished loading the stored session).
+    if (this.sessionSubject.value !== null) {
+      this.sessionSubject.next(null);
+    }
   }
 
   private async setSession(response: AuthResponse): Promise<void> {

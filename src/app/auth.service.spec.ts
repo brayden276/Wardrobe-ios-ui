@@ -520,6 +520,17 @@ describe('AuthService', () => {
       expect(stored.value).toBeNull();
     });
 
+    it('handleUnauthorized() should not emit when there is no session to clear', async () => {
+      const emissions: (typeof service.session)[] = [];
+      const sub = service.session$.subscribe((session) => emissions.push(session));
+
+      await service.handleUnauthorized({ status: 401 });
+      sub.unsubscribe();
+
+      expect(service.session).toBeNull();
+      expect(emissions).toEqual([null]);
+    });
+
     it('handleUnauthorized() should not clear session when error status is not 401', async () => {
       const loginPromise = service.login('test@example.com', 'Pass123');
       httpTesting.expectOne(`${baseUrl}/api/auth/login`).flush(mockAuthResponse);
