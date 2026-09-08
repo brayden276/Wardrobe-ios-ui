@@ -28,7 +28,7 @@ export class LoginPage {
 
   async ionViewWillEnter(): Promise<void> {
     this.resetToken = this.route.snapshot.queryParamMap.get('token')?.trim() ?? this.resetToken;
-    if (this.router.url.startsWith('/reset-password')) this.mode = 'reset';
+    if (this.router.url?.startsWith('/reset-password')) this.mode = 'reset';
     await this.auth.restore();
     if (this.auth.session) {
       await this.router.navigateByUrl(this.auth.hasCompletedPersonalDetails ? '/tabs/wardrobe' : '/onboarding');

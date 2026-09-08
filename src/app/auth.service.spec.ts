@@ -86,7 +86,11 @@ describe('AuthService', () => {
       req.flush(mockAuthResponse);
       await loginPromise;
 
-      await service.logout();
+      const logoutPromise = service.logout();
+      const logoutReq = httpTesting.expectOne(`${baseUrl}/api/auth/logout`);
+      expect(logoutReq.request.method).toBe('POST');
+      logoutReq.flush({});
+      await logoutPromise;
       sub.unsubscribe();
 
       expect(emissions.length).toBe(3);
@@ -377,7 +381,11 @@ describe('AuthService', () => {
 
       expect(service.token).toBe('test-access-token');
 
-      await service.logout();
+      const logoutPromise = service.logout();
+      const logoutReq = httpTesting.expectOne(`${baseUrl}/api/auth/logout`);
+      expect(logoutReq.request.method).toBe('POST');
+      logoutReq.flush({});
+      await logoutPromise;
 
       expect(service.session).toBeNull();
       expect(service.token).toBeNull();
