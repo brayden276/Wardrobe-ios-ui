@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { LoginPage } from './login.page';
 import { AuthService } from '../../auth.service';
 
@@ -7,6 +7,7 @@ describe('LoginPage', () => {
   let component: LoginPage;
   let mockAuthService: jasmine.SpyObj<AuthService>;
   let mockRouter: jasmine.SpyObj<Router>;
+  let mockActivatedRoute: any;
 
   beforeEach(() => {
     mockAuthService = jasmine.createSpyObj<AuthService>(
@@ -21,11 +22,20 @@ describe('LoginPage', () => {
     mockRouter = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
     mockRouter.navigateByUrl.and.returnValue(Promise.resolve(true));
 
+    mockActivatedRoute = {
+      snapshot: {
+        queryParamMap: {
+          get: (key: string) => null
+        }
+      }
+    };
+
     TestBed.configureTestingModule({
       providers: [
         LoginPage,
         { provide: AuthService, useValue: mockAuthService },
-        { provide: Router, useValue: mockRouter }
+        { provide: Router, useValue: mockRouter },
+        { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
     });
 
