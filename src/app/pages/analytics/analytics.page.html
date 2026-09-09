@@ -184,7 +184,7 @@
         </div>
 
         <div class="ios-grouped-card">
-          <div class="distribution-row" [class.clickable-row]="scope === 'user'" *ngFor="let cat of categoryList" (click)="openCategoryItems(cat)">
+          <div class="distribution-row" [class.clickable-row]="scope === 'user'" *ngFor="let cat of categoryList; trackBy: trackById" (click)="openCategoryItems(cat)">
             <div class="distribution-header">
               <span class="cat-label">{{ cat.label }}</span>
               <span class="cat-count">
@@ -207,7 +207,7 @@
 
         <div class="ios-grouped-card colour-card">
           <div class="colour-chips-wrap">
-            <div class="colour-chip" *ngFor="let col of colourList">
+            <div class="colour-chip" *ngFor="let col of colourList; trackBy: trackById">
               <span class="colour-chip-dot" [attr.data-colour]="col.id"></span>
               <span class="colour-chip-name">{{ col.label }}</span>
               <span class="colour-chip-count">{{ col.count }}</span>
@@ -223,9 +223,9 @@
         </div>
 
         <div class="ios-grouped-card">
-          <div class="top-worn-row" *ngFor="let item of currentMetrics.topWornItems">
+          <div class="top-worn-row" *ngFor="let item of currentMetrics.topWornItems; trackBy: trackById">
             <div class="item-thumb-box">
-              <img *ngIf="item.thumbnailUrl" [src]="item.thumbnailUrl" alt="{{ item.name }}" />
+              <img *ngIf="item.thumbnailUrl" [src]="item.thumbnailUrl" [alt]="item.name" loading="lazy" decoding="async" />
               <ion-icon *ngIf="!item.thumbnailUrl" name="shirt-outline"></ion-icon>
             </div>
             <div class="item-meta">
@@ -323,7 +323,7 @@
 
           <div *ngIf="!isLoadingCategoryItems && categoryItems.length > 0" class="ios-grouped-card items-drilldown-list">
             <div
-              *ngFor="let item of categoryItems"
+              *ngFor="let item of categoryItems; trackBy: trackById"
               class="drilldown-item-row"
               (click)="openItemDetail(item)"
             >

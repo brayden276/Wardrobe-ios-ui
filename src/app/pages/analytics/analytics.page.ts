@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AnalyticsSummaryDto, AiCostDetailDto, WardrobeAnalyticsMetricsDto, WardrobeItemDto } from '../../models';
 import { AuthService } from '../../auth.service';
@@ -7,13 +7,15 @@ import { readMessage } from '../page-helpers';
 
 export type AnalyticsScope = 'user' | 'platform';
 
+type AnalyticsDistributionRow = { id: string; label: string; count: number; percentage: number };
+
 @Component({
   selector: 'app-analytics',
   standalone: false,
   templateUrl: './analytics.page.html',
   styleUrls: ['./analytics.page.scss']
 })
-export class AnalyticsPage implements OnInit {
+export class AnalyticsPage {
   private readonly api = inject(WardrobeApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
@@ -32,10 +34,8 @@ export class AnalyticsPage implements OnInit {
   categoryItems: WardrobeItemDto[] = [];
   isLoadingCategoryItems = false;
   categoryItemsError = '';
-
-  ngOnInit(): void {
-    void this.loadAnalytics();
-  }
+  categoryList: AnalyticsDistributionRow[] = [];
+  colourList: AnalyticsDistributionRow[] = [];
 
   async ionViewWillEnter(): Promise<void> {
     await this.loadAnalytics();
@@ -61,6 +61,7 @@ export class AnalyticsPage implements OnInit {
         // take a 401, and get bounced to /login instead of seeing feedback.
         await this.auth.restore();
         this.analytics = await this.api.getAnalyticsSummary();
+        this.refreshDerivedScopeState();
         this.pingLatencyMs = Math.round(performance.now() - startPing);
         this.lastRefreshed = new Date();
       } catch (err) {
@@ -79,8 +80,10 @@ export class AnalyticsPage implements OnInit {
   }
 
   setScope(scope: AnalyticsScope): void {
+    if (this.scope === scope) return;
     this.closeCategoryModal();
     this.scope = scope;
+    this.refreshDerivedScopeState();
   }
 
   openSettings(): void {
@@ -179,32 +182,30 @@ export class AnalyticsPage implements OnInit {
     return clean.charAt(0).toUpperCase() + clean.slice(1);
   }
 
-  get categoryList(): Array<{ id: string; label: string; count: number; percentage: number }> {
-    const metrics = this.currentMetrics;
-    if (!metrics || metrics.totalItems === 0) return [];
-    const entries = Object.entries(metrics.itemsByCategory || {});
-    return entries
-      .map(([id, count]) => ({
-        id,
-        label: this.formatCategoryLabel(id),
-        count,
-        percentage: Math.round((count / metrics.totalItems) * 100)
-      }))
-      .sort((a, b) => b.count - a.count);
+  trackById(_: number, value: { id: string }): string {
+    return value.id;
   }
 
-  get colourList(): Array<{ id: string; label: string; count: number; percentage: number }> {
+  private refreshDerivedScopeState(): void {
     const metrics = this.currentMetrics;
-    if (!metrics || metrics.totalItems === 0) return [];
-    const entries = Object.entries(metrics.itemsByColour || {});
-    return entries
+    this.categoryList = this.toDistributionList(metrics?.itemsByCategory, metrics?.totalItems, id => this.formatCategoryLabel(id));
+    this.colourList = this.toDistributionList(metrics?.itemsByColour, metrics?.totalItems, id => this.formatColourLabel(id));
+  }
+
+  private toDistributionList(
+    values: Record<string, number> | null | undefined,
+    totalItems: number | null | undefined,
+    formatLabel: (id: string) => string
+  ): AnalyticsDistributionRow[] {
+    if (!values || !totalItems) return [];
+    return Object.entries(values)
       .map(([id, count]) => ({
         id,
-        label: this.formatColourLabel(id),
+        label: formatLabel(id),
         count,
-        percentage: Math.round((count / metrics.totalItems) * 100)
+        percentage: Math.round((count / totalItems) * 100)
       }))
-      .sort((a, b) => b.count - a.count);
+      .sort((left, right) => right.count - left.count || left.id.localeCompare(right.id));
   }
 
   get avgCostPerItem(): string {

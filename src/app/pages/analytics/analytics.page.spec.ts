@@ -137,6 +137,23 @@ describe('AnalyticsPage', () => {
     expect(colours[0].percentage).toBe(50);
   });
 
+  it('keeps derived lists stable between checks and rebuilds them when the scope changes', async () => {
+    await component.loadAnalytics();
+    const userCategories = component.categoryList;
+    const userColours = component.colourList;
+
+    expect(component.categoryList).toBe(userCategories);
+    expect(component.colourList).toBe(userColours);
+
+    component.setScope('platform');
+    const platformCategories = component.categoryList;
+    expect(platformCategories).not.toBe(userCategories);
+
+    component.setScope('user');
+    expect(component.categoryList).not.toBe(platformCategories);
+    expect(component.categoryList.map(category => category.id)).toEqual(userCategories.map(category => category.id));
+  });
+
   it('should navigate to settings when openSettings is called', () => {
     component.openSettings();
     expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/tabs/settings');
