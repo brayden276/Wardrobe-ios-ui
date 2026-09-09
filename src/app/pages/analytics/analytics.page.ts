@@ -1,6 +1,6 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { AnalyticsSummaryDto, AiCostDetailDto, WardrobeAnalyticsMetricsDto, WardrobeItemDto } from '../../models';
+import { AnalyticsSummaryDto, AiCostBreakdownItemDto, AiCostDetailDto, PlatformTelemetryDto, WardrobeAnalyticsMetricsDto, WardrobeItemDto } from '../../models';
 import { AuthService } from '../../auth.service';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import { readMessage } from '../page-helpers';
@@ -8,20 +8,44 @@ import { readMessage } from '../page-helpers';
 export type AnalyticsScope = 'user' | 'platform';
 
 type AnalyticsDistributionRow = { id: string; label: string; count: number; percentage: number };
+type AnalyticsTopWornRow = { id: string; name: string; categoryLabel: string; wearCount: number; thumbnailUrl: string | null };
+type AnalyticsCostRow = { id: string; name: string; dotClass: string; detail: string; formattedSubtotal: string };
+type AnalyticsViewState = {
+  scope: AnalyticsScope;
+  totalCost: string;
+  averageCostPerItem: string;
+  averageCostPerOutfit: string;
+  costRows: AnalyticsCostRow[];
+  totalItems: number;
+  activeItems: number;
+  archivedItems: number;
+  totalOutfits: number;
+  outfitsWithImages: number;
+  totalWearCount: number;
+  hasZeroData: boolean;
+  categoryList: AnalyticsDistributionRow[];
+  colourList: AnalyticsDistributionRow[];
+  topWornItems: AnalyticsTopWornRow[];
+  telemetry: PlatformTelemetryDto;
+  lastRefreshedLabel: string;
+};
 
 @Component({
   selector: 'app-analytics',
   standalone: false,
   templateUrl: './analytics.page.html',
-  styleUrls: ['./analytics.page.scss']
+  styleUrls: ['./analytics.page.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AnalyticsPage {
   private readonly api = inject(WardrobeApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly changeDetector = inject(ChangeDetectorRef);
 
   scope: AnalyticsScope = 'user';
   analytics: AnalyticsSummaryDto | null = null;
+  view: AnalyticsViewState | null = null;
   isLoading = false;
   error = '';
   lastRefreshed: Date | null = null;
@@ -34,8 +58,6 @@ export class AnalyticsPage {
   categoryItems: WardrobeItemDto[] = [];
   isLoadingCategoryItems = false;
   categoryItemsError = '';
-  categoryList: AnalyticsDistributionRow[] = [];
-  colourList: AnalyticsDistributionRow[] = [];
 
   async ionViewWillEnter(): Promise<void> {
     await this.loadAnalytics();
@@ -61,13 +83,14 @@ export class AnalyticsPage {
         // take a 401, and get bounced to /login instead of seeing feedback.
         await this.auth.restore();
         this.analytics = await this.api.getAnalyticsSummary();
-        this.refreshDerivedScopeState();
         this.pingLatencyMs = Math.round(performance.now() - startPing);
         this.lastRefreshed = new Date();
+        this.refreshDerivedScopeState();
       } catch (err) {
         this.error = readMessage(err, 'Failed to load analytics.');
       } finally {
         this.isLoading = false;
+        this.changeDetector.markForCheck();
         event?.target?.complete?.();
       }
     })();
@@ -84,6 +107,7 @@ export class AnalyticsPage {
     this.closeCategoryModal();
     this.scope = scope;
     this.refreshDerivedScopeState();
+    this.changeDetector.markForCheck();
   }
 
   openSettings(): void {
@@ -99,6 +123,7 @@ export class AnalyticsPage {
     this.categoryItems = [];
     this.categoryItemsError = '';
     this.isLoadingCategoryItems = true;
+    this.changeDetector.markForCheck();
     try {
       // Fetch garments for this category
       const items = await this.api.getItems({ categoryId: category.id, includeArchived: true });
@@ -107,6 +132,7 @@ export class AnalyticsPage {
       if (loadId === this.categoryLoadId) this.categoryItemsError = readMessage(err, 'Failed to load garments for this category.');
     } finally {
       if (loadId === this.categoryLoadId) this.isLoadingCategoryItems = false;
+      this.changeDetector.markForCheck();
     }
   }
 
@@ -116,6 +142,7 @@ export class AnalyticsPage {
     this.selectedCategory = null;
     this.categoryItems = [];
     this.categoryItemsError = '';
+    this.changeDetector.markForCheck();
   }
 
   openItemDetail(item: WardrobeItemDto): void {
@@ -123,32 +150,7 @@ export class AnalyticsPage {
     this.router.navigateByUrl(`/tabs/wardrobe/${item.id}`);
   }
 
-  get currentCost(): AiCostDetailDto | null {
-    if (!this.analytics) return null;
-    return this.scope === 'user' ? this.analytics.userCost : this.analytics.platformCost;
-  }
-
-  get currentMetrics(): WardrobeAnalyticsMetricsDto | null {
-    if (!this.analytics) return null;
-    return this.scope === 'user' ? this.analytics.userMetrics : this.analytics.platformMetrics;
-  }
-
-  get hasZeroData(): boolean {
-    const metrics = this.currentMetrics;
-    return !!metrics && metrics.totalItems === 0 && metrics.totalOutfits === 0;
-  }
-
-  get formattedTotalCost(): string {
-    const cost = this.currentCost?.totalCostUsd ?? 0;
-    return cost.toLocaleString(undefined, {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 4,
-      maximumFractionDigits: 4
-    });
-  }
-
-  formatCurrency(value: number, minDecimals = 4, maxDecimals = 4): string {
+  private formatCurrency(value: number, minDecimals = 4, maxDecimals = 4): string {
     return value.toLocaleString(undefined, {
       style: 'currency',
       currency: 'USD',
@@ -157,7 +159,7 @@ export class AnalyticsPage {
     });
   }
 
-  formatCategoryLabel(catId: string | null | undefined): string {
+  private formatCategoryLabel(catId: string | null | undefined): string {
     if (!catId) return 'Unknown';
     const clean = catId.toLowerCase().replace(/_/g, ' ');
     const labels: Record<string, string> = {
@@ -176,7 +178,7 @@ export class AnalyticsPage {
     return labels[catId.toLowerCase()] ?? labels[clean] ?? clean.charAt(0).toUpperCase() + clean.slice(1);
   }
 
-  formatColourLabel(colourId: string | null | undefined): string {
+  private formatColourLabel(colourId: string | null | undefined): string {
     if (!colourId) return 'Unknown';
     const clean = colourId.replace(/_/g, ' ');
     return clean.charAt(0).toUpperCase() + clean.slice(1);
@@ -187,9 +189,59 @@ export class AnalyticsPage {
   }
 
   private refreshDerivedScopeState(): void {
-    const metrics = this.currentMetrics;
-    this.categoryList = this.toDistributionList(metrics?.itemsByCategory, metrics?.totalItems, id => this.formatCategoryLabel(id));
-    this.colourList = this.toDistributionList(metrics?.itemsByColour, metrics?.totalItems, id => this.formatColourLabel(id));
+    const summary = this.analytics;
+    if (!summary) {
+      this.view = null;
+      return;
+    }
+
+    const cost = this.scope === 'user' ? summary.userCost : summary.platformCost;
+    const metrics = this.scope === 'user' ? summary.userMetrics : summary.platformMetrics;
+    const totalCost = cost.totalCostUsd;
+    const topWornItems = this.scope === 'user' ? metrics.topWornItems.slice(0, 12).map(item => ({
+      id: item.id,
+      name: item.name,
+      categoryLabel: this.formatCategoryLabel(item.categoryId),
+      wearCount: item.wearCount,
+      thumbnailUrl: item.thumbnailUrl
+    })) : [];
+
+    this.view = {
+      scope: this.scope,
+      totalCost: this.formatCurrency(totalCost),
+      averageCostPerItem: metrics.totalItems ? this.formatCurrency(totalCost / metrics.totalItems) : '$0.0000',
+      averageCostPerOutfit: metrics.totalOutfits ? this.formatCurrency(totalCost / metrics.totalOutfits) : '$0.0000',
+      costRows: [
+        this.toCostRow('classification', 'Item Classification', 'classification-dot', cost.classifications, 'scans', 'item'),
+        this.toCostRow('outfit-search', 'Outfit Search & Styling', 'search-dot', cost.outfitSearches, 'queries', 'query'),
+        this.toCostRow('display-image', 'Garment Display / Cutout', 'display-dot', cost.displayImages, 'images', 'img'),
+        this.toCostRow('outfit-image', 'Rendered Outfit Looks', 'outfit-img-dot', cost.outfitImages, 'renders', 'render')
+      ],
+      totalItems: metrics.totalItems,
+      activeItems: metrics.activeItems,
+      archivedItems: metrics.archivedItems,
+      totalOutfits: metrics.totalOutfits,
+      outfitsWithImages: metrics.outfitsWithImages,
+      totalWearCount: metrics.totalWearCount,
+      hasZeroData: metrics.totalItems === 0 && metrics.totalOutfits === 0,
+      categoryList: this.toDistributionList(metrics.itemsByCategory, metrics.totalItems, id => this.formatCategoryLabel(id)),
+      colourList: this.toDistributionList(metrics.itemsByColour, metrics.totalItems, id => this.formatColourLabel(id)),
+      topWornItems,
+      telemetry: summary.platformTelemetry,
+      lastRefreshedLabel: this.lastRefreshed
+        ? this.lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        : ''
+    };
+  }
+
+  private toCostRow(id: string, name: string, dotClass: string, cost: AiCostBreakdownItemDto, countLabel: string, unitLabel: string): AnalyticsCostRow {
+    return {
+      id,
+      name,
+      dotClass,
+      detail: `${cost.count} ${countLabel} × ${this.formatCurrency(cost.unitCostUsd, 3, 3)}/${unitLabel}`,
+      formattedSubtotal: this.formatCurrency(cost.subtotalCostUsd)
+    };
   }
 
   private toDistributionList(
@@ -197,33 +249,18 @@ export class AnalyticsPage {
     totalItems: number | null | undefined,
     formatLabel: (id: string) => string
   ): AnalyticsDistributionRow[] {
-    if (!values || !totalItems) return [];
+    const total = totalItems ?? 0;
+    if (!values || !Number.isFinite(total) || total <= 0) return [];
     return Object.entries(values)
+      .filter(([id, count]) => id.length > 0 && Number.isFinite(count) && count >= 0)
       .map(([id, count]) => ({
         id,
         label: formatLabel(id),
         count,
-        percentage: Math.round((count / totalItems) * 100)
+        percentage: Math.min(100, Math.round((count / total) * 100))
       }))
-      .sort((left, right) => right.count - left.count || left.id.localeCompare(right.id));
+      .sort((left, right) => right.count - left.count || left.id.localeCompare(right.id))
+      .slice(0, 24);
   }
 
-  get avgCostPerItem(): string {
-    const totalItems = this.currentMetrics?.totalItems ?? 0;
-    const totalCost = this.currentCost?.totalCostUsd ?? 0;
-    if (totalItems === 0) return '$0.0000';
-    return this.formatCurrency(totalCost / totalItems);
-  }
-
-  get avgCostPerOutfit(): string {
-    const totalOutfits = this.currentMetrics?.totalOutfits ?? 0;
-    const totalCost = this.currentCost?.totalCostUsd ?? 0;
-    if (totalOutfits === 0) return '$0.0000';
-    return this.formatCurrency(totalCost / totalOutfits);
-  }
-
-  get lastRefreshedLabel(): string {
-    if (!this.lastRefreshed) return '';
-    return this.lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  }
 }

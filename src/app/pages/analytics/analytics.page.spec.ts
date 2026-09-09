@@ -107,23 +107,23 @@ describe('AnalyticsPage', () => {
     await component.ionViewWillEnter();
     expect(mockApi.getAnalyticsSummary).toHaveBeenCalled();
     expect(component.analytics).toEqual(mockAnalyticsData);
-    expect(component.formattedTotalCost).toBe('$0.0460');
+    expect(component.view?.totalCost).toBe('$0.0460');
   });
 
   it('should switch cost and metrics when scope changes to platform', async () => {
     await component.loadAnalytics();
     expect(component.scope).toBe('user');
-    expect(component.formattedTotalCost).toBe('$0.0460');
+    expect(component.view?.totalCost).toBe('$0.0460');
 
     component.setScope('platform');
     expect(component.scope).toBe('platform');
-    expect(component.formattedTotalCost).toBe('$0.1340');
-    expect(component.currentMetrics?.totalItems).toBe(10);
+    expect(component.view?.totalCost).toBe('$0.1340');
+    expect(component.view?.totalItems).toBe(10);
   });
 
   it('should compute category distribution accurately', async () => {
     await component.loadAnalytics();
-    const categories = component.categoryList;
+    const categories = component.view?.categoryList ?? [];
     expect(categories.length).toBe(3);
     expect(categories[0].id).toBe('tops');
     expect(categories[0].count).toBe(2);
@@ -132,26 +132,26 @@ describe('AnalyticsPage', () => {
 
   it('should compute colour distribution accurately', async () => {
     await component.loadAnalytics();
-    const colours = component.colourList;
+    const colours = component.view?.colourList ?? [];
     expect(colours.length).toBe(2);
     expect(colours[0].percentage).toBe(50);
   });
 
   it('keeps derived lists stable between checks and rebuilds them when the scope changes', async () => {
     await component.loadAnalytics();
-    const userCategories = component.categoryList;
-    const userColours = component.colourList;
+    const userCategories = component.view?.categoryList;
+    const userColours = component.view?.colourList;
 
-    expect(component.categoryList).toBe(userCategories);
-    expect(component.colourList).toBe(userColours);
+    expect(component.view?.categoryList).toBe(userCategories);
+    expect(component.view?.colourList).toBe(userColours);
 
     component.setScope('platform');
-    const platformCategories = component.categoryList;
+    const platformCategories = component.view?.categoryList;
     expect(platformCategories).not.toBe(userCategories);
 
     component.setScope('user');
-    expect(component.categoryList).not.toBe(platformCategories);
-    expect(component.categoryList.map(category => category.id)).toEqual(userCategories.map(category => category.id));
+    expect(component.view?.categoryList).not.toBe(platformCategories);
+    expect(component.view?.categoryList.map(category => category.id)).toEqual(userCategories?.map(category => category.id));
   });
 
   it('should navigate to settings when openSettings is called', () => {

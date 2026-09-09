@@ -59,7 +59,7 @@
       <button type="button" class="retry-btn" (click)="loadAnalytics()">Retry</button>
     </div>
 
-    <ng-container *ngIf="analytics && currentCost && currentMetrics">
+    <ng-container *ngIf="view as analyticsView">
       <!-- SECTION 1: Exact AI Cost Breakdown -->
       <section class="ios-section">
         <div class="ios-section-header">
@@ -69,56 +69,23 @@
 
         <div class="ios-grouped-card hero-cost-card">
           <div class="hero-cost-main">
-            <span class="cost-scope-label">{{ scope === 'user' ? 'My AI Spend' : 'Total Platform AI Spend' }}</span>
+            <span class="cost-scope-label">{{ analyticsView.scope === 'user' ? 'My AI Spend' : 'Total Platform AI Spend' }}</span>
             <div class="cost-amount-wrap">
-              <span class="cost-number">{{ formattedTotalCost }}</span>
+              <span class="cost-number">{{ analyticsView.totalCost }}</span>
             </div>
             <span class="cost-disclaimer">Estimated from recorded items and outfits using configured unit rates</span>
           </div>
 
           <div class="cost-breakdown-table">
-            <div class="breakdown-row">
+            <div class="breakdown-row" *ngFor="let row of analyticsView.costRows; trackBy: trackById">
               <div class="breakdown-col-info">
-                <div class="breakdown-dot classification-dot"></div>
+                <div [class]="'breakdown-dot ' + row.dotClass"></div>
                 <div class="breakdown-text">
-                  <span class="breakdown-name">Item Classification</span>
-                  <span class="breakdown-sub">{{ currentCost.classifications.count }} scans × {{ formatCurrency(currentCost.classifications.unitCostUsd, 3, 3) }}/item</span>
+                  <span class="breakdown-name">{{ row.name }}</span>
+                  <span class="breakdown-sub">{{ row.detail }}</span>
                 </div>
               </div>
-              <span class="breakdown-val">{{ formatCurrency(currentCost.classifications.subtotalCostUsd) }}</span>
-            </div>
-
-            <div class="breakdown-row">
-              <div class="breakdown-col-info">
-                <div class="breakdown-dot search-dot"></div>
-                <div class="breakdown-text">
-                  <span class="breakdown-name">Outfit Search & Styling</span>
-                  <span class="breakdown-sub">{{ currentCost.outfitSearches.count }} queries × {{ formatCurrency(currentCost.outfitSearches.unitCostUsd, 3, 3) }}/query</span>
-                </div>
-              </div>
-              <span class="breakdown-val">{{ formatCurrency(currentCost.outfitSearches.subtotalCostUsd) }}</span>
-            </div>
-
-            <div class="breakdown-row">
-              <div class="breakdown-col-info">
-                <div class="breakdown-dot display-dot"></div>
-                <div class="breakdown-text">
-                  <span class="breakdown-name">Garment Display / Cutout</span>
-                  <span class="breakdown-sub">{{ currentCost.displayImages.count }} images × {{ formatCurrency(currentCost.displayImages.unitCostUsd, 3, 3) }}/img</span>
-                </div>
-              </div>
-              <span class="breakdown-val">{{ formatCurrency(currentCost.displayImages.subtotalCostUsd) }}</span>
-            </div>
-
-            <div class="breakdown-row">
-              <div class="breakdown-col-info">
-                <div class="breakdown-dot outfit-img-dot"></div>
-                <div class="breakdown-text">
-                  <span class="breakdown-name">Rendered Outfit Looks</span>
-                  <span class="breakdown-sub">{{ currentCost.outfitImages.count }} renders × {{ formatCurrency(currentCost.outfitImages.unitCostUsd, 3, 3) }}/render</span>
-                </div>
-              </div>
-              <span class="breakdown-val">{{ formatCurrency(currentCost.outfitImages.subtotalCostUsd) }}</span>
+              <span class="breakdown-val">{{ row.formattedSubtotal }}</span>
             </div>
           </div>
         </div>
@@ -127,49 +94,49 @@
       <!-- SECTION 2: Wardrobe & Inventory Metrics -->
       <section class="ios-section">
         <div class="ios-section-header">
-          <span>{{ scope === 'user' ? 'MY WARDROBE METRICS' : 'PLATFORM INVENTORY METRICS' }}</span>
+          <span>{{ analyticsView.scope === 'user' ? 'MY WARDROBE METRICS' : 'PLATFORM INVENTORY METRICS' }}</span>
         </div>
 
         <div class="metrics-grid">
           <div class="metric-card">
-            <span class="metric-value">{{ currentMetrics.totalItems }}</span>
+            <span class="metric-value">{{ analyticsView.totalItems }}</span>
             <span class="metric-title">Total Items</span>
-            <span class="metric-sub">{{ currentMetrics.activeItems }} active · {{ currentMetrics.archivedItems }} archived</span>
+            <span class="metric-sub">{{ analyticsView.activeItems }} active · {{ analyticsView.archivedItems }} archived</span>
           </div>
 
           <div class="metric-card">
-            <span class="metric-value">{{ currentMetrics.totalOutfits }}</span>
+            <span class="metric-value">{{ analyticsView.totalOutfits }}</span>
             <span class="metric-title">Outfits Saved</span>
-            <span class="metric-sub">{{ currentMetrics.outfitsWithImages }} with generated image</span>
+            <span class="metric-sub">{{ analyticsView.outfitsWithImages }} with generated image</span>
           </div>
 
           <div class="metric-card">
-            <span class="metric-value">{{ currentMetrics.totalWearCount }}</span>
+            <span class="metric-value">{{ analyticsView.totalWearCount }}</span>
             <span class="metric-title">Wear Events</span>
             <span class="metric-sub">Logged wear history</span>
           </div>
 
           <div class="metric-card">
-            <span class="metric-value">{{ avgCostPerItem }}</span>
+            <span class="metric-value">{{ analyticsView.averageCostPerItem }}</span>
             <span class="metric-title">Avg Cost / Item</span>
-            <span class="metric-sub">{{ avgCostPerOutfit }} / outfit</span>
+            <span class="metric-sub">{{ analyticsView.averageCostPerOutfit }} / outfit</span>
           </div>
         </div>
       </section>
 
       <!-- Zero-data placeholder when user has 0 items and 0 outfits -->
-      <section class="ios-section" *ngIf="hasZeroData">
+      <section class="ios-section" *ngIf="analyticsView.hasZeroData">
         <div class="ios-grouped-card zero-data-card">
           <div class="zero-data-icon">
             <ion-icon name="shirt-outline"></ion-icon>
           </div>
-          <h2 class="zero-data-title">{{ scope === 'user' ? 'No Wardrobe Items Yet' : 'No Platform Activity' }}</h2>
+          <h2 class="zero-data-title">{{ analyticsView.scope === 'user' ? 'No Wardrobe Items Yet' : 'No Platform Activity' }}</h2>
           <p class="zero-data-text">
-            {{ scope === 'user'
+            {{ analyticsView.scope === 'user'
               ? 'Catalog items and save styled outfits to unlock category breakdowns, color distributions, and wear frequency telemetry.'
               : 'No items or outfits have been registered on the platform yet.' }}
           </p>
-          <ion-button class="primary-button zero-data-cta" *ngIf="scope === 'user'" routerLink="/tabs/add">
+          <ion-button class="primary-button zero-data-cta" *ngIf="analyticsView.scope === 'user'" routerLink="/tabs/add">
             <ion-icon name="add-outline" slot="start"></ion-icon>
             Add Garments
           </ion-button>
@@ -177,19 +144,19 @@
       </section>
 
       <!-- SECTION 3: Category Distribution -->
-      <section class="ios-section" *ngIf="categoryList.length > 0">
+      <section class="ios-section" *ngIf="analyticsView.categoryList.length > 0">
         <div class="ios-section-header">
           <span>ITEMS BY CATEGORY</span>
-          <span class="section-sub">{{ categoryList.length }} categories</span>
+          <span class="section-sub">{{ analyticsView.categoryList.length }} categories</span>
         </div>
 
         <div class="ios-grouped-card">
-          <div class="distribution-row" [class.clickable-row]="scope === 'user'" *ngFor="let cat of categoryList; trackBy: trackById" (click)="openCategoryItems(cat)">
+          <div class="distribution-row" [class.clickable-row]="analyticsView.scope === 'user'" *ngFor="let cat of analyticsView.categoryList; trackBy: trackById" (click)="openCategoryItems(cat)">
             <div class="distribution-header">
               <span class="cat-label">{{ cat.label }}</span>
               <span class="cat-count">
                 {{ cat.count }} <small>({{ cat.percentage }}%)</small>
-                <ion-icon *ngIf="scope === 'user'" name="chevron-forward" class="row-arrow"></ion-icon>
+                <ion-icon *ngIf="analyticsView.scope === 'user'" name="chevron-forward" class="row-arrow"></ion-icon>
               </span>
             </div>
             <div class="progress-bar-bg">
@@ -200,14 +167,14 @@
       </section>
 
       <!-- SECTION 4: Colour Distribution -->
-      <section class="ios-section" *ngIf="colourList.length > 0">
+      <section class="ios-section" *ngIf="analyticsView.colourList.length > 0">
         <div class="ios-section-header">
           <span>COLOUR PALETTE DISTRIBUTION</span>
         </div>
 
         <div class="ios-grouped-card colour-card">
           <div class="colour-chips-wrap">
-            <div class="colour-chip" *ngFor="let col of colourList; trackBy: trackById">
+            <div class="colour-chip" *ngFor="let col of analyticsView.colourList; trackBy: trackById">
               <span class="colour-chip-dot" [attr.data-colour]="col.id"></span>
               <span class="colour-chip-name">{{ col.label }}</span>
               <span class="colour-chip-count">{{ col.count }}</span>
@@ -217,20 +184,20 @@
       </section>
 
       <!-- SECTION 5: Top Worn Pieces -->
-      <section class="ios-section" *ngIf="scope === 'user' && currentMetrics.topWornItems && currentMetrics.topWornItems.length > 0">
+      <section class="ios-section" *ngIf="analyticsView.topWornItems.length > 0">
         <div class="ios-section-header">
           <span>MOST WORN ITEMS</span>
         </div>
 
         <div class="ios-grouped-card">
-          <div class="top-worn-row" *ngFor="let item of currentMetrics.topWornItems; trackBy: trackById">
+          <div class="top-worn-row" *ngFor="let item of analyticsView.topWornItems; trackBy: trackById">
             <div class="item-thumb-box">
               <img *ngIf="item.thumbnailUrl" [src]="item.thumbnailUrl" [alt]="item.name" loading="lazy" decoding="async" />
               <ion-icon *ngIf="!item.thumbnailUrl" name="shirt-outline"></ion-icon>
             </div>
             <div class="item-meta">
               <span class="item-name">{{ item.name }}</span>
-              <span class="item-cat">{{ formatCategoryLabel(item.categoryId) }}</span>
+              <span class="item-cat">{{ item.categoryLabel }}</span>
             </div>
             <div class="wear-pill">
               <ion-icon name="repeat-outline"></ion-icon>
@@ -252,39 +219,39 @@
         <div class="ios-grouped-card">
           <div class="ios-table-row">
             <span class="row-label">Testing Users Registered</span>
-            <span class="row-value">{{ analytics.platformTelemetry.totalUsers }}</span>
+            <span class="row-value">{{ analyticsView.telemetry.totalUsers }}</span>
           </div>
           <div class="ios-table-row">
             <span class="row-label">Platform Items Total</span>
-            <span class="row-value">{{ analytics.platformTelemetry.totalPlatformItems }} items</span>
+            <span class="row-value">{{ analyticsView.telemetry.totalPlatformItems }} items</span>
           </div>
           <div class="ios-table-row">
             <span class="row-label">Platform Outfits Total</span>
-            <span class="row-value">{{ analytics.platformTelemetry.totalPlatformOutfits }} outfits</span>
+            <span class="row-value">{{ analyticsView.telemetry.totalPlatformOutfits }} outfits</span>
           </div>
           <div class="ios-table-row">
             <span class="row-label">Cloud Images Stored</span>
-            <span class="row-value">{{ analytics.platformTelemetry.totalPlatformImages }} assets</span>
+            <span class="row-value">{{ analyticsView.telemetry.totalPlatformImages }} assets</span>
           </div>
           <div class="ios-table-row">
             <span class="row-label">Persistence Engine</span>
-            <span class="row-value highlight">{{ analytics.platformTelemetry.databaseMode }}</span>
+            <span class="row-value highlight">{{ analyticsView.telemetry.databaseMode }}</span>
           </div>
           <div class="ios-table-row">
             <span class="row-label">Text & Classification Model</span>
-            <span class="row-value code">{{ analytics.platformTelemetry.modelTier }}</span>
+            <span class="row-value code">{{ analyticsView.telemetry.modelTier }}</span>
           </div>
           <div class="ios-table-row">
             <span class="row-label">Image Generation Model</span>
-            <span class="row-value code">{{ analytics.platformTelemetry.imageModelTier }}</span>
+            <span class="row-value code">{{ analyticsView.telemetry.imageModelTier }}</span>
           </div>
           <div class="ios-table-row" *ngIf="pingLatencyMs !== null">
             <span class="row-label">API Health Latency</span>
             <span class="row-value latency">{{ pingLatencyMs }} ms</span>
           </div>
         </div>
-        <p class="ios-section-footer center" *ngIf="lastRefreshedLabel">
-          Last updated at {{ lastRefreshedLabel }}. Pull to refresh live testing data.
+        <p class="ios-section-footer center" *ngIf="analyticsView.lastRefreshedLabel">
+          Last updated at {{ analyticsView.lastRefreshedLabel }}. Pull to refresh live testing data.
         </p>
       </section>
     </ng-container>
