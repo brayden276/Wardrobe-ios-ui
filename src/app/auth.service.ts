@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Preferences } from '@capacitor/preferences';
-import { BehaviorSubject, firstValueFrom } from 'rxjs';
+import { BehaviorSubject, firstValueFrom, timeout } from 'rxjs';
 import { apiBaseUrl } from './api-url';
 import { DeviceImageCacheService } from './device-image-cache.service';
 import { AuthProviderDto, AuthResponse, AuthUserDto, StatusMessageDto, UpdatePersonalDetailsRequest, UpdateProfileRequest } from './models';
@@ -17,6 +17,7 @@ interface Session {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private static readonly authRequestTimeoutMs = 10_000;
   private readonly http = inject(HttpClient);
   private readonly deviceImageCache = inject(DeviceImageCacheService);
   private readonly offlineData = inject(OfflineDataService);
@@ -83,6 +84,7 @@ export class AuthService {
 
     try {
       await this.validateSession();
+      return;
     } catch (error) {
       if (!this.isUnauthorized(error)) {
         return;
@@ -222,7 +224,11 @@ export class AuthService {
     }
 
     try {
-      const response = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/api/auth/refresh`, { refreshToken }));
+      const response = await firstValueFrom(
+        this.http
+          .post<AuthResponse>(`${this.apiBaseUrl}/api/auth/refresh`, { refreshToken })
+          .pipe(timeout(AuthService.authRequestTimeoutMs))
+      );
       await this.setSession(response);
       return true;
     } catch (error) {
@@ -241,9 +247,13 @@ export class AuthService {
       return;
     }
 
-    const user = await firstValueFrom(this.http.get<AuthUserDto>(`${this.apiBaseUrl}/api/auth/me`, {
-      headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
-    }));
+    const user = await firstValueFrom(
+      this.http
+        .get<AuthUserDto>(`${this.apiBaseUrl}/api/auth/me`, {
+          headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
+        })
+        .pipe(timeout(AuthService.authRequestTimeoutMs))
+    );
 
     const session = this.session;
     if (!session) {

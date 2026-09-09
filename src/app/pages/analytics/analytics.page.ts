@@ -64,7 +64,7 @@ export class AnalyticsPage implements OnInit {
         this.pingLatencyMs = Math.round(performance.now() - startPing);
         this.lastRefreshed = new Date();
       } catch (err) {
-        this.error = readMessage(err, 'Failed to load platform analytics.');
+        this.error = readMessage(err, 'Failed to load analytics.');
       } finally {
         this.isLoading = false;
         event?.target?.complete?.();

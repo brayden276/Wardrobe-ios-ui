@@ -103,7 +103,7 @@ async getItems(
   const userId = this.auth.session?.user.id;
   if (!this.isOnline && userId) {
     const cachedItems = await this.offlineData.read<WardrobeItemDto[]>(userId, 'items');
-    if (cachedItems) return cachedItems;
+    if (cachedItems) return this.filterOfflineItems(cachedItems, params);
   }
     const query = this.queryString(params);
     const cacheKey = query || 'all';
@@ -113,7 +113,13 @@ async getItems(
     }
 
   return this.setCached(this.itemsCache, cacheKey, async () => {
-      const response = await this.authorized(() => firstValueFrom(this.http.get<{ items: WardrobeItemDto[] }>(this.url(`/api/wardrobe/items${query ? `?${query}` : ''}`), this.authOptions())));
+    const response = await this.authorized(() =>
+      firstValueFrom(
+        this.http
+          .get<{ items: WardrobeItemDto[] }>(this.url(`/api/wardrobe/items${query ? `?${query}` : ''}`), this.authOptions())
+          .pipe(timeout(10000))
+      )
+    );
     const items = await Promise.all(response.items.map((item) => this.normaliseItem(item, false)));
     if (userId && Object.keys(params).length === 0 && this.auth.session?.user.id === userId) await this.offlineData.write(userId, 'items', items);
     return items;
@@ -222,7 +228,10 @@ async getItems(
 async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
   const userId = this.auth.session?.user.id;
   if (!this.isOnline && userId) {
-    const cachedOutfits = await this.offlineData.read<OutfitDto[]>(userId, 'outfits');
+    const cachedOutfits = await this.offlineData.read<OutfitDto[]>(
+      userId,
+      options.includePending ? 'outfits-pending' : 'outfits'
+    );
     if (cachedOutfits) return cachedOutfits;
   }
     const cacheKey = options.includePending ? `${this.outfitsCacheKey}:include-pending` : this.outfitsCacheKey;
@@ -235,7 +244,9 @@ async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
       const query = options.includePending ? '?includePending=true' : '';
       const response = await this.authorized(() => firstValueFrom(this.http.get<{ outfits: OutfitDto[] }>(this.url(`/api/outfits${query}`), this.authOptions())));
     const outfits = await Promise.all(response.outfits.map((outfit) => this.normaliseOutfit(outfit)));
-    if (userId && !options.includePending && this.auth.session?.user.id === userId) await this.offlineData.write(userId, 'outfits', outfits);
+    if (userId && this.auth.session?.user.id === userId) {
+      await this.offlineData.write(userId, options.includePending ? 'outfits-pending' : 'outfits', outfits);
+    }
     return outfits;
     });
   }
@@ -358,6 +369,62 @@ async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
 
   private url(path: string): string {
     return `${this.apiBaseUrl}${path}`;
+  }
+
+  private filterOfflineItems(
+    items: WardrobeItemDto[],
+    params: Record<string, string | number | boolean | null | undefined>
+  ): WardrobeItemDto[] {
+    const textParam = (key: string): string => String(params[key] ?? '').trim().toLowerCase();
+    const matches = (value: string | null | undefined, expected: string): boolean =>
+      !expected || (value ?? '').toLowerCase() === expected;
+    const includeArchived = params['includeArchived'] === true || params['includeArchived'] === 'true';
+    const colourId = textParam('colourId');
+    const searchTerm = this.canonicaliseOfflineSearch(textParam('search'));
+
+    const filtered = items
+      .filter(item => !item.isDeleted && (includeArchived || !item.isArchived))
+      .filter(item => matches(item.categoryId, textParam('categoryId')))
+      .filter(item => matches(item.subcategoryId, textParam('subcategoryId')))
+      .filter(item => matches(item.patternId, textParam('patternId')))
+      .filter(item => matches(item.visibleMaterialId, textParam('visibleMaterialId')))
+      .filter(item => matches(item.necklineId, textParam('necklineId')))
+      .filter(item => matches(item.sleeveLengthId, textParam('sleeveLengthId')))
+      .filter(item => matches(item.fitId, textParam('fitId')))
+      .filter(item => matches(item.lengthId, textParam('lengthId')))
+      .filter(item => matches(item.bottomShapeId, textParam('bottomShapeId')))
+      .filter(item => matches(item.riseId, textParam('riseId')))
+      .filter(item => !colourId || matches(item.primaryColourId, colourId) || item.secondaryColourIds.some(colour => matches(colour, colourId)))
+      .filter(item => !searchTerm || this.canonicaliseOfflineSearch([
+        item.id,
+        item.name,
+        item.categoryId,
+        item.subcategoryId,
+        item.primaryColourId,
+        ...item.secondaryColourIds,
+        item.patternId,
+        item.visibleMaterialId,
+        item.necklineId,
+        item.sleeveLengthId,
+        item.fitId,
+        item.lengthId,
+        item.bottomShapeId,
+        item.riseId
+      ].filter(Boolean).join(' ')).includes(searchTerm))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id));
+
+    const offset = this.normaliseOfflinePageNumber(params['offset']);
+    const limit = this.normaliseOfflinePageNumber(params['limit']);
+    return limit > 0 ? filtered.slice(offset, offset + Math.min(limit, 200)) : filtered.slice(offset);
+  }
+
+  private canonicaliseOfflineSearch(value: string): string {
+    return Array.from(value.toLowerCase()).filter(character => /[\p{L}\p{N}]/u.test(character)).join('');
+  }
+
+  private normaliseOfflinePageNumber(value: string | number | boolean | null | undefined): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : 0;
   }
 
   private queryString(params: Record<string, string | number | boolean | null | undefined>): string {

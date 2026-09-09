@@ -217,7 +217,7 @@
       </section>
 
       <!-- SECTION 5: Top Worn Pieces -->
-      <section class="ios-section" *ngIf="currentMetrics.topWornItems && currentMetrics.topWornItems.length > 0">
+      <section class="ios-section" *ngIf="scope === 'user' && currentMetrics.topWornItems && currentMetrics.topWornItems.length > 0">
         <div class="ios-section-header">
           <span>MOST WORN ITEMS</span>
         </div>
