@@ -177,23 +177,7 @@
 }
 
 /* Sections & Cards */
-.ios-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
 .ios-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: var(--app-muted);
-
   .rate-badge {
     padding: 2px 6px;
     border-radius: 4px;
@@ -209,14 +193,6 @@
     text-transform: none;
     color: var(--app-muted);
   }
-}
-
-.ios-grouped-card {
-  border-radius: var(--app-radius-md);
-  border: 0.5px solid var(--app-border);
-  background: var(--app-surface);
-  overflow: hidden;
-  box-shadow: var(--app-shadow-subtle);
 }
 
 /* Hero Cost Card */
@@ -667,17 +643,6 @@
     height: 6px;
     border-radius: 50%;
     background: #27ae60;
-  }
-}
-
-.ios-section-footer {
-  margin: 6px 16px 0;
-  font-size: 12px;
-  line-height: 1.35;
-  color: var(--app-muted);
-
-  &.center {
-    text-align: center;
   }
 }
 

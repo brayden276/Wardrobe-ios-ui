@@ -2,7 +2,7 @@
   <ion-toolbar>
     <ion-title>Outfit Studio</ion-title>
     <ion-buttons slot="end">
-      <ion-button routerLink="/tabs/getting-started" aria-label="Learn how to build outfits"><ion-icon slot="icon-only" name="help-circle-outline"></ion-icon></ion-button>
+      <ion-button routerLink="/tabs/getting-started" [queryParams]="{ returnUrl: '/tabs/builder' }" aria-label="Learn how to build outfits"><ion-icon slot="icon-only" name="help-circle-outline"></ion-icon></ion-button>
     </ion-buttons>
   </ion-toolbar>
 
@@ -30,7 +30,7 @@
       <h2>Add clothes to build your first look</h2>
       <p class="muted">Start with a top, bottoms and shoes, or a dress and shoes. Then ask AI Stylist for ideas or pick the pieces yourself in Manual Canvas.</p>
       <ion-button class="primary-button" routerLink="/tabs/add">Add Clothes</ion-button>
-      <ion-button fill="clear" routerLink="/tabs/getting-started">Show Me How</ion-button>
+      <ion-button fill="clear" routerLink="/tabs/getting-started" [queryParams]="{ returnUrl: '/tabs/builder' }">Show Me How</ion-button>
     </article>
     <div class="builder-learning" *ngIf="items.length && !resultCards.length && !isBuildingOutfits">
       <p *ngIf="builderMode === 'generate'">Choose an occasion, add optional notes, then generate ideas from your wardrobe. Save the looks you like to Outfits.</p>

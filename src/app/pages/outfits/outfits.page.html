@@ -196,7 +196,7 @@
   </div>
 
   <!-- Native iOS Modal Sheet for Outfit Detail Inspection -->
-  <ion-modal [isOpen]="!!selectedOutfit" [canDismiss]="!isSavingOutfit" [breakpoints]="[0, 0.65, 0.95]" [initialBreakpoint]="0.65" [handle]="true" (ionModalDidDismiss)="close()">
+  <ion-modal class="outfit-detail-modal" [isOpen]="!!selectedOutfit" [canDismiss]="!isSavingOutfit" [breakpoints]="[0, 1]" [initialBreakpoint]="1" [handle]="true" (ionModalDidDismiss)="close()">
     <ng-template>
       <div class="sheet-modal-content" *ngIf="selectedOutfit">
         <header class="modal-nav-bar">
@@ -264,9 +264,10 @@
             <span>{{ markingOutfitIds.has(selectedOutfit.id) ? 'Logging Wear...' : 'Log Outfit as Worn Today' }}</span>
           </button>
           <div class="sheet-footer-secondary">
-            <button type="button" class="sheet-btn-secondary" (click)="toggleFavorite(selectedOutfit)" [disabled]="!canChangeFavorites" [attr.aria-pressed]="isFavorite(selectedOutfit.id)">
-              <ion-icon [name]="isFavorite(selectedOutfit.id) ? 'heart' : 'heart-outline'"></ion-icon>
-              <span>{{ isFavorite(selectedOutfit.id) ? 'Favorited' : 'Favorite' }}</span>
+            <button type="button" class="sheet-btn-secondary" (click)="toggleFavorite(selectedOutfit)" [disabled]="!canChangeFavorites || isUpdatingFavorite(selectedOutfit.id)" [attr.aria-busy]="isUpdatingFavorite(selectedOutfit.id)" [attr.aria-pressed]="isFavorite(selectedOutfit.id)">
+              <ion-spinner *ngIf="isUpdatingFavorite(selectedOutfit.id)" name="crescent" aria-hidden="true"></ion-spinner>
+              <ion-icon *ngIf="!isUpdatingFavorite(selectedOutfit.id)" [name]="isFavorite(selectedOutfit.id) ? 'heart' : 'heart-outline'"></ion-icon>
+              <span>{{ isUpdatingFavorite(selectedOutfit.id) ? 'Saving...' : isFavorite(selectedOutfit.id) ? 'Favorited' : 'Favorite' }}</span>
             </button>
             <button type="button" class="sheet-btn-danger" (click)="remove(selectedOutfit)">
               <ion-icon name="trash-outline"></ion-icon>

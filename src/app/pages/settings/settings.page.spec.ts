@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { Preferences } from '@capacitor/preferences';
 import { IonicModule } from '@ionic/angular';
@@ -59,6 +59,17 @@ describe('Settings password change', () => {
   afterEach(async () => {
     http.verify();
     await Preferences.clear();
+  });
+
+  it('returns to Analytics when opened there and otherwise to Wardrobe', () => {
+    const route = TestBed.inject(ActivatedRoute);
+    const params = spyOnProperty(route.snapshot, 'queryParamMap', 'get');
+    params.and.returnValue(convertToParamMap({ returnUrl: '/tabs/analytics' }));
+    page.goBack();
+    expect(navigate).toHaveBeenCalledWith('/tabs/analytics');
+    params.and.returnValue(convertToParamMap({ returnUrl: '/login' }));
+    page.goBack();
+    expect(navigate).toHaveBeenCalledWith('/tabs/wardrobe');
   });
 
   it('changes the password, clears credentials and sensitive fields, then returns to sign-in', async () => {

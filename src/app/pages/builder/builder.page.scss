@@ -77,7 +77,7 @@
   font-weight: 550;
   padding: 8px 16px;
   cursor: pointer;
-  transition: all 150ms ease;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 
   &:active {
     background: var(--app-surface-pressed);
@@ -86,7 +86,7 @@
   &.active {
     background: var(--app-olive);
     border-color: var(--app-olive);
-    color: #ffffff;
+    color: var(--ion-color-primary-contrast);
   }
 }
 

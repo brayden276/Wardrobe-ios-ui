@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
 import { AuthService } from '../../auth.service';
 import { DeviceImageCacheService } from '../../device-image-cache.service';
@@ -31,6 +31,7 @@ export class SettingsPage {
   readonly auth = inject(AuthService);
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly alertController = inject(AlertController);
   private readonly toastController = inject(ToastController);
   private readonly deviceImageCache = inject(DeviceImageCacheService);
@@ -145,7 +146,8 @@ export class SettingsPage {
   }
 
   goBack(): void {
-    this.router.navigateByUrl('/tabs/analytics');
+    const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+    this.router.navigateByUrl(returnUrl === '/tabs/analytics' ? returnUrl : '/tabs/wardrobe');
   }
 
   async loadAiUsage(): Promise<void> {

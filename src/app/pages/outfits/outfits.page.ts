@@ -309,6 +309,10 @@ export class OutfitsPage {
     return this.favoriteOutfitIds.has(outfitId);
   }
 
+  isUpdatingFavorite(outfitId: string): boolean {
+    return this.updatingFavoriteIds.has(outfitId);
+  }
+
   formatSubcategory(subcategoryId: string | null): string {
     if (!subcategoryId) return '';
     if (this.lookups) {

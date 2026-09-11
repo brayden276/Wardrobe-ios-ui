@@ -12,6 +12,7 @@ Structural map compiled from source code via AST. No LLM — deterministic, 200m
 - [Saved outfit workflows](./outfit-workflows.md)
 - [Account settings](./account-settings.md)
 - [First use and learning the app](./first-use.md)
+- [Shared UI styling and navigation](./ui-conventions.md)
 
 ## Quick Stats
 

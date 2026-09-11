@@ -10,6 +10,9 @@
     <ion-title *ngIf="isSelectionMode">{{ selectedCount }} Selected</ion-title>
 
     <ion-buttons slot="end">
+      <ion-button *ngIf="!isSelectionMode" routerLink="/tabs/settings" [queryParams]="{ returnUrl: '/tabs/wardrobe' }" aria-label="Open Settings">
+        <ion-icon slot="icon-only" name="settings-outline"></ion-icon>
+      </ion-button>
       <ion-button *ngIf="!isSelectionMode" fill="clear" (click)="enterSelectionMode()" [disabled]="isLoading || !items.length">
         Select
       </ion-button>

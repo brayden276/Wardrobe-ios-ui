@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { TestBed } from '@angular/core/testing';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, Router, RouterLink } from '@angular/router';
 import { By } from '@angular/platform-browser';
 import { RouterTestingModule } from '@angular/router/testing';
 import { IonicModule } from '@ionic/angular';
@@ -30,6 +30,17 @@ describe('Getting started', () => {
   it('starts new users with no completed actions', async () => {
     await page.ionViewWillEnter();
     expect(page.progress).toEqual({ hasItems: false, hasOutfits: false, hasWornOutfit: false });
+  });
+
+  it('returns help to the screen that opened it and rejects unrelated destinations', () => {
+    const route = TestBed.inject(ActivatedRoute);
+    const params = spyOnProperty(route.snapshot, 'queryParamMap', 'get');
+    for (const returnUrl of ['/tabs/builder', '/tabs/settings']) {
+      params.and.returnValue(convertToParamMap({ returnUrl }));
+      expect(page.returnUrl).toBe(returnUrl);
+    }
+    params.and.returnValue(convertToParamMap({ returnUrl: 'https://example.com' }));
+    expect(page.returnUrl).toBe('/tabs/wardrobe');
   });
 
   it('derives progress from active clothes, saved looks and actual wear counts', async () => {

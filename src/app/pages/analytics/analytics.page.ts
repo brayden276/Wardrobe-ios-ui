@@ -111,7 +111,7 @@ export class AnalyticsPage {
   }
 
   openSettings(): void {
-    this.router.navigateByUrl('/tabs/settings');
+    this.router.navigateByUrl('/tabs/settings?returnUrl=/tabs/analytics');
   }
 
   async openCategoryItems(category: { id: string; label: string; count: number }): Promise<void> {

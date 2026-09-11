@@ -1,7 +1,7 @@
 <ion-header>
   <ion-toolbar>
     <ion-title>Getting Started</ion-title>
-    <ion-buttons slot="end"><ion-button routerLink="/tabs/wardrobe">Done</ion-button></ion-buttons>
+    <ion-buttons slot="end"><ion-button [routerLink]="returnUrl">Done</ion-button></ion-buttons>
   </ion-toolbar>
 </ion-header>
 <ion-content class="app-content">
@@ -50,7 +50,7 @@
       </details>
       <details>
         <summary>Can I change my style preferences later?</summary>
-        <p>Open Settings from Analytics and edit Personal Style. You can also reopen this guide in Settings whenever you need it.</p>
+        <p>Open Settings from Wardrobe or Analytics and edit Personal Style. You can also reopen this guide in Settings whenever you need it.</p>
         <ion-button routerLink="/tabs/settings" fill="clear" size="small">Open Settings</ion-button>
       </details>
     </section>

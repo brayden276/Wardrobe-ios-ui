@@ -5,53 +5,13 @@
   width: 100%;
   max-width: 680px;
   margin: 0 auto;
-  padding: calc(var(--ion-safe-area-top) + 16px) 16px calc(96px + var(--ion-safe-area-bottom));
+  padding: var(--app-space-4) var(--app-space-4) var(--app-space-6);
   box-sizing: border-box;
-}
-
-.settings-header {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 0 4px;
-
-  .header-nav-row {
-    display: flex;
-    align-items: center;
-    margin-bottom: 4px;
-  }
-
-  .back-link-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    min-height: 44px;
-    border: none;
-    background: transparent;
-    color: var(--app-olive);
-    font-size: 16px;
-    font-weight: 500;
-    cursor: pointer;
-    padding: 0;
-
-    ion-icon {
-      font-size: 20px;
-    }
-  }
 }
 
 .row-action-link.view-link {
   color: var(--app-olive);
   text-decoration: none;
-}
-
-.ios-large-title {
-  margin: 0;
-  font-family: var(--app-heading-font);
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  color: var(--app-ink);
 }
 
 /* Profile Card */

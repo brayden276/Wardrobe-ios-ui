@@ -1,14 +1,16 @@
-<ion-content class="app-content" [fullscreen]="true">
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="goBack()" aria-label="Back">
+        <ion-icon slot="start" name="chevron-back-outline"></ion-icon>
+        Back
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Settings</ion-title>
+  </ion-toolbar>
+</ion-header>
+<ion-content class="app-content">
   <div class="settings-viewport">
-    <header class="settings-header">
-      <div class="header-nav-row">
-        <button type="button" class="back-link-btn" (click)="goBack()">
-          <ion-icon name="chevron-back-outline"></ion-icon>
-          <span>Analytics</span>
-        </button>
-      </div>
-      <h1 class="ios-large-title">Settings</h1>
-    </header>
 
     <!-- SECTION 1: Account Profile -->
     <div class="ios-section">
@@ -194,7 +196,7 @@
     <div class="ios-section">
       <div class="ios-section-header">LEARN THE APP</div>
       <div class="ios-grouped-card">
-        <a class="ios-link-row" routerLink="/tabs/getting-started">
+        <a class="ios-link-row" routerLink="/tabs/getting-started" [queryParams]="{ returnUrl: '/tabs/settings' }">
           <span class="link-label">Getting Started &amp; Help</span>
           <ion-icon name="help-circle-outline" class="link-icon"></ion-icon>
         </a>

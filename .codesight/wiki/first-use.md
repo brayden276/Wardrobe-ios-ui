@@ -4,7 +4,7 @@ New accounts complete Personal Style before entering the authenticated tab area.
 
 `GettingStartedPage` explains the existing Add → Builder → Outfits → wear activity workflow. Its links open the actual screens. Progress comes from existing user-scoped `getItems()` and `getOutfits()` results, not local completion flags: active clothes, saved looks, and a saved outfit with a wear count. Failed loads leave progress unknown but keep the guide usable. Navigation and account changes invalidate late results.
 
-The guide can always be reopened from **Getting Started & Help** in Settings and **Show Me How It Works** in the empty wardrobe. Expandable help covers editing and archiving garments, search and selection, AI processing, and changing style preferences.
+The guide can always be reopened from **Getting Started & Help** in Settings and **Show Me How It Works** in the empty wardrobe. Builder also has a Help action. Done returns to Builder or Settings when opened there, and to Wardrobe otherwise. Settings is available from Wardrobe and Analytics. Expandable help covers editing and archiving garments, search and selection, AI processing, and changing style preferences.
 
 This is an Ionic Angular UI workflow using existing authenticated API reads. It adds no API route, database schema, or onboarding tracking data.
 

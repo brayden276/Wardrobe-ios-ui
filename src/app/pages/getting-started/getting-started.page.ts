@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../auth.service';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import { readMessage } from '../page-helpers';
@@ -12,6 +13,12 @@ import { readMessage } from '../page-helpers';
 export class GettingStartedPage {
   private readonly api = inject(WardrobeApiService);
   private readonly auth = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
+
+  get returnUrl(): string {
+    const url = this.route.snapshot.queryParamMap.get('returnUrl');
+    return url === '/tabs/settings' || url === '/tabs/builder' ? url : '/tabs/wardrobe';
+  }
   isLoading = false;
   message = '';
   progress: { hasItems: boolean; hasOutfits: boolean; hasWornOutfit: boolean } | null = null;

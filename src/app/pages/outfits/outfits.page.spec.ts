@@ -268,6 +268,26 @@ describe('Saved outfit workflows', () => {
     expect(modal.querySelector('ion-input')?.label).toBe('Name');
     expect(modal.querySelector('ion-textarea')?.label).toBe('Notes');
     expect(modal.querySelector('button[type="submit"]')?.textContent).toContain('Save Changes');
+    const cancel = modal.querySelector<HTMLButtonElement>('.sheet-modal-footer .text-btn')!;
+    expect(getComputedStyle(cancel).minHeight).toBe('44px');
+    expect(getComputedStyle(cancel).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+    expect(await modal.getCurrentBreakpoint()).toBe(1);
+    const footer = modal.querySelector<HTMLElement>('.sheet-modal-footer')!;
+    expect(footer.getBoundingClientRect().bottom).toBeLessThanOrEqual(modal.getBoundingClientRect().bottom + 1);
+
+    fixture.componentInstance.cancelOutfitEdit();
+    fixture.detectChanges();
+    const favouriteButton = modal.querySelector<HTMLButtonElement>('.sheet-btn-secondary')!;
+    favouriteButton.click();
+    fixture.detectChanges();
+    expect(favouriteButton.disabled).toBeTrue();
+    expect(favouriteButton.getAttribute('aria-busy')).toBe('true');
+    expect(favouriteButton.textContent).toContain('Saving...');
+    http.expectOne(`${baseUrl}/api/wardrobe/favourites/outfit/${outfit.id}`).flush(null);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(favouriteButton.disabled).toBeFalse();
+    expect(favouriteButton.textContent).toContain('Favorited');
     await modal.dismiss();
     fixture.destroy();
   });
