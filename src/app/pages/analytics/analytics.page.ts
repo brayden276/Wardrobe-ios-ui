@@ -159,7 +159,7 @@ export class AnalyticsPage {
     });
   }
 
-  private formatCategoryLabel(catId: string | null | undefined): string {
+  formatCategoryLabel(catId: string | null | undefined): string {
     if (!catId) return 'Unknown';
     const clean = catId.toLowerCase().replace(/_/g, ' ');
     const labels: Record<string, string> = {

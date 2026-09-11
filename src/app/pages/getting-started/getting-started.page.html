@@ -1,0 +1,58 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Getting Started</ion-title>
+    <ion-buttons slot="end"><ion-button routerLink="/tabs/wardrobe">Done</ion-button></ion-buttons>
+  </ion-toolbar>
+</ion-header>
+<ion-content class="app-content">
+  <main class="getting-started">
+    <h1>Make outfits from clothes you own</h1>
+    <p class="intro">Start with a few everyday pieces. You can add the rest of your wardrobe whenever you like.</p>
+    <p *ngIf="isLoading" role="status">Checking your wardrobe...</p>
+    <div *ngIf="message" class="guide-feedback" role="status">
+      <p>{{ message }}</p>
+      <ion-button fill="outline" size="small" (click)="loadProgress()">Retry Progress</ion-button>
+    </div>
+
+    <ol class="guide-steps">
+      <li>
+        <h2>Add your clothes <span *ngIf="progress?.hasItems" class="step-status">Started</span></h2>
+        <p>Use <strong>Add</strong> to take a photo or select photos from your library. Good lighting and a plain background make garments easier to recognise.</p>
+        <p>Try a top, bottoms and shoes, or a dress and shoes. After adding each item, check its details and correct anything the AI missed.</p>
+        <ion-button routerLink="/tabs/add">{{ progress?.hasItems ? 'Add More Clothes' : 'Add Your First Clothes' }}</ion-button>
+      </li>
+      <li>
+        <h2>Build and save a look <span *ngIf="progress?.hasOutfits" class="step-status">Saved</span></h2>
+        <p>In <strong>Builder</strong>, choose an occasion in AI Stylist, or pick pieces yourself in Manual Canvas. Save a look to keep it in <strong>Outfits</strong>.</p>
+        <p *ngIf="progress && !progress.hasItems" class="next-step-note">Add a few clothes first so Builder has pieces to work with.</p>
+        <ion-button routerLink="/tabs/builder" fill="outline">Open Builder</ion-button>
+      </li>
+      <li>
+        <h2>Keep track of what you wear <span *ngIf="progress?.hasWornOutfit" class="step-status">Logged</span></h2>
+        <p>Open a saved look in <strong>Outfits</strong> to favourite it, edit its name and notes, or log that you wore it today. <strong>Analytics</strong> shows your wardrobe and wear activity.</p>
+        <ion-button routerLink="/tabs/outfits" fill="outline">Open Outfits</ion-button>
+      </li>
+    </ol>
+
+    <section class="guide-help" aria-labelledby="guide-help-title">
+      <h2 id="guide-help-title">A few useful things to know</h2>
+      <details>
+        <summary>How do I correct an item or hide it from suggestions?</summary>
+        <p>Tap a garment in Wardrobe, then Edit to correct its details. The item menu also lets you archive it. Archived items are kept in your wardrobe but hidden from outfit suggestions; unarchive them from the same menu.</p>
+      </details>
+      <details>
+        <summary>How do I find and manage my clothes?</summary>
+        <p>Use Wardrobe's search and filters to narrow the list. Choose Select to manage several items at once. Outfits has its own search and Favourites filter.</p>
+      </details>
+      <details>
+        <summary>When does the app use AI?</summary>
+        <p>Adding photos and generating outfit suggestions use AI and need a connection. You'll be asked for AI consent before uploading photos or using AI Stylist. Manual Canvas lets you choose the pieces yourself; saved outfit images may still use AI.</p>
+      </details>
+      <details>
+        <summary>Can I change my style preferences later?</summary>
+        <p>Open Settings from Analytics and edit Personal Style. You can also reopen this guide in Settings whenever you need it.</p>
+        <ion-button routerLink="/tabs/settings" fill="clear" size="small">Open Settings</ion-button>
+      </details>
+    </section>
+  </main>
+</ion-content>

@@ -87,6 +87,11 @@
       <ion-button class="secondary-button" fill="outline" size="small" (click)="load(true)">Try again</ion-button>
     </article>
 
+    <article class="state-panel" *ngIf="favoriteMessage" aria-live="polite">
+      <p class="muted">{{ favoriteMessage }}</p>
+      <ion-button fill="outline" size="small" (click)="syncFavorites()" [disabled]="isLoadingFavorites">Retry Sync</ion-button>
+    </article>
+
     <!-- Lookbook Cards Grid -->
     <div class="lookbook-grid" *ngIf="visibleOutfits.length">
       <article class="lookbook-card" *ngFor="let card of visibleOutfits; trackBy: trackByCardId" [class.selected]="card.isSelected" [class.in-selection-mode]="isSelectionMode" (click)="onCardClick(card.outfit, $event)">
@@ -109,7 +114,7 @@
           </div>
 
           <!-- Top-right Favorite Heart Toggle -->
-          <button type="button" class="favorite-button" *ngIf="!isSelectionMode" (click)="toggleFavorite(card.outfit, $event)" [attr.aria-label]="card.isFavorite ? 'Remove favorite' : 'Add favorite'">
+          <button type="button" class="favorite-button" *ngIf="!isSelectionMode" (click)="toggleFavorite(card.outfit, $event)" [disabled]="!canChangeFavorites || card.isFavoriting" [attr.aria-pressed]="card.isFavorite" [attr.aria-label]="card.isFavorite ? 'Remove favorite' : 'Add favorite'">
             <ion-icon [name]="card.isFavorite ? 'heart' : 'heart-outline'" [class.is-fav]="card.isFavorite"></ion-icon>
           </button>
 
@@ -191,20 +196,27 @@
   </div>
 
   <!-- Native iOS Modal Sheet for Outfit Detail Inspection -->
-  <ion-modal [isOpen]="!!selectedOutfit" [breakpoints]="[0, 0.65, 0.95]" [initialBreakpoint]="0.65" [handle]="true" (ionModalDidDismiss)="close()">
+  <ion-modal [isOpen]="!!selectedOutfit" [canDismiss]="!isSavingOutfit" [breakpoints]="[0, 0.65, 0.95]" [initialBreakpoint]="0.65" [handle]="true" (ionModalDidDismiss)="close()">
     <ng-template>
       <div class="sheet-modal-content" *ngIf="selectedOutfit">
         <header class="modal-nav-bar">
           <div class="sheet-title-group">
-            <h2 class="modal-title">{{ selectedOutfit.name }}</h2>
+            <h2 class="modal-title">{{ isEditingOutfit ? 'Edit Outfit' : selectedOutfit.name }}</h2>
             <p class="sheet-wear-badge" *ngIf="selectedOutfit.wearCount > 0">Worn {{ selectedOutfit.wearCount }} {{ selectedOutfit.wearCount === 1 ? 'time' : 'times' }}</p>
           </div>
-          <button type="button" class="sheet-close-btn text-btn" (click)="close()" aria-label="Close">
+          <button type="button" class="text-btn" *ngIf="!isEditingOutfit" (click)="editOutfit(selectedOutfit)">Edit</button>
+          <button type="button" class="sheet-close-btn text-btn" (click)="close()" [disabled]="isSavingOutfit" aria-label="Close">
             <ion-icon name="close-circle"></ion-icon>
           </button>
         </header>
 
         <div class="sheet-modal-scrollable">
+          <form *ngIf="isEditingOutfit" id="outfit-edit-form" class="outfit-edit-form" (ngSubmit)="saveOutfit()">
+            <ion-input label="Name" labelPlacement="stacked" name="outfitName" [(ngModel)]="outfitForm.name" [maxlength]="256" required [disabled]="isSavingOutfit"></ion-input>
+            <ion-textarea label="Notes" labelPlacement="stacked" name="outfitNotes" [(ngModel)]="outfitForm.explanation" [maxlength]="2000" [autoGrow]="true" [rows]="3" [disabled]="isSavingOutfit"></ion-textarea>
+            <p *ngIf="editMessage" class="outfit-edit-error" role="alert">{{ editMessage }}</p>
+          </form>
+          <ng-container *ngIf="!isEditingOutfit">
           <!-- Hero Outfit Image if exists -->
           <div class="sheet-hero-image" *ngIf="selectedOutfit.imageUrl">
             <img [appLazyImage]="selectedOutfit.imageUrl" [alt]="selectedOutfit.name">
@@ -233,17 +245,26 @@
               </div>
             </div>
           </div>
+          </ng-container>
         </div>
 
         <!-- Sticky Sheet Bottom Actions -->
-        <footer class="sheet-modal-footer">
+        <footer class="sheet-modal-footer" *ngIf="isEditingOutfit">
+          <button type="submit" form="outfit-edit-form" class="sheet-cta-wear" [disabled]="isSavingOutfit || !outfitForm.name.trim()">
+            <ion-spinner name="crescent" *ngIf="isSavingOutfit"></ion-spinner>
+            {{ isSavingOutfit ? 'Saving...' : 'Save Changes' }}
+          </button>
+          <button type="button" class="text-btn" (click)="cancelOutfitEdit()" [disabled]="isSavingOutfit">Cancel</button>
+        </footer>
+        <footer class="sheet-modal-footer" *ngIf="!isEditingOutfit">
+          <p *ngIf="favoriteMessage" class="outfit-edit-error" role="alert">{{ favoriteMessage }}</p>
           <button type="button" class="sheet-cta-wear" (click)="markWorn(selectedOutfit)" [disabled]="markingOutfitIds.has(selectedOutfit.id)">
             <ion-spinner name="crescent" *ngIf="markingOutfitIds.has(selectedOutfit.id)"></ion-spinner>
             <ion-icon name="checkmark-circle" *ngIf="!markingOutfitIds.has(selectedOutfit.id)"></ion-icon>
             <span>{{ markingOutfitIds.has(selectedOutfit.id) ? 'Logging Wear...' : 'Log Outfit as Worn Today' }}</span>
           </button>
           <div class="sheet-footer-secondary">
-            <button type="button" class="sheet-btn-secondary" (click)="toggleFavorite(selectedOutfit)">
+            <button type="button" class="sheet-btn-secondary" (click)="toggleFavorite(selectedOutfit)" [disabled]="!canChangeFavorites" [attr.aria-pressed]="isFavorite(selectedOutfit.id)">
               <ion-icon [name]="isFavorite(selectedOutfit.id) ? 'heart' : 'heart-outline'"></ion-icon>
               <span>{{ isFavorite(selectedOutfit.id) ? 'Favorited' : 'Favorite' }}</span>
             </button>

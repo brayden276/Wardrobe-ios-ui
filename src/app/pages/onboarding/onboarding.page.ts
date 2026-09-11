@@ -40,43 +40,43 @@ export class OnboardingPage {
     {
       key: 'gender',
       title: 'Wardrobe direction',
-      subtitle: 'Calibrates standard garment sizing and silhouette recommendations.',
+      subtitle: 'Which styling direction feels most relevant to you?',
       options: [
-        { value: 'female', label: 'Womenswear', description: 'Curated silhouettes, styling, and cuts tailored for women.' },
-        { value: 'male', label: 'Menswear', description: 'Structured shoulders, tailored proportions, and menswear staples.' }
+        { value: 'female', label: 'Womenswear', description: 'Womenswear styling and silhouettes.' },
+        { value: 'male', label: 'Menswear', description: 'Menswear styling and silhouettes.' }
       ]
     },
     {
       key: 'fitPreference',
       title: 'Fit preference',
-      subtitle: 'Defines how clothes drape over your silhouette.',
+      subtitle: 'How do you like your clothes to fit?',
       options: [
-        { value: 'tailored', label: 'Tailored', description: 'Streamlined lines, contouring seams, and sharp definition.' },
-        { value: 'balanced', label: 'Balanced', description: 'Standard proportional ease with comfortable, natural movement.' },
-        { value: 'relaxed', label: 'Relaxed', description: 'Generous volume, drop shoulders, and effortless casual drape.' }
+        { value: 'tailored', label: 'Tailored', description: 'Closer-fitting clothes with a defined shape.' },
+        { value: 'balanced', label: 'Balanced', description: 'A regular fit with room to move.' },
+        { value: 'relaxed', label: 'Relaxed', description: 'Loose, roomy and comfortable.' }
       ]
     },
     {
       key: 'stylePreference',
-      title: 'Style lean',
-      subtitle: 'Select the primary aesthetic formula for daily outfit suggestions.',
+      title: 'Your everyday style',
+      subtitle: 'Pick the style you reach for most often.',
       options: [
-        { value: 'minimal', label: 'Minimal', description: 'Neutral palettes, clean lines, and unadorned architectural cuts.' },
-        { value: 'classic', label: 'Classic', description: 'Timeless sartorial staples, heritage fabrics, and refined balance.' },
-        { value: 'polished', label: 'Polished', description: 'Sharp coordination, elevated footwear, and sharp sophistication.' },
-        { value: 'casual', label: 'Casual', description: 'Unstructured comfort, tactile textures, and relaxed versatility.' },
-        { value: 'creative', label: 'Creative', description: 'Expressive silhouette pairings, texture play, and bold contrasts.' }
+        { value: 'minimal', label: 'Minimal', description: 'Simple pieces, clean lines and neutral colours.' },
+        { value: 'classic', label: 'Classic', description: 'Familiar staples that stay in style.' },
+        { value: 'polished', label: 'Polished', description: 'Coordinated pieces with a dressed-up finish.' },
+        { value: 'casual', label: 'Casual', description: 'Easy combinations for everyday comfort.' },
+        { value: 'creative', label: 'Creative', description: 'Colour, pattern and unexpected combinations.' }
       ]
     },
     {
       key: 'dailyContext',
-      title: 'Usual context',
-      subtitle: 'Where you spend the majority of your dressed hours.',
+      title: 'What do you dress for most?',
+      subtitle: 'Choose a starting point. You can choose any occasion in Builder.',
       options: [
-        { value: 'work', label: 'Work & Professional', description: 'Smart offices, meetings, and corporate dressing.' },
-        { value: 'weekend', label: 'Weekend & Leisure', description: 'Off-duty outings, dining, travel, and social events.' },
-        { value: 'evening', label: 'Evening & Occasion', description: 'Dinner dates, gallery openings, and formal evening gatherings.' },
-        { value: 'active', label: 'Active & Transit', description: 'High-movement schedules, outdoor routines, and athleisure utility.' }
+        { value: 'work', label: 'Work', description: 'Office days, meetings and professional settings.' },
+        { value: 'weekend', label: 'Everyday & Weekends', description: 'Errands, outings and time with friends.' },
+        { value: 'evening', label: 'Evenings & Events', description: 'Dinners, celebrations and special occasions.' },
+        { value: 'active', label: 'Active Days', description: 'Exercise, outdoor activities and being on the move.' }
       ]
     }
   ];
@@ -85,12 +85,20 @@ export class OnboardingPage {
   values: Partial<Record<PersonalDetailsKey, string>> = {};
   message = '';
   isBusy = false;
+  isReviewing = false;
+  returnToReview = false;
   animationDirection: 'slide-forward' | 'slide-backward' = 'slide-forward';
   private returnUrl = '/tabs/wardrobe';
 
   ionViewWillEnter(): void {
     this.stepIndex = 0;
-    this.returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') || '/tabs/wardrobe';
+    this.isReviewing = false;
+    this.returnToReview = false;
+    this.message = '';
+    this.values = {};
+    this.returnUrl = this.auth.hasCompletedPersonalDetails
+      ? this.route.snapshot.queryParamMap.get('returnUrl') || '/tabs/wardrobe'
+      : '/tabs/getting-started';
     const personalDetails = this.auth.session?.user?.personalDetails;
     if (personalDetails) {
       this.values = {
@@ -111,7 +119,7 @@ export class OnboardingPage {
   }
 
   get canContinue(): boolean {
-    return !!this.values[this.currentStep.key] && !this.isBusy;
+    return !this.isBusy && (this.isReviewing ? !!this.buildRequest() : this.currentStep.options.some((option) => option.value === this.values[this.currentStep.key]));
   }
 
   get canLeave(): boolean {
@@ -119,7 +127,9 @@ export class OnboardingPage {
   }
 
   get submitLabel(): string {
-    return this.isBusy ? 'Saving...' : this.isFinalStep ? 'Save details' : 'Continue';
+    if (this.isBusy) return 'Saving...';
+    if (this.isReviewing) return this.canLeave ? 'Save Changes' : 'Save & Get Started';
+    return this.isFinalStep || this.returnToReview ? 'Review Preferences' : 'Continue';
   }
 
   get messageKind(): NoticeKind {
@@ -131,16 +141,36 @@ export class OnboardingPage {
   }
 
   choose(key: PersonalDetailsKey, value: string): void {
+    if (this.isBusy || !this.steps.find((step) => step.key === key)?.options.some((option) => option.value === value)) return;
     this.values = { ...this.values, [key]: value };
     this.message = '';
     void lightImpact();
   }
 
-  selectAndAdvance(key: PersonalDetailsKey, value: string): void {
-    this.choose(key, value);
+  answerLabel(key: PersonalDetailsKey): string {
+    return this.steps.find((step) => step.key === key)?.options.find((option) => option.value === this.values[key])?.label ?? 'Not chosen';
+  }
+
+  editAnswer(index: number): void {
+    if (this.isBusy || !this.steps[index]) return;
+    this.stepIndex = index;
+    this.isReviewing = false;
+    this.returnToReview = true;
+    this.message = '';
   }
 
   handleBack(): void {
+    if (this.isBusy) return;
+    if (this.returnToReview) {
+      this.returnToReview = false;
+      this.isReviewing = true;
+      return;
+    }
+    if (this.isReviewing) {
+      this.isReviewing = false;
+      this.stepIndex = this.steps.length - 1;
+      return;
+    }
     if (this.stepIndex > 0) {
       this.animationDirection = 'slide-backward';
       this.previous();
@@ -161,12 +191,18 @@ export class OnboardingPage {
   }
 
   async advance(): Promise<void> {
+    if (this.isBusy) return;
     if (!this.canContinue) {
       this.message = 'Choose one option to continue.';
       return;
     }
 
-    if (!this.isFinalStep) {
+    if (this.isReviewing) {
+      await this.save();
+      return;
+    }
+
+    if (!this.isFinalStep && !this.returnToReview) {
       this.animationDirection = 'slide-forward';
       this.stepIndex += 1;
       this.message = '';
@@ -174,7 +210,9 @@ export class OnboardingPage {
       return;
     }
 
-    await this.save();
+    this.isReviewing = true;
+    this.returnToReview = false;
+    this.message = '';
   }
 
   async close(): Promise<void> {
@@ -211,7 +249,7 @@ export class OnboardingPage {
     const fitPreference = this.values.fitPreference;
     const stylePreference = this.values.stylePreference;
     const dailyContext = this.values.dailyContext;
-    if (!gender || !fitPreference || !stylePreference || !dailyContext) {
+    if (!this.steps.every((step) => step.options.some((option) => option.value === this.values[step.key]))) {
       return null;
     }
 

@@ -3,6 +3,7 @@ export interface AuthUserDto {
   email: string;
   displayName: string;
   provider?: string;
+  hasPassword?: boolean;
   personalDetails?: UserPersonalDetailsDto | null;
 }
 

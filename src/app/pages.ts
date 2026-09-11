@@ -1,5 +1,6 @@
 export { LoginPage } from './pages/login/login.page';
 export { OnboardingPage } from './pages/onboarding/onboarding.page';
+export { GettingStartedPage } from './pages/getting-started/getting-started.page';
 export { TabsPage } from './pages/tabs/tabs.page';
 export { WardrobePage } from './pages/wardrobe/wardrobe.page';
 export { AddItemPage } from './pages/add-item/add-item.page';

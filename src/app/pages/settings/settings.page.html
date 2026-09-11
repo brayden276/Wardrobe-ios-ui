@@ -25,6 +25,32 @@
     </div>
 
     <!-- SECTION 2: Personal Style Details -->
+    <div class="ios-section" *ngIf="canChangePassword">
+      <div class="ios-grouped-card" *ngIf="!isChangingPassword">
+        <button type="button" class="ios-action-row" (click)="startChangingPassword()" [disabled]="isBusy">
+          <span class="action-label">Change Password</span>
+          <ion-icon name="lock-closed-outline" class="action-icon"></ion-icon>
+        </button>
+      </div>
+      <form class="ios-grouped-card style-editor-card" *ngIf="isChangingPassword" (ngSubmit)="savePassword()">
+        <div class="ios-form-row">
+          <ion-input label="Current password" labelPlacement="stacked" type="password" autocomplete="current-password" name="currentPassword" [(ngModel)]="passwordForm.currentPassword" required [disabled]="isBusy"></ion-input>
+        </div>
+        <div class="ios-form-row">
+          <ion-input label="New password" labelPlacement="stacked" type="password" autocomplete="new-password" name="newPassword" [(ngModel)]="passwordForm.newPassword" [minlength]="8" [maxlength]="128" required [disabled]="isBusy"></ion-input>
+        </div>
+        <div class="ios-form-row">
+          <ion-input label="Confirm new password" labelPlacement="stacked" type="password" autocomplete="new-password" name="confirmPassword" [(ngModel)]="passwordForm.confirmPassword" [maxlength]="128" required [disabled]="isBusy"></ion-input>
+        </div>
+        <p class="password-message" *ngIf="passwordMessage" role="alert">{{ passwordMessage }}</p>
+        <div class="editor-actions-row">
+          <ion-button class="secondary-button compact-button flex-1" fill="outline" type="button" (click)="cancelChangingPassword()" [disabled]="isBusy">Cancel</ion-button>
+          <ion-button class="primary-button compact-button flex-1" type="submit" [disabled]="isBusy">{{ busyAction === 'password' ? 'Changing...' : 'Change Password' }}</ion-button>
+        </div>
+      </form>
+      <p class="ios-section-footer" *ngIf="isChangingPassword">Use 8–128 characters. Changing your password signs you out on all devices.</p>
+    </div>
+
     <div class="ios-section">
       <div class="ios-section-header">
         <span>PERSONAL STYLE</span>
@@ -165,6 +191,16 @@
     </div>
 
     <!-- SECTION 5: Legal & Support -->
+    <div class="ios-section">
+      <div class="ios-section-header">LEARN THE APP</div>
+      <div class="ios-grouped-card">
+        <a class="ios-link-row" routerLink="/tabs/getting-started">
+          <span class="link-label">Getting Started &amp; Help</span>
+          <ion-icon name="help-circle-outline" class="link-icon"></ion-icon>
+        </a>
+      </div>
+    </div>
+
     <div class="ios-section">
       <div class="ios-section-header">LEGAL & SUPPORT</div>
       <div class="ios-grouped-card">

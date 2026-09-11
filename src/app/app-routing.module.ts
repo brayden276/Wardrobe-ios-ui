@@ -9,6 +9,7 @@ import {
   ItemDetailPage,
   LoginPage,
   OnboardingPage,
+  GettingStartedPage,
   OutfitsPage,
   SettingsPage,
   TabsPage,
@@ -67,6 +68,7 @@ const routes: Routes = [
       { path: 'builder', children: [{ path: '', component: BuilderPage }] },
       { path: 'analytics', children: [{ path: '', component: AnalyticsPage }] },
       { path: 'settings', children: [{ path: '', component: SettingsPage }] },
+      { path: 'getting-started', component: GettingStartedPage },
       { path: '', redirectTo: 'wardrobe', pathMatch: 'full' }
     ]
   },

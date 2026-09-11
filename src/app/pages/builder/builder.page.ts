@@ -67,6 +67,7 @@ export class BuilderPage {
   manualItemIds: string[] = [];
   manualCanSave = false;
   manualHint = '';
+  wardrobeHint = '';
   items: WardrobeItemDto[] = [];
   results: GeneratedOutfitDto[] = [];
   lookups: WardrobeLookupsDto | null = null;
@@ -256,7 +257,7 @@ export class BuilderPage {
   }
 
   async search(): Promise<void> {
-    if (this.isBuildingOutfits) {
+    if (this.isBuildingOutfits || !this.canGenerate) {
       return;
     }
 
@@ -621,6 +622,18 @@ export class BuilderPage {
   private rebuildItemIndexes(): void {
     this.itemById = new Map(this.items.map((item) => [item.id, item]));
     this.itemNameById = new Map(this.items.map((item) => [item.id, item.name]));
+    const categories = new Set(this.items.map((item) => item.categoryId === 'shoes' ? 'footwear' : this.manualCategory(item)));
+    const hasBase = categories.has('dresses') || categories.has('one_pieces')
+      || (categories.has('tops') && categories.has('bottoms'));
+    if (!this.items.length || (hasBase && categories.has('footwear'))) {
+      this.wardrobeHint = '';
+    } else {
+      const missing = [
+        ...(!hasBase ? [categories.has('tops') ? 'bottoms or a dress' : categories.has('bottoms') ? 'a top or a dress' : 'a top and bottoms, or a dress'] : []),
+        ...(!categories.has('footwear') ? ['shoes'] : [])
+      ];
+      this.wardrobeHint = `For a complete look, add ${missing.join(' and ')}. You can still use the pieces you have or save a partial look in Manual Canvas.`;
+    }
   }
 
   private pruneBuilderSelections(): void {

@@ -5,12 +5,12 @@
       <button
         type="button"
         class="ios-nav-back"
-        *ngIf="stepIndex > 0 || canLeave; else navSpacer"
+        *ngIf="stepIndex > 0 || canLeave || isReviewing || returnToReview; else navSpacer"
         (click)="handleBack()"
-        [attr.aria-label]="stepIndex === 0 ? 'Cancel onboarding' : 'Previous step'"
+        [attr.aria-label]="returnToReview ? 'Back to review' : stepIndex === 0 && !isReviewing ? 'Cancel onboarding' : 'Previous step'"
         [disabled]="isBusy">
-        <ion-icon [name]="stepIndex > 0 ? 'chevron-back' : 'close'"></ion-icon>
-        <span>{{ stepIndex === 0 ? 'Cancel' : 'Back' }}</span>
+        <ion-icon [name]="stepIndex > 0 || isReviewing || returnToReview ? 'chevron-back' : 'close'"></ion-icon>
+        <span>{{ stepIndex === 0 && !isReviewing && !returnToReview ? 'Cancel' : 'Back' }}</span>
       </button>
       <ng-template #navSpacer>
         <span class="ios-nav-spacer"></span>
@@ -19,7 +19,7 @@
       <div class="ios-nav-title">Personal Style</div>
 
       <div class="ios-nav-step-badge">
-        {{ stepIndex + 1 }} of {{ steps.length }}
+        {{ isReviewing ? 'Review' : (stepIndex + 1) + ' of ' + steps.length }}
       </div>
     </header>
 
@@ -28,29 +28,27 @@
       <div
         *ngFor="let step of steps; let i = index"
         class="step-indicator-pill"
-        [class.completed]="i < stepIndex"
-        [class.active]="i === stepIndex">
+        [class.completed]="i < stepIndex || isReviewing"
+        [class.active]="i === stepIndex && !isReviewing">
       </div>
     </div>
 
     <!-- Main Content Area with Slide Animation -->
     <main class="onboarding-main-stage" [ngClass]="animationDirection">
       <div class="step-header">
-        <span class="step-eyebrow">Step {{ stepIndex + 1 }}</span>
-        <h1 class="step-title">{{ currentStep.title }}</h1>
-        <p class="step-description">{{ currentStep.subtitle }}</p>
+        <h1 class="step-title" aria-live="polite">{{ isReviewing ? 'Review your preferences' : currentStep.title }}</h1>
+        <p class="step-description">{{ isReviewing ? 'Check your choices before saving. You can change them later in Settings.' : currentStep.subtitle }}</p>
+        <p class="setup-context" *ngIf="stepIndex === 0 && !isReviewing && !returnToReview">A few preferences help us suggest outfits from clothes you own. Next, we'll show you how to add clothes and build your first look.</p>
       </div>
 
       <!-- Inset Grouped Selection Rows -->
-      <div class="ios-selection-group" role="radiogroup" [attr.aria-label]="currentStep.title">
-        <button
-          type="button"
+      <div *ngIf="!isReviewing" class="ios-selection-group" role="radiogroup" [attr.aria-label]="currentStep.title">
+        <label
           *ngFor="let option of currentStep.options"
           class="ios-selection-row"
           [class.selected]="selectedValue(currentStep.key) === option.value"
-          [attr.aria-checked]="selectedValue(currentStep.key) === option.value"
-          role="radio"
-          (click)="selectAndAdvance(currentStep.key, option.value)">
+          [class.disabled]="isBusy">
+          <input class="selection-input" type="radio" [name]="currentStep.key" [value]="option.value" [checked]="selectedValue(currentStep.key) === option.value" [disabled]="isBusy" (change)="choose(currentStep.key, option.value)">
           
           <div class="selection-content">
             <span class="selection-label">{{ option.label }}</span>
@@ -63,8 +61,16 @@
               [class.checked]="selectedValue(currentStep.key) === option.value">
             </ion-icon>
           </div>
-        </button>
+        </label>
       </div>
+
+      <dl class="preference-review" *ngIf="isReviewing">
+        <div *ngFor="let step of steps; let i = index" class="review-row">
+          <dt>{{ step.title }}</dt>
+          <dd>{{ answerLabel(step.key) }}</dd>
+          <button type="button" (click)="editAnswer(i)" [disabled]="isBusy" [attr.aria-label]="'Edit ' + step.title">Edit</button>
+        </div>
+      </dl>
 
       <!-- Error / System Status -->
       <div class="onboarding-feedback" *ngIf="message" aria-live="polite">
@@ -81,9 +87,9 @@
         class="ios-primary-button"
         expand="block"
         (click)="advance()"
-        [disabled]="!canContinue || isBusy">
-        <ion-spinner *ngIf="isBusy" name="crescent" color="light" class="button-spinner"></ion-spinner>
-        <span *ngIf="!isBusy">{{ submitLabel }}</span>
+        [disabled]="!canContinue || isBusy" [attr.aria-busy]="isBusy">
+        <ion-spinner *ngIf="isBusy" name="crescent" color="light" class="button-spinner" aria-hidden="true"></ion-spinner>
+        <span>{{ submitLabel }}</span>
       </ion-button>
     </footer>
   </div>

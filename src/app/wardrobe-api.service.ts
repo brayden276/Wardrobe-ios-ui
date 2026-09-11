@@ -714,7 +714,7 @@ private authOptions(): { headers: HttpHeaders } {
 
 async updateOutfit(id: string, request: { name?: string; prompt?: string | null; explanation?: string | null; itemIds?: string[] }): Promise<OutfitDto> {
   this.requireOnline();
-  const response = await this.authorized(() => firstValueFrom(this.http.put<{ outfit: OutfitDto }>(this.url(`/api/outfits/${id}`), request, this.authOptions())));
+  const response = await this.authorized(() => firstValueFrom(this.http.put<{ outfit: OutfitDto }>(this.url(`/api/outfits/${id}`), request, this.authOptions()).pipe(timeout(10000))));
   this.clearOutfitCaches();
   return this.normaliseOutfit(response.outfit);
 }
@@ -722,14 +722,14 @@ async updateOutfit(id: string, request: { name?: string; prompt?: string | null;
 async getFavourites(): Promise<FavouriteDto[]> {
   const userId = this.auth.session?.user.id;
   if (!this.isOnline && userId) return (await this.offlineData.read<FavouriteDto[]>(userId, 'favourites')) ?? [];
-  const response = await this.authorized(() => firstValueFrom(this.http.get<{ favourites: FavouriteDto[] }>(this.url('/api/wardrobe/favourites'), this.authOptions())));
+  const response = await this.authorized(() => firstValueFrom(this.http.get<{ favourites: FavouriteDto[] }>(this.url('/api/wardrobe/favourites'), this.authOptions()).pipe(timeout(10000))));
   if (userId && this.auth.session?.user.id === userId) await this.offlineData.write(userId, 'favourites', response.favourites);
   return response.favourites;
 }
 
 async setFavourite(targetType: 'item' | 'outfit', targetId: string, isFavourite: boolean): Promise<void> {
   this.requireOnline();
-  await this.authorized(() => firstValueFrom(this.http.put(this.url(`/api/wardrobe/favourites/${targetType}/${targetId}`), { isFavourite }, this.authOptions())));
+  await this.authorized(() => firstValueFrom(this.http.put(this.url(`/api/wardrobe/favourites/${targetType}/${targetId}`), { isFavourite }, this.authOptions()).pipe(timeout(10000))));
 }
 
 async getWearEvents(params: { itemId?: string; outfitId?: string } = {}): Promise<WearEventDto[]> {

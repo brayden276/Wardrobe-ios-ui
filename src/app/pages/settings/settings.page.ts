@@ -65,13 +65,72 @@ export class SettingsPage {
   aiUsage: AiUsageCostSummaryDto | null = null;
   aiUsageLoadMessage = '';
   isLoadingAiUsage = false;
-  busyAction: 'details' | 'signout' | 'delete' | 'cache' | 'consent' | null = null;
+  busyAction: 'details' | 'password' | 'signout' | 'delete' | 'cache' | 'consent' | null = null;
   get isBusy(): boolean {
     return this.busyAction !== null;
   }
   busyMessage = '';
   message = '';
   isEditingPersonalDetails = false;
+  isChangingPassword = false;
+  passwordForm = { currentPassword: '', newPassword: '', confirmPassword: '' };
+  passwordMessage = '';
+
+  get canChangePassword(): boolean {
+    const user = this.auth.session?.user;
+    return user?.hasPassword ?? user?.provider === 'password';
+  }
+
+  startChangingPassword(): void {
+    if (this.isBusy || !this.canChangePassword) return;
+    this.passwordForm = { currentPassword: '', newPassword: '', confirmPassword: '' };
+    this.passwordMessage = '';
+    this.isChangingPassword = true;
+  }
+
+  cancelChangingPassword(): void {
+    if (this.isBusy) return;
+    this.clearPasswordForm();
+  }
+
+  ionViewDidLeave(): void {
+    this.clearPasswordForm();
+  }
+
+  private clearPasswordForm(): void {
+    this.passwordForm = { currentPassword: '', newPassword: '', confirmPassword: '' };
+    this.passwordMessage = '';
+    this.isChangingPassword = false;
+  }
+
+  async savePassword(): Promise<void> {
+    if (this.isBusy || !this.canChangePassword) return;
+    const { currentPassword, newPassword, confirmPassword } = this.passwordForm;
+    if (!currentPassword || newPassword.length < 8 || newPassword.length > 128) {
+      this.passwordMessage = 'Enter your current password and a new password of 8–128 characters.';
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      this.passwordMessage = 'New passwords do not match.';
+      return;
+    }
+
+    this.busyAction = 'password';
+    this.busyMessage = 'Changing password...';
+    this.passwordMessage = '';
+    try {
+      await this.auth.changePassword(currentPassword, newPassword);
+      this.clearPasswordForm();
+      await this.router.navigateByUrl('/login');
+    } catch (error) {
+      this.passwordMessage = (error as { status?: number })?.status === 401
+        ? 'Your current password could not be verified. Check it and try again.'
+        : readMessage(error, 'Could not change your password. Please try again.');
+    } finally {
+      this.busyAction = null;
+      this.busyMessage = '';
+    }
+  }
   personalDetailsForm: UpdatePersonalDetailsRequest = {
     gender: 'female',
     fitPreference: 'balanced',

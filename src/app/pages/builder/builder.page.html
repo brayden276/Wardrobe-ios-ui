@@ -1,6 +1,9 @@
 <ion-header translucent="true" class="ion-no-border ios-builder-header">
   <ion-toolbar>
     <ion-title>Outfit Studio</ion-title>
+    <ion-buttons slot="end">
+      <ion-button routerLink="/tabs/getting-started" aria-label="Learn how to build outfits"><ion-icon slot="icon-only" name="help-circle-outline"></ion-icon></ion-button>
+    </ion-buttons>
   </ion-toolbar>
 
   <!-- iOS Mode Switcher -->
@@ -18,10 +21,29 @@
 
 <ion-content class="app-content" [fullscreen]="true">
   <div class="screen builder-screen">
+    <div class="builder-loading-state" *ngIf="isLoadingWardrobe && !items.length" role="status">
+      <ion-spinner name="crescent"></ion-spinner>
+      <span>Loading wardrobe items...</span>
+    </div>
+    <article class="ios-empty-state" *ngIf="!isLoadingWardrobe && !items.length && !message">
+      <div class="empty-icon-wrap"><ion-icon name="shirt-outline"></ion-icon></div>
+      <h2>Add clothes to build your first look</h2>
+      <p class="muted">Start with a top, bottoms and shoes, or a dress and shoes. Then ask AI Stylist for ideas or pick the pieces yourself in Manual Canvas.</p>
+      <ion-button class="primary-button" routerLink="/tabs/add">Add Clothes</ion-button>
+      <ion-button fill="clear" routerLink="/tabs/getting-started">Show Me How</ion-button>
+    </article>
+    <div class="builder-learning" *ngIf="items.length && !resultCards.length && !isBuildingOutfits">
+      <p *ngIf="builderMode === 'generate'">Choose an occasion, add optional notes, then generate ideas from your wardrobe. Save the looks you like to Outfits.</p>
+      <p *ngIf="builderMode === 'manual'">Tap pieces to put a look together, give it a name and save it to Outfits. A partial look is fine too.</p>
+      <div *ngIf="wardrobeHint && builderMode === 'generate'" class="wardrobe-hint">
+        <p>{{ wardrobeHint }}</p>
+        <ion-button fill="clear" size="small" routerLink="/tabs/add">Add Missing Pieces</ion-button>
+      </div>
+    </div>
     <!-- MODE 1: AI GENERATE -->
     <ng-container *ngIf="builderMode === 'generate'">
       <!-- Prompt & Controls Card (Hidden or collapsible when results exist) -->
-      <section class="ai-prompt-surface" *ngIf="!resultCards.length || isBuildingOutfits">
+      <section class="ai-prompt-surface" *ngIf="items.length && (!resultCards.length || isBuildingOutfits)">
         <!-- Occasion Chips -->
         <div class="intent-block">
           <span class="intent-label">OCCASION</span>
@@ -103,9 +125,9 @@
             placeholder="Add specific notes, e.g. 'Chilly evening, pair with Chelsea boots'"></ion-textarea>
           
           <div class="prompt-quick-tags" *ngIf="!query">
-            <span role="button" tabindex="0" (click)="applyPromptInspiration('Warm layers, tailored outerwear')">Layered</span>
-            <span role="button" tabindex="0" (click)="applyPromptInspiration('Monochrome minimalist tones')">Monochrome</span>
-            <span role="button" tabindex="0" (click)="applyPromptInspiration('Rainy day, water-resistant footwear')">Rainy day</span>
+            <button type="button" (click)="applyPromptInspiration('Warm layers, tailored outerwear')">Layered</button>
+            <button type="button" (click)="applyPromptInspiration('Monochrome minimalist tones')">Monochrome</button>
+            <button type="button" (click)="applyPromptInspiration('Rainy day, water-resistant footwear')">Rainy day</button>
           </div>
         </div>
 
@@ -219,25 +241,6 @@
 
     <!-- MODE 2: MANUAL CANVAS -->
     <ng-container *ngIf="builderMode === 'manual'">
-      <!-- Zero Inventory Empty State -->
-      <article class="ios-empty-state" *ngIf="!isLoadingWardrobe && !items.length">
-        <div class="empty-icon-wrap">
-          <ion-icon name="shirt-outline"></ion-icon>
-        </div>
-        <h2>Your wardrobe is empty</h2>
-        <p class="muted">Add garments to your wardrobe to start building custom outfits manually.</p>
-        <ion-button class="primary-button" routerLink="/tabs/add">
-          <ion-icon name="add-circle-outline" slot="start"></ion-icon>
-          Add Garments
-        </ion-button>
-      </article>
-
-      <!-- Loading State when wardrobe items are being fetched -->
-      <div class="builder-loading-state" *ngIf="isLoadingWardrobe && !items.length">
-        <ion-spinner name="crescent"></ion-spinner>
-        <span>Loading wardrobe items...</span>
-      </div>
-
       <!-- Manual Builder Card -->
       <article class="ios-grouped-card manual-builder-card" *ngIf="items.length">
         <div class="manual-top-header">

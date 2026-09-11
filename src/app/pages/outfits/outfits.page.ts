@@ -13,6 +13,7 @@ export interface OutfitCard {
   isMarking: boolean;
   isRemoving: boolean;
   isFavorite: boolean;
+  isFavoriting: boolean;
   actionMessage: string;
 }
 
@@ -35,12 +36,19 @@ export class OutfitsPage {
   outfits: OutfitDto[] = [];
   lookups: WardrobeLookupsDto | null = null;
   selectedOutfit: OutfitDto | null = null;
+  isEditingOutfit = false;
+  isSavingOutfit = false;
+  outfitForm = { name: '', explanation: '' };
+  editMessage = '';
   isLoading = true;
   message = '';
   isSelectionMode = false;
   isDeletingSelected = false;
   selectedOutfitIds = new Set<string>();
   favoriteOutfitIds = new Set<string>();
+  favoriteMessage = '';
+  isLoadingFavorites = false;
+  private readonly updatingFavoriteIds = new Set<string>();
 
   readonly markingOutfitIds = new Set<string>();
   private readonly deletingOutfitIds = new Set<string>();
@@ -186,6 +194,7 @@ export class OutfitsPage {
       ]);
       this.lookups = lookups;
       this.outfits = outfits;
+      await this.syncFavorites();
       this.pruneSelectedOutfits();
       this.pruneFavoriteIds();
       if (this.selectedOutfit) {
@@ -230,17 +239,70 @@ export class OutfitsPage {
     return userId ? `${this.FAVORITES_STORAGE_PREFIX}_${userId}` : this.FAVORITES_STORAGE_PREFIX;
   }
 
-  toggleFavorite(outfit: OutfitDto, event?: Event): void {
+  get canChangeFavorites(): boolean {
+    return this.api.isOnline && !this.isLoadingFavorites;
+  }
+
+  async syncFavorites(): Promise<void> {
+    const userId = this.auth.session?.user.id;
+    if (!userId || this.isLoadingFavorites || this.updatingFavoriteIds.size) return;
+    if (!this.api.isOnline) {
+      this.favoriteMessage = 'Favourites are available on this device. Connect to sync or change them.';
+      return;
+    }
+    this.isLoadingFavorites = true;
+    this.favoriteMessage = '';
+    const storageKey = this.FAFavoritesKey();
+    try {
+      const favourites = await this.api.getFavourites();
+      if (this.auth.session?.user.id !== userId) return;
+      const ids = new Set(favourites.filter((favourite) => favourite.targetType === 'outfit').map((favourite) => favourite.targetId));
+      if (localStorage.getItem(`${storageKey}_synced`) !== 'true') {
+        const outfitIds = new Set(this.outfits.map((outfit) => outfit.id));
+        const legacyIds = [...this.favoriteOutfitIds].filter((id) => outfitIds.has(id) && !ids.has(id));
+        for (const id of legacyIds) {
+          if (this.auth.session?.user.id !== userId) return;
+          await this.api.setFavourite('outfit', id, true);
+          ids.add(id);
+        }
+        if (this.auth.session?.user.id !== userId) return;
+        localStorage.setItem(`${storageKey}_synced`, 'true');
+      }
+      if (this.auth.session?.user.id !== userId) return;
+      this.favoriteOutfitIds = ids;
+      this.saveFavorites();
+      this.updateVisibleOutfits();
+    } catch (error) {
+      if (this.auth.session?.user.id === userId) {
+        this.favoriteMessage = readMessage(error, 'Could not sync favourites. Your saved favourites are still on this device.');
+      }
+    } finally {
+      this.isLoadingFavorites = false;
+    }
+  }
+
+  async toggleFavorite(outfit: OutfitDto, event?: Event): Promise<void> {
     event?.preventDefault();
     event?.stopPropagation();
-    if (this.favoriteOutfitIds.has(outfit.id)) {
-      this.favoriteOutfitIds.delete(outfit.id);
-    } else {
-      this.favoriteOutfitIds.add(outfit.id);
-    }
-    this.saveFavorites();
+    if (!this.canChangeFavorites || this.updatingFavoriteIds.has(outfit.id)) return;
+    const userId = this.auth.session?.user.id;
+    const isFavourite = !this.favoriteOutfitIds.has(outfit.id);
+    this.updatingFavoriteIds.add(outfit.id);
+    this.favoriteMessage = '';
     this.updateVisibleOutfits();
-    void lightImpact();
+    try {
+      await this.api.setFavourite('outfit', outfit.id, isFavourite);
+      if (this.auth.session?.user.id !== userId) return;
+      if (isFavourite) this.favoriteOutfitIds.add(outfit.id);
+      else this.favoriteOutfitIds.delete(outfit.id);
+      this.saveFavorites();
+      void lightImpact();
+    } catch (error) {
+      if (this.auth.session?.user.id === userId) this.favoriteMessage = readMessage(error, 'Could not update favourite.');
+    } finally {
+      this.updatingFavoriteIds.delete(outfit.id);
+      this.updateVisibleOutfits();
+    }
   }
 
   isFavorite(outfitId: string): boolean {
@@ -278,7 +340,47 @@ export class OutfitsPage {
     }
 
     this.selectedOutfit = outfit;
+    this.cancelOutfitEdit();
     void lightImpact();
+  }
+
+  editOutfit(outfit: OutfitDto): void {
+    if (this.isSavingOutfit) return;
+    this.selectedOutfit = outfit;
+    this.outfitForm = { name: outfit.name, explanation: outfit.explanation ?? '' };
+    this.editMessage = '';
+    this.isEditingOutfit = true;
+  }
+
+  cancelOutfitEdit(): void {
+    if (this.isSavingOutfit) return;
+    this.isEditingOutfit = false;
+    this.editMessage = '';
+  }
+
+  async saveOutfit(): Promise<void> {
+    if (!this.selectedOutfit || this.isSavingOutfit) return;
+    const name = this.outfitForm.name.trim();
+    const explanation = this.outfitForm.explanation.trim();
+    if (!name || name.length > 256 || explanation.length > 2000) {
+      this.editMessage = 'Enter a name of 1–256 characters and notes of up to 2000 characters.';
+      return;
+    }
+
+    this.isSavingOutfit = true;
+    this.editMessage = '';
+    try {
+      const updated = await this.api.updateOutfit(this.selectedOutfit.id, { name, explanation });
+      this.outfits = this.outfits.map((outfit) => outfit.id === updated.id ? updated : outfit);
+      this.selectedOutfit = updated;
+      this.isEditingOutfit = false;
+      this.updateVisibleOutfits();
+      void successFeedback();
+    } catch (error) {
+      this.editMessage = readMessage(error, 'Could not save outfit. Your changes are still here.');
+    } finally {
+      this.isSavingOutfit = false;
+    }
   }
 
   onCardClick(outfit: OutfitDto, event?: Event): void {
@@ -290,7 +392,9 @@ export class OutfitsPage {
   }
 
   close(): void {
+    if (this.isSavingOutfit) return;
     this.selectedOutfit = null;
+    this.cancelOutfitEdit();
     this.message = '';
     void lightImpact();
   }
@@ -331,6 +435,11 @@ export class OutfitsPage {
       header: outfit.name,
       buttons: [
         {
+          text: 'Edit Outfit',
+          icon: 'create-outline',
+          handler: () => { this.editOutfit(outfit); }
+        },
+        {
           text: 'Wear This Outfit Today',
           icon: 'checkmark-circle-outline',
           handler: () => {
@@ -341,7 +450,7 @@ export class OutfitsPage {
           text: isFav ? 'Remove from Favorites' : 'Add to Favorites',
           icon: isFav ? 'heart-dislike-outline' : 'heart-outline',
           handler: () => {
-            this.toggleFavorite(outfit);
+            void this.toggleFavorite(outfit);
           }
         },
         {
@@ -602,6 +711,7 @@ export class OutfitsPage {
         isMarking,
         isRemoving,
         isFavorite: this.favoriteOutfitIds.has(outfit.id),
+        isFavoriting: this.updatingFavoriteIds.has(outfit.id),
         actionMessage: isMarking
           ? `Marking "${outfit.name}" as worn...`
           : isRemoving

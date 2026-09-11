@@ -17,6 +17,13 @@
 }
 
 /* Apple Intelligence Prompt Surface */
+.builder-learning {
+  margin-bottom: 20px;
+  color: var(--app-muted);
+  p { margin: 0 0 8px; line-height: 1.5; }
+  .wardrobe-hint { border-left: 2px solid var(--app-border); padding-left: 12px; margin-top: 12px; }
+}
+
 .ai-prompt-surface {
   display: flex;
   flex-direction: column;

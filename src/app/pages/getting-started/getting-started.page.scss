@@ -1,0 +1,35 @@
+.getting-started {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 20px calc(24px + var(--ion-safe-area-bottom, 0px));
+  color: var(--app-ink);
+
+  h1 { margin: 0 0 12px; font-size: 26px; line-height: 1.2; }
+  h2 { margin: 0 0 8px; font-size: 19px; line-height: 1.35; }
+  p { margin: 0 0 12px; line-height: 1.5; }
+  .intro { color: var(--app-muted); }
+}
+
+.guide-steps {
+  padding-left: 24px;
+  margin: 24px 0;
+  li { padding: 0 0 24px 4px; }
+  li:last-child { padding-bottom: 0; }
+}
+
+.step-status {
+  display: inline-block;
+  margin-left: 8px;
+  color: var(--app-olive);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.next-step-note, .guide-feedback { color: var(--app-muted); }
+
+.guide-help {
+  border-top: 1px solid var(--app-border);
+  padding-top: 24px;
+  details { border-bottom: 1px solid var(--app-border); }
+  summary { padding: 16px 0; cursor: pointer; font-weight: 500; line-height: 1.4; }
+}

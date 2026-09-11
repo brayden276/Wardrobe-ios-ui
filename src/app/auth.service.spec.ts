@@ -1,8 +1,10 @@
-import { TestBed } from '@angular/core/testing';
+import { fakeAsync, flushMicrotasks, TestBed, tick as advanceTime } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Preferences } from '@capacitor/preferences';
 import { AuthService } from './auth.service';
+import { DeviceImageCacheService } from './device-image-cache.service';
+import { OfflineDataService } from './offline-data.service';
 import { apiBaseUrl } from './api-url';
 import { AuthResponse, AuthUserDto, UpdatePersonalDetailsRequest } from './models';
 
@@ -450,7 +452,139 @@ describe('AuthService', () => {
     });
   });
 
+  describe('Sign-out failures', () => {
+    for (const failedCache of ['offline', 'images']) {
+      it(`should clear credentials and attempt both caches when ${failedCache} cleanup fails`, async () => {
+        const loginPromise = service.login('test@example.com', 'Pass123');
+        httpTesting.expectOne(`${baseUrl}/api/auth/login`).flush(mockAuthResponse);
+        await loginPromise;
+
+        const failure = new Error('Cache cleanup failed');
+        const offlineCleanup = spyOn(TestBed.inject(OfflineDataService), 'clearUser').and.resolveTo();
+        const imageCleanup = spyOn(TestBed.inject(DeviceImageCacheService), 'clearCache').and.resolveTo();
+        (failedCache === 'offline' ? offlineCleanup : imageCleanup).and.rejectWith(failure);
+
+        const logoutPromise = service.logout();
+        httpTesting.expectOne(`${baseUrl}/api/auth/logout`).flush({});
+        await expectAsync(logoutPromise).toBeRejectedWith(failure);
+
+        expect(service.session).toBeNull();
+        expect((await Preferences.get({ key: 'wardrobe-session' })).value).toBeNull();
+        expect(offlineCleanup).toHaveBeenCalledOnceWith(mockUser.id);
+        expect(imageCleanup).toHaveBeenCalledTimes(1);
+      });
+    }
+
+    it('should clear in-memory credentials and attempt cache cleanup when credential removal fails', async () => {
+      const loginPromise = service.login('test@example.com', 'Pass123');
+      httpTesting.expectOne(`${baseUrl}/api/auth/login`).flush(mockAuthResponse);
+      await loginPromise;
+
+      const failure = new Error('Credential removal failed');
+      const remove = spyOn(Storage.prototype, 'removeItem').and.throwError(failure);
+      const offlineCleanup = spyOn(TestBed.inject(OfflineDataService), 'clearUser').and.resolveTo();
+      const imageCleanup = spyOn(TestBed.inject(DeviceImageCacheService), 'clearCache').and.resolveTo();
+
+      await expectAsync(service.handleUnauthorized({ status: 401 })).toBeRejectedWith(failure);
+      remove.and.callThrough();
+
+      expect(service.token).toBeNull();
+      expect(offlineCleanup).toHaveBeenCalledOnceWith(mockUser.id);
+      expect(imageCleanup).toHaveBeenCalledTimes(1);
+    });
+
+    it('should finish local sign-out when server revocation times out', fakeAsync(() => {
+      void service.login('test@example.com', 'Pass123');
+      httpTesting.expectOne(`${baseUrl}/api/auth/login`).flush(mockAuthResponse);
+      flushMicrotasks();
+
+      let completed = false;
+      void service.logout().then(() => { completed = true; });
+      const request = httpTesting.expectOne(`${baseUrl}/api/auth/logout`);
+      advanceTime(10_001);
+      flushMicrotasks();
+
+      expect(request.cancelled).toBeTrue();
+      expect(completed).toBeTrue();
+      expect(service.token).toBeNull();
+    }));
+  });
+
   describe('refreshSession() and 401 handling', () => {
+    it('should ignore a refresh response received after sign-out', async () => {
+      const loginPromise = service.login('test@example.com', 'Pass123');
+      httpTesting.expectOne(`${baseUrl}/api/auth/login`).flush(mockAuthResponse);
+      await loginPromise;
+
+      const refreshPromise = service.refreshSession();
+      const refreshRequest = httpTesting.expectOne(`${baseUrl}/api/auth/refresh`);
+      const logoutPromise = service.logout();
+      httpTesting.expectOne(`${baseUrl}/api/auth/logout`).flush({});
+      await logoutPromise;
+
+      refreshRequest.flush(mockAuthResponse);
+      expect(await refreshPromise).toBeFalse();
+      expect(service.session).toBeNull();
+      expect((await Preferences.get({ key: 'wardrobe-session' })).value).toBeNull();
+    });
+
+    for (const outcome of ['success', 'unauthorized']) {
+      it(`should preserve a newer sign-in when an earlier refresh returns ${outcome}`, async () => {
+        const loginPromise = service.login('test@example.com', 'Pass123');
+        httpTesting.expectOne(`${baseUrl}/api/auth/login`).flush(mockAuthResponse);
+        await loginPromise;
+
+        const refreshPromise = service.refreshSession();
+        const refreshRequest = httpTesting.expectOne(`${baseUrl}/api/auth/refresh`);
+        const nextSession: AuthResponse = {
+          ...mockAuthResponse,
+          accessToken: 'next-access-token',
+          refreshToken: 'next-refresh-token',
+          user: { ...mockUser, id: 'next-user' }
+        };
+        const nextLogin = service.login('next@example.com', 'Pass456');
+        httpTesting.expectOne(`${baseUrl}/api/auth/login`).flush(nextSession);
+        await nextLogin;
+
+        if (outcome === 'success') {
+          refreshRequest.flush(mockAuthResponse);
+        } else {
+          refreshRequest.flush({}, { status: 401, statusText: 'Unauthorized' });
+        }
+
+        expect(await refreshPromise).toBeFalse();
+        expect(service.session).toEqual(nextSession);
+        expect(JSON.parse((await Preferences.get({ key: 'wardrobe-session' })).value!)).toEqual(nextSession);
+      });
+    }
+
+    it('should deduplicate refreshes only within the current session', async () => {
+      const loginPromise = service.login('test@example.com', 'Pass123');
+      httpTesting.expectOne(`${baseUrl}/api/auth/login`).flush(mockAuthResponse);
+      await loginPromise;
+      const oldRefresh = service.refreshSession();
+      const oldRequest = httpTesting.expectOne(`${baseUrl}/api/auth/refresh`);
+
+      const nextSession = { ...mockAuthResponse, refreshToken: 'next-refresh-token' };
+      const nextLogin = service.login('test@example.com', 'Pass123');
+      httpTesting.expectOne(`${baseUrl}/api/auth/login`).flush(nextSession);
+      await nextLogin;
+      const nextRefresh = service.refreshSession();
+      const nextRequest = httpTesting.expectOne(`${baseUrl}/api/auth/refresh`);
+      expect(nextRequest.request.body).toEqual({ refreshToken: 'next-refresh-token' });
+
+      oldRequest.flush({}, { status: 401, statusText: 'Unauthorized' });
+      expect(await oldRefresh).toBeFalse();
+      const duplicateRefresh = service.refreshSession();
+      httpTesting.expectNone(`${baseUrl}/api/auth/refresh`);
+      nextRequest.flush({ ...nextSession, accessToken: 'refreshed-next-token', refreshToken: 'rotated-next-token' });
+
+      expect(await nextRefresh).toBeTrue();
+      expect(await duplicateRefresh).toBeTrue();
+      expect(service.token).toBe('refreshed-next-token');
+      expect((await Preferences.get({ key: 'wardrobe-session' })).value).toContain('rotated-next-token');
+    });
+
     it('refreshSession() should return false and clear session when no refresh token is stored', async () => {
       const refreshed = await service.refreshSession();
 

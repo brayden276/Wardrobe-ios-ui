@@ -24,7 +24,7 @@ export class AuthService {
   private readonly apiBaseUrl = apiBaseUrl();
   private readonly sessionSubject = new BehaviorSubject<Session | null>(null);
   private restorePromise: Promise<void> | null = null;
-  private refreshPromise: Promise<boolean> | null = null;
+  private refreshRequest: { token: string | null; promise: Promise<boolean> } | null = null;
   readonly session$ = this.sessionSubject.asObservable();
 
   get session(): Session | null {
@@ -125,19 +125,23 @@ export class AuthService {
   }
 
   async updatePersonalDetails(request: UpdatePersonalDetailsRequest): Promise<AuthUserDto> {
-    const token = this.token;
-    if (!token) {
+    if (this.session && this.isExpired(this.session) && !await this.refreshSession()) {
+      throw new Error('Could not refresh your session. Sign in again or retry when connected.');
+    }
+    const requestSession = this.session;
+    if (!requestSession?.accessToken) {
       throw new Error('Sign in before saving personal details.');
     }
 
     const user = await firstValueFrom(this.http.put<AuthUserDto>(`${this.apiBaseUrl}/api/auth/personal-details`, request, {
-      headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
-    }));
+      headers: new HttpHeaders({ Authorization: `Bearer ${requestSession.accessToken}` })
+    }).pipe(timeout(AuthService.authRequestTimeoutMs)));
 
     const session = this.session;
-    if (session) {
-      await this.storeSession({ ...session, user });
+    if (!session || session.refreshToken !== requestSession.refreshToken) {
+      throw new Error('Your session changed. Please try again.');
     }
+    await this.storeSession({ ...session, user });
 
     return user;
   }
@@ -151,9 +155,19 @@ export class AuthService {
   }
 
   async changePassword(currentPassword: string, newPassword: string): Promise<StatusMessageDto> {
+    if (!this.session) throw new Error('Sign in before changing your password.');
+    if (this.isExpired(this.session) && !await this.refreshSession()) {
+      throw new Error('Could not refresh your session. Sign in again or retry when connected.');
+    }
+    const requestSession = this.session;
+    if (!requestSession) throw new Error('Sign in before changing your password.');
     const response = await firstValueFrom(this.http.put<StatusMessageDto>(`${this.apiBaseUrl}/api/auth/password`,
-      { currentPassword, newPassword }, this.authOptions()));
-    await this.clearLocalSession();
+      { currentPassword, newPassword }, this.authOptions()).pipe(timeout(AuthService.authRequestTimeoutMs)));
+    if (this.session?.refreshToken !== requestSession.refreshToken) {
+      throw new Error('Your session changed. Please try again.');
+    }
+    await this.clearLocalSession(requestSession.user.id, requestSession.refreshToken);
+    if (this.session) throw new Error('Your session changed. Please try again.');
     return response;
   }
 
@@ -169,15 +183,14 @@ export class AuthService {
     try {
       if (session?.refreshToken && typeof navigator !== 'undefined' && navigator.onLine) {
         try {
-          await firstValueFrom(this.http.post(`${this.apiBaseUrl}/api/auth/logout`, { refreshToken: session.refreshToken }));
+          await firstValueFrom(this.http.post(`${this.apiBaseUrl}/api/auth/logout`, { refreshToken: session.refreshToken })
+            .pipe(timeout(AuthService.authRequestTimeoutMs)));
         } catch {
           // Best effort: local sign-out must succeed even if the server revoke call fails.
         }
       }
     } finally {
-      if (session?.user.id) await this.offlineData.clearUser(session.user.id);
-      await this.deviceImageCache.clearCache();
-      await this.clearSession();
+      await this.clearLocalSession(session?.user.id);
     }
   }
 
@@ -191,11 +204,7 @@ export class AuthService {
         }));
       }
     } finally {
-      if (userId) {
-        await this.offlineData.clearUser(userId);
-      }
-      await this.deviceImageCache.clearCache();
-      await this.clearSession();
+      await this.clearLocalSession(userId);
     }
   }
 
@@ -206,18 +215,21 @@ export class AuthService {
   }
 
   async refreshSession(): Promise<boolean> {
-    if (this.refreshPromise) {
-      return this.refreshPromise;
+    const refreshToken = this.session?.refreshToken ?? null;
+    if (this.refreshRequest?.token === refreshToken) {
+      return this.refreshRequest.promise;
     }
 
-    this.refreshPromise = this.refreshCore().finally(() => {
-      this.refreshPromise = null;
+    const promise = this.refreshCore(refreshToken).finally(() => {
+      if (this.refreshRequest?.promise === promise) {
+        this.refreshRequest = null;
+      }
     });
-    return this.refreshPromise;
+    this.refreshRequest = { token: refreshToken, promise };
+    return promise;
   }
 
-  private async refreshCore(): Promise<boolean> {
-    const refreshToken = this.session?.refreshToken;
+  private async refreshCore(refreshToken: string | null): Promise<boolean> {
     if (!refreshToken) {
       await this.clearSession();
       return false;
@@ -229,10 +241,15 @@ export class AuthService {
           .post<AuthResponse>(`${this.apiBaseUrl}/api/auth/refresh`, { refreshToken })
           .pipe(timeout(AuthService.authRequestTimeoutMs))
       );
+      // The request belongs to the session that started it. A late response
+      // must not undo sign-out or replace credentials from a newer sign-in.
+      if (this.session?.refreshToken !== refreshToken) {
+        return false;
+      }
       await this.setSession(response);
       return true;
     } catch (error) {
-      if (this.isUnauthorized(error)) {
+      if (this.isUnauthorized(error) && this.session?.refreshToken === refreshToken) {
         await this.clearSession();
       }
 
@@ -268,11 +285,18 @@ export class AuthService {
     return { headers: token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : new HttpHeaders() };
   }
 
-  private async clearLocalSession(): Promise<void> {
-    const userId = this.session?.user.id;
-    if (userId) await this.offlineData.clearUser(userId);
-    await this.deviceImageCache.clearCache();
-    await this.clearSession();
+  private async clearLocalSession(userId = this.session?.user.id, expectedRefreshToken?: string): Promise<void> {
+    const isCurrentSession = () => expectedRefreshToken === undefined || this.session?.refreshToken === expectedRefreshToken;
+    if (!isCurrentSession()) return;
+    try {
+      if (userId) await this.offlineData.clearUser(userId);
+    } finally {
+      try {
+        if (isCurrentSession()) await this.deviceImageCache.clearCache();
+      } finally {
+        if (isCurrentSession()) await this.clearSession();
+      }
+    }
   }
 
   private isExpired(session: Session): boolean {
@@ -285,12 +309,15 @@ export class AuthService {
   }
 
   private async clearSession(): Promise<void> {
-    await Preferences.remove({ key: 'wardrobe-session' });
-    // Only emit on a real transition: notifying when there was no session
-    // would bounce the user to /login without anything having changed
-    // (e.g. a 401 fired before restore() finished loading the stored session).
-    if (this.sessionSubject.value !== null) {
-      this.sessionSubject.next(null);
+    try {
+      await Preferences.remove({ key: 'wardrobe-session' });
+    } finally {
+      // Only emit on a real transition: notifying when there was no session
+      // would bounce the user to /login without anything having changed
+      // (e.g. a 401 fired before restore() finished loading the stored session).
+      if (this.sessionSubject.value !== null) {
+        this.sessionSubject.next(null);
+      }
     }
   }
 
