@@ -200,13 +200,11 @@
     <ng-template>
       <div class="sheet-modal-content" *ngIf="selectedOutfit">
         <header class="modal-nav-bar">
-          <div class="sheet-title-group">
-            <h2 class="modal-title">{{ isEditingOutfit ? 'Edit Outfit' : selectedOutfit.name }}</h2>
-            <p class="sheet-wear-badge" *ngIf="selectedOutfit.wearCount > 0">Worn {{ selectedOutfit.wearCount }} {{ selectedOutfit.wearCount === 1 ? 'time' : 'times' }}</p>
-          </div>
+          <button type="button" class="text-btn" (click)="close()" [disabled]="isSavingOutfit">Close</button>
+          <h2 class="modal-title">{{ isEditingOutfit ? 'Edit Outfit' : 'Outfit' }}</h2>
           <button type="button" class="text-btn" *ngIf="!isEditingOutfit" (click)="editOutfit(selectedOutfit)">Edit</button>
-          <button type="button" class="sheet-close-btn text-btn" (click)="close()" [disabled]="isSavingOutfit" aria-label="Close">
-            <ion-icon name="close-circle"></ion-icon>
+          <button type="button" class="text-btn sheet-menu-btn" *ngIf="!isEditingOutfit" (click)="openOutfitMenu(selectedOutfit, $event)" aria-label="More outfit options">
+            <ion-icon name="ellipsis-horizontal-circle-outline" aria-hidden="true"></ion-icon>
           </button>
         </header>
 
@@ -216,64 +214,79 @@
             <ion-textarea label="Notes" labelPlacement="stacked" name="outfitNotes" [(ngModel)]="outfitForm.explanation" [maxlength]="2000" [autoGrow]="true" [rows]="3" [disabled]="isSavingOutfit"></ion-textarea>
             <p *ngIf="editMessage" class="outfit-edit-error" role="alert">{{ editMessage }}</p>
           </form>
-          <ng-container *ngIf="!isEditingOutfit">
+          <section class="detail-screen" *ngIf="!isEditingOutfit">
           <!-- Hero Outfit Image if exists -->
-          <div class="sheet-hero-image" *ngIf="selectedOutfit.imageUrl">
-            <img [appLazyImage]="selectedOutfit.imageUrl" [alt]="selectedOutfit.name">
+          <div class="detail-image-stage" *ngIf="selectedOutfit.imageUrl">
+            <img class="detail-image" [appLazyImage]="selectedOutfit.imageUrl" [appLazyImagePriority]="true" [alt]="selectedOutfit.name" decoding="async">
+          </div>
+
+          <div class="detail-header-block">
+            <h1 class="detail-title">{{ selectedOutfit.name }}</h1>
+            <p class="detail-meta">{{ selectedOutfit.items.length }} {{ selectedOutfit.items.length === 1 ? 'piece' : 'pieces' }}</p>
+          </div>
+
+          <div class="detail-action-bar">
+            <ion-button class="primary-button" expand="block" (click)="markWorn(selectedOutfit)" [disabled]="markingOutfitIds.has(selectedOutfit.id)">
+              <ion-spinner name="crescent" slot="start" *ngIf="markingOutfitIds.has(selectedOutfit.id)"></ion-spinner>
+              <ion-icon name="checkmark-outline" slot="start" *ngIf="!markingOutfitIds.has(selectedOutfit.id)"></ion-icon>
+              {{ markingOutfitIds.has(selectedOutfit.id) ? 'Marking worn...' : 'Mark Worn Today' }}
+            </ion-button>
+            <ion-button class="secondary-button detail-favourite" expand="block" fill="outline" (click)="toggleFavorite(selectedOutfit)" [disabled]="!canChangeFavorites || isUpdatingFavorite(selectedOutfit.id)" [attr.aria-busy]="isUpdatingFavorite(selectedOutfit.id)" [attr.aria-pressed]="isFavorite(selectedOutfit.id)">
+              <ion-spinner *ngIf="isUpdatingFavorite(selectedOutfit.id)" name="crescent" slot="start"></ion-spinner>
+              <ion-icon *ngIf="!isUpdatingFavorite(selectedOutfit.id)" [name]="isFavorite(selectedOutfit.id) ? 'heart' : 'heart-outline'" slot="start"></ion-icon>
+              {{ isUpdatingFavorite(selectedOutfit.id) ? 'Saving...' : isFavorite(selectedOutfit.id) ? 'Favourited' : 'Favourite' }}
+            </ion-button>
+            <p *ngIf="favoriteMessage || message" class="outfit-edit-error" role="alert">{{ favoriteMessage || message }}</p>
+          </div>
+
+          <div class="ios-metrics-grid">
+            <div class="metric-card">
+              <span class="metric-title">Times Worn</span>
+              <span class="metric-val">{{ selectedOutfit.wearCount }}x</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-title">Last Worn</span>
+              <span class="metric-val">{{ formatLastWorn(selectedOutfit.lastWornAt) }}</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-title">Pieces</span>
+              <span class="metric-val">{{ selectedOutfit.items.length }}</span>
+            </div>
           </div>
 
           <!-- Stylist Notes -->
-          <div class="sheet-section" *ngIf="selectedOutfit.explanation">
-            <h4 class="sheet-section-heading">Stylist Notes</h4>
-            <div class="sheet-notes-box">
-              <ion-icon name="sparkles" class="notes-icon"></ion-icon>
+          <div class="ios-section" *ngIf="selectedOutfit.explanation">
+            <h2 class="ios-section-header">Stylist Notes</h2>
+            <div class="sheet-notes-box ios-grouped-card">
               <p>{{ selectedOutfit.explanation }}</p>
             </div>
           </div>
 
           <!-- Garment Breakdown -->
-          <div class="sheet-section">
-            <h4 class="sheet-section-heading">Pieces in this Look ({{ selectedOutfit.items.length }})</h4>
-            <div class="garment-detail-list">
-              <div class="garment-detail-row clickable" *ngFor="let item of selectedOutfit.items; trackBy: trackByOutfitItemId" (click)="viewGarmentDetail(item.id, $event)">
+          <div class="ios-section">
+            <h2 class="ios-section-header">Pieces in this Look ({{ selectedOutfit.items.length }})</h2>
+            <div class="ios-grouped-card" *ngIf="selectedOutfit.items.length; else noOutfitPieces">
+              <button type="button" class="garment-detail-row" *ngFor="let item of selectedOutfit.items; trackBy: trackByOutfitItemId" (click)="viewGarmentDetail(item.id, $event)" [attr.aria-label]="'View ' + item.name">
                 <img [appLazyImage]="outfitItemImageUrl(item)" [alt]="item.name" class="garment-thumb" decoding="async">
-                <div class="garment-info">
+                <span class="garment-info">
                   <span class="garment-name">{{ item.name }}</span>
                   <span class="garment-sub">{{ formatSubcategory(item.subcategoryId) }}</span>
-                </div>
-                <ion-icon name="chevron-forward-outline" class="garment-row-chevron"></ion-icon>
-              </div>
+                </span>
+                <ion-icon name="chevron-forward-outline" class="garment-row-chevron" aria-hidden="true"></ion-icon>
+              </button>
             </div>
+            <ng-template #noOutfitPieces><p class="detail-meta">No pieces are available for this look.</p></ng-template>
           </div>
-          </ng-container>
+          </section>
         </div>
 
         <!-- Sticky Sheet Bottom Actions -->
         <footer class="sheet-modal-footer" *ngIf="isEditingOutfit">
-          <button type="submit" form="outfit-edit-form" class="sheet-cta-wear" [disabled]="isSavingOutfit || !outfitForm.name.trim()">
+          <ion-button type="submit" form="outfit-edit-form" class="primary-button" expand="block" [disabled]="isSavingOutfit || !outfitForm.name.trim()">
             <ion-spinner name="crescent" *ngIf="isSavingOutfit"></ion-spinner>
             {{ isSavingOutfit ? 'Saving...' : 'Save Changes' }}
-          </button>
+          </ion-button>
           <button type="button" class="text-btn" (click)="cancelOutfitEdit()" [disabled]="isSavingOutfit">Cancel</button>
-        </footer>
-        <footer class="sheet-modal-footer" *ngIf="!isEditingOutfit">
-          <p *ngIf="favoriteMessage" class="outfit-edit-error" role="alert">{{ favoriteMessage }}</p>
-          <button type="button" class="sheet-cta-wear" (click)="markWorn(selectedOutfit)" [disabled]="markingOutfitIds.has(selectedOutfit.id)">
-            <ion-spinner name="crescent" *ngIf="markingOutfitIds.has(selectedOutfit.id)"></ion-spinner>
-            <ion-icon name="checkmark-circle" *ngIf="!markingOutfitIds.has(selectedOutfit.id)"></ion-icon>
-            <span>{{ markingOutfitIds.has(selectedOutfit.id) ? 'Logging Wear...' : 'Log Outfit as Worn Today' }}</span>
-          </button>
-          <div class="sheet-footer-secondary">
-            <button type="button" class="sheet-btn-secondary" (click)="toggleFavorite(selectedOutfit)" [disabled]="!canChangeFavorites || isUpdatingFavorite(selectedOutfit.id)" [attr.aria-busy]="isUpdatingFavorite(selectedOutfit.id)" [attr.aria-pressed]="isFavorite(selectedOutfit.id)">
-              <ion-spinner *ngIf="isUpdatingFavorite(selectedOutfit.id)" name="crescent" aria-hidden="true"></ion-spinner>
-              <ion-icon *ngIf="!isUpdatingFavorite(selectedOutfit.id)" [name]="isFavorite(selectedOutfit.id) ? 'heart' : 'heart-outline'"></ion-icon>
-              <span>{{ isUpdatingFavorite(selectedOutfit.id) ? 'Saving...' : isFavorite(selectedOutfit.id) ? 'Favorited' : 'Favorite' }}</span>
-            </button>
-            <button type="button" class="sheet-btn-danger" (click)="remove(selectedOutfit)">
-              <ion-icon name="trash-outline"></ion-icon>
-              <span>Delete Look</span>
-            </button>
-          </div>
         </footer>
       </div>
     </ng-template>

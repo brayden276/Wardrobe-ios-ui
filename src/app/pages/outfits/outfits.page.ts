@@ -4,7 +4,7 @@ import { ActionSheetController, AlertController, ToastController } from '@ionic/
 import { OutfitDto, WardrobeLookupsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import { AuthService } from '../../auth.service';
-import { confirmAction, lightImpact, lookupLabel, noticeKind, NoticeKind, readMessage, successFeedback, warningFeedback } from '../page-helpers';
+import { formatLastWorn, confirmAction, lightImpact, lookupLabel, noticeKind, NoticeKind, readMessage, successFeedback, warningFeedback } from '../page-helpers';
 
 export interface OutfitCard {
   outfit: OutfitDto;
@@ -24,6 +24,7 @@ export interface OutfitCard {
   styleUrls: ['./outfits.page.scss']
 })
 export class OutfitsPage {
+  readonly formatLastWorn = formatLastWorn;
   private readonly api = inject(WardrobeApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);

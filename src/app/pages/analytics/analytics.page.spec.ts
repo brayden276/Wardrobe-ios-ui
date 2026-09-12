@@ -86,14 +86,13 @@ describe('AnalyticsPage', () => {
       declarations: [AnalyticsPage],
       imports: [CommonModule, IonicModule.forRoot(), RouterTestingModule],
       providers: [
-        AnalyticsPage,
         { provide: WardrobeApiService, useValue: mockApi },
         { provide: AuthService, useValue: mockAuth },
         { provide: Router, useValue: mockRouter }
       ]
     });
 
-    component = TestBed.inject(AnalyticsPage);
+    component = TestBed.createComponent(AnalyticsPage).componentInstance;
   });
 
   it('should initialize with default user scope and not loading', () => {
@@ -156,7 +155,7 @@ describe('AnalyticsPage', () => {
 
   it('should navigate to settings when openSettings is called', () => {
     component.openSettings();
-    expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/tabs/settings');
+    expect(mockRouter.navigateByUrl).toHaveBeenCalledWith('/tabs/settings?returnUrl=/tabs/analytics');
   });
 
   it('does not send an unauthenticated request when session restoration fails', async () => {

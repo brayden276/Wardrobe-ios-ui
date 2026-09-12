@@ -13,6 +13,8 @@ import { OutfitDto } from '../../models';
 import { OfflineDataService } from '../../offline-data.service';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import { OutfitsPage } from './outfits.page';
+import { emptyItemForm } from '../page-helpers';
+import { Router } from '@angular/router';
 
 describe('Saved outfit workflows', () => {
   let page: OutfitsPage;
@@ -260,24 +262,45 @@ describe('Saved outfit workflows', () => {
     fixture.componentInstance.outfits = [outfit];
     fixture.detectChanges();
     const modal: HTMLIonModalElement = fixture.nativeElement.querySelector('ion-modal');
-    fixture.componentInstance.editOutfit(outfit);
+    const detailOutfit: OutfitDto = {
+      ...outfit,
+      imageUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="600"/%3E',
+      items: [{
+        ...emptyItemForm(), id: 'piece-1', name: 'Linen shirt',
+        isArchived: false, isDeleted: false, wearCount: 0, lastWornAt: null,
+        image: { originalUrl: '', displayUrl: '', canonicalUrl: null, thumbnailUrl: null },
+        imageGenerationStatus: null, createdAt: outfit.createdAt, updatedAt: outfit.updatedAt
+      }]
+    };
+    fixture.componentInstance.editOutfit(detailOutfit);
     fixture.detectChanges();
     await modal.present();
     await fixture.whenStable();
     fixture.detectChanges();
     expect(modal.querySelector('ion-input')?.label).toBe('Name');
     expect(modal.querySelector('ion-textarea')?.label).toBe('Notes');
-    expect(modal.querySelector('button[type="submit"]')?.textContent).toContain('Save Changes');
+    expect(modal.querySelector('ion-button[type="submit"]')?.textContent).toContain('Save Changes');
     const cancel = modal.querySelector<HTMLButtonElement>('.sheet-modal-footer .text-btn')!;
     expect(getComputedStyle(cancel).minHeight).toBe('44px');
     expect(getComputedStyle(cancel).backgroundColor).toBe('rgba(0, 0, 0, 0)');
     expect(await modal.getCurrentBreakpoint()).toBe(1);
     const footer = modal.querySelector<HTMLElement>('.sheet-modal-footer')!;
     expect(footer.getBoundingClientRect().bottom).toBeLessThanOrEqual(modal.getBoundingClientRect().bottom + 1);
+    const save = spyOn(fixture.componentInstance, 'saveOutfit');
+    modal.querySelector<HTMLIonButtonElement>('ion-button[type="submit"]')!.shadowRoot!.querySelector('button')!.click();
+    expect(save).toHaveBeenCalled();
 
     fixture.componentInstance.cancelOutfitEdit();
     fixture.detectChanges();
-    const favouriteButton = modal.querySelector<HTMLButtonElement>('.sheet-btn-secondary')!;
+    const image = modal.querySelector<HTMLImageElement>('.detail-image')!;
+    const stage = modal.querySelector<HTMLElement>('.detail-image-stage')!;
+    expect(getComputedStyle(image).objectFit).toBe('contain');
+    expect(stage.getBoundingClientRect().height).toBeGreaterThanOrEqual(320);
+    expect(image.getBoundingClientRect().height).toBeLessThanOrEqual(stage.getBoundingClientRect().height);
+    expect(modal.querySelector('.detail-title')?.textContent).toBe(outfit.name);
+    expect(modal.querySelectorAll('.metric-card').length).toBe(3);
+    expect(modal.querySelector('.detail-action-bar .primary-button')?.textContent).toContain('Mark Worn Today');
+    const favouriteButton = modal.querySelector<HTMLIonButtonElement>('.detail-favourite')!;
     favouriteButton.click();
     fixture.detectChanges();
     expect(favouriteButton.disabled).toBeTrue();
@@ -287,7 +310,11 @@ describe('Saved outfit workflows', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     expect(favouriteButton.disabled).toBeFalse();
-    expect(favouriteButton.textContent).toContain('Favorited');
+    expect(favouriteButton.textContent).toContain('Favourited');
+    const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+    modal.querySelector<HTMLButtonElement>('.garment-detail-row')!.click();
+    expect(navigate).toHaveBeenCalledWith(['/tabs/wardrobe', 'piece-1']);
+    expect(fixture.componentInstance.selectedOutfit).toBeNull();
     await modal.dismiss();
     fixture.destroy();
   });

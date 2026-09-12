@@ -7,6 +7,7 @@ import {
   colourSwatch,
   confirmAction,
   emptyItemForm,
+  formatLastWorn,
   lightImpact,
   lookupLabel,
   noticeKind,
@@ -68,18 +69,7 @@ export class ItemDetailPage implements OnDestroy {
     return colourSwatch(id);
   }
 
-  formatLastWorn(dateString: string | null): string {
-    if (!dateString) return 'Never';
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return 'Never';
-    const diffMs = Date.now() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  }
+  readonly formatLastWorn = formatLastWorn;
 
   openEditModal(): void {
     if (this.item) {

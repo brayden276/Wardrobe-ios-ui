@@ -34,11 +34,11 @@
   <!-- Main Item Inspection View -->
   <section class="screen detail-screen" *ngIf="!isLoading && item">
     <!-- Hero Product Stage -->
-    <div class="product-hero-stage">
+    <div class="detail-image-group">
       <!-- Cutout / Original Segment Toggle -->
       <ion-segment
         mode="ios"
-        class="stage-image-segment"
+        class="detail-image-controls"
         *ngIf="item.image?.originalUrl"
         [value]="activeImageLayer"
         (ionChange)="setImageLayer($any($event).detail.value)">
@@ -50,15 +50,17 @@
         </ion-segment-button>
       </ion-segment>
 
-      <img
-        class="hero-product-image"
-        [appLazyImage]="activeImageLayer === 'display' ? item.image.displayUrl : (item.image.originalUrl || item.image.displayUrl)"
-        [appLazyImagePriority]="true"
-        [alt]="item.name"
-        loading="eager"
-        decoding="async">
+      <div class="detail-image-stage">
+        <img
+          class="detail-image"
+          [appLazyImage]="activeImageLayer === 'display' ? item.image.displayUrl : (item.image.originalUrl || item.image.displayUrl)"
+          [appLazyImagePriority]="true"
+          [alt]="item.name"
+          loading="eager"
+          decoding="async">
+      </div>
 
-      <div class="image-generation-overlay detail-overlay" *ngIf="imageGenerationMessage(item.imageGenerationStatus) as status" [class.failed]="!isImageGenerationInProgress(item.imageGenerationStatus)">
+      <div class="detail-image-status" role="status" *ngIf="imageGenerationMessage(item.imageGenerationStatus) as status" [class.failed]="!isImageGenerationInProgress(item.imageGenerationStatus)">
         <ion-spinner *ngIf="isImageGenerationInProgress(item.imageGenerationStatus)" name="crescent"></ion-spinner>
         <span>{{ status }}</span>
       </div>
@@ -66,13 +68,14 @@
 
     <!-- Title & Primary Action -->
     <div class="detail-header-block">
-      <h1 class="detail-garment-title">{{ item.name }}</h1>
-      <p class="detail-garment-meta">{{ label(item.categoryId) }} · {{ label(item.subcategoryId) }}</p>
+      <h1 class="detail-title">{{ item.name }}</h1>
+      <p class="detail-meta">{{ label(item.categoryId) }} · {{ label(item.subcategoryId) }}</p>
     </div>
 
     <div class="detail-action-bar">
       <ion-button class="primary-button" expand="block" (click)="markWorn()" [disabled]="isMarkingWorn">
-        <ion-icon name="checkmark-outline" slot="start"></ion-icon>
+        <ion-spinner *ngIf="isMarkingWorn" name="crescent" slot="start"></ion-spinner>
+        <ion-icon *ngIf="!isMarkingWorn" name="checkmark-outline" slot="start"></ion-icon>
         {{ isMarkingWorn ? 'Marking worn...' : 'Mark Worn Today' }}
       </ion-button>
     </div>
@@ -96,7 +99,7 @@
     </div>
 
     <!-- Garment Specifications: Inset Grouped Card -->
-    <div class="detail-specs-section">
+    <div class="ios-section">
       <span class="specs-header">GARMENT SPECIFICATIONS</span>
       <div class="ios-grouped-card">
         <div class="ios-table-row">
