@@ -84,16 +84,18 @@ async getLookups(): Promise<WardrobeLookupsDto> {
     const cached = await this.offlineData.read<WardrobeLookupsDto>(userId, 'lookups');
     if (cached) return cached;
   }
-  this.lookupsPromise ??= this.authorized(() => firstValueFrom(this.http.get<WardrobeLookupsDto>(this.url('/api/lookups/wardrobe'), this.authOptions())))
+    if (this.lookupsPromise) return this.lookupsPromise;
+    const promise = this.authorized(() => firstValueFrom(this.http.get<WardrobeLookupsDto>(this.url('/api/lookups/wardrobe'), this.authOptions()).pipe(timeout(10000))))
     .then(async (lookups) => {
       if (userId && this.auth.session?.user.id === userId) await this.offlineData.write(userId, 'lookups', lookups);
       return lookups;
     })
       .catch((error) => {
-        this.lookupsPromise = null;
+        if (this.lookupsPromise === promise) this.lookupsPromise = null;
         throw error;
       });
-    return this.lookupsPromise;
+    this.lookupsPromise = promise;
+    return promise;
   }
 
 async getItems(
@@ -127,7 +129,7 @@ async getItems(
   }
 
   async getItem(id: string): Promise<WardrobeItemDto> {
-    const response = await this.authorized(() => firstValueFrom(this.http.get<WardrobeItemResponse>(this.url(`/api/wardrobe/items/${id}`), this.authOptions())));
+    const response = await this.authorized(() => firstValueFrom(this.http.get<WardrobeItemResponse>(this.url(`/api/wardrobe/items/${id}`), this.authOptions()).pipe(timeout(30_000))));
     return this.normaliseItem(this.unwrapItemResponse(response));
   }
 
@@ -135,15 +137,15 @@ async getItems(
     this.requireOnline();
     const body = new FormData();
     body.append('image', image, fileName);
-    const response = await this.authorized(() => firstValueFrom(this.http.post<{ item?: WardrobeItemDto; items?: WardrobeItemDto[] }>(this.url('/api/wardrobe/items'), body, this.authOptions())));
+    const response = await this.authorized(() => firstValueFrom(this.http.post<{ item?: WardrobeItemDto; items?: WardrobeItemDto[] }>(this.url('/api/wardrobe/items'), body, this.authOptions()).pipe(timeout(180_000))));
     this.clearWardrobeCaches();
     const rawItem = response.item ?? response.items?.[0];
     if (!rawItem) {
       throw new Error('Wardrobe item response was not in the expected format.');
     }
-    const item = await this.normaliseItem(rawItem);
+    const item = await this.normaliseItem(rawItem, false);
     const items = response.items?.length
-      ? await Promise.all(response.items.map((entry) => this.normaliseItem(entry)))
+      ? await Promise.all(response.items.map((entry) => this.normaliseItem(entry, false)))
       : [item];
     return Object.assign(item, { items });
   }
@@ -155,17 +157,17 @@ async getItems(
       body.append('images', image, image.name);
     }
 
-    const response = await this.authorized(() => firstValueFrom(this.http.post<BatchWardrobeItemsResponse>(this.url('/api/wardrobe/items/batch'), body, this.authOptions())));
+    const response = await this.authorized(() => firstValueFrom(this.http.post<BatchWardrobeItemsResponse>(this.url('/api/wardrobe/items/batch'), body, this.authOptions()).pipe(timeout(480_000))));
     this.clearWardrobeCaches();
     return {
       ...response,
       results: await Promise.all(response.results.map(async (result) => {
-        const item = result.item ? await this.normaliseItem(result.item) : null;
+        const item = result.item ? await this.normaliseItem(result.item, false) : null;
         return {
           ...result,
           item,
           items: result.items?.length
-            ? await Promise.all(result.items.map((i) => this.normaliseItem(i)))
+            ? await Promise.all(result.items.map((i) => this.normaliseItem(i, false)))
             : (item ? [item] : null)
         };
       }))
@@ -174,20 +176,20 @@ async getItems(
 
   async updateItem(id: string, request: UpdateWardrobeItemRequest): Promise<WardrobeItemDto> {
     this.requireOnline();
-    const response = await this.authorized(() => firstValueFrom(this.http.put<{ item: WardrobeItemDto }>(this.url(`/api/wardrobe/items/${id}`), request, this.authOptions())));
+    const response = await this.authorized(() => firstValueFrom(this.http.put<{ item: WardrobeItemDto }>(this.url(`/api/wardrobe/items/${id}`), request, this.authOptions()).pipe(timeout(30_000))));
     this.clearWardrobeCaches();
     return this.normaliseItem(response.item);
   }
 
   async deleteItem(id: string): Promise<void> {
     this.requireOnline();
-    await this.authorized(() => firstValueFrom(this.http.delete<void>(this.url(`/api/wardrobe/items/${id}`), this.authOptions())));
+    await this.authorized(() => firstValueFrom(this.http.delete<void>(this.url(`/api/wardrobe/items/${id}`), this.authOptions()).pipe(timeout(30_000))));
     this.clearWardrobeCaches();
   }
 
   async deleteItems(ids: string[]): Promise<BulkDeleteResponse> {
     this.requireOnline();
-    const response = await this.authorized(() => firstValueFrom(this.http.post<BulkDeleteResponse>(this.url('/api/wardrobe/items/bulk-delete'), { ids }, this.authOptions())));
+    const response = await this.authorized(() => firstValueFrom(this.http.post<BulkDeleteResponse>(this.url('/api/wardrobe/items/bulk-delete'), { ids }, this.authOptions()).pipe(timeout(30_000))));
     this.clearWardrobeCaches();
     return response;
   }
@@ -202,7 +204,7 @@ async getItems(
     }
 
     return this.setCached(this.searchOutfitsCache, cacheKey, async () => {
-      const response = await this.authorized(() => firstValueFrom(this.http.post<{ outfits: GeneratedOutfitDto[] }>(this.url('/api/outfits/search'), { query, requiredItemId }, this.authOptions())));
+      const response = await this.authorized(() => firstValueFrom(this.http.post<{ outfits: GeneratedOutfitDto[] }>(this.url('/api/outfits/search'), { query, requiredItemId }, this.authOptions()).pipe(timeout(300_000))));
       return Promise.all(response.outfits.map(async (outfit) => {
         const imageUrl = this.normaliseAssetUrl(outfit.imageUrl);
         return {
@@ -219,10 +221,10 @@ async getItems(
 
   async saveOutfit(name: string, prompt: string | null, explanation: string | null, itemIds: string[], imageUrl: string | null = null): Promise<OutfitDto> {
     this.requireOnline();
-    const response = await this.authorized(() => firstValueFrom(this.http.post<{ outfit: OutfitDto }>(this.url('/api/outfits'), { name, prompt, explanation, itemIds, imageUrl }, this.authOptions())));
+    const response = await this.authorized(() => firstValueFrom(this.http.post<{ outfit: OutfitDto }>(this.url('/api/outfits'), { name, prompt, explanation, itemIds, imageUrl }, this.authOptions()).pipe(timeout(30_000))));
     this.clearOutfitCaches();
-    const outfit = await this.normaliseOutfit(response.outfit);
-    return outfit.imageUrl ? outfit : this.waitForOutfitImage(outfit.id);
+    // The composition is saved independently of its optional background preview.
+    return this.normaliseOutfit(response.outfit);
   }
 
 async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
@@ -242,7 +244,7 @@ async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
 
     return this.setCached(this.outfitsCache, cacheKey, async () => {
       const query = options.includePending ? '?includePending=true' : '';
-      const response = await this.authorized(() => firstValueFrom(this.http.get<{ outfits: OutfitDto[] }>(this.url(`/api/outfits${query}`), this.authOptions())));
+      const response = await this.authorized(() => firstValueFrom(this.http.get<{ outfits: OutfitDto[] }>(this.url(`/api/outfits${query}`), this.authOptions()).pipe(timeout(30_000))));
     const outfits = await Promise.all(response.outfits.map((outfit) => this.normaliseOutfit(outfit)));
     if (userId && this.auth.session?.user.id === userId) {
       await this.offlineData.write(userId, options.includePending ? 'outfits-pending' : 'outfits', outfits);
@@ -281,21 +283,36 @@ async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
 
     const controller = new AbortController();
     let closed = false;
+    let activityTimeout: ReturnType<typeof setTimeout>;
+    const finish = () => {
+      if (closed) return;
+      closed = true;
+      clearTimeout(activityTimeout);
+      controller.abort();
+      onError?.();
+    };
+    const watchActivity = () => {
+      clearTimeout(activityTimeout);
+      activityTimeout = setTimeout(finish, 15_000);
+    };
+    watchActivity();
 
     void this.authorized(() => this.readImageGenerationStatusStream(
       `${this.url('/api/wardrobe/image-generation/stream')}?${query.toString()}`,
       this.auth.token ?? '',
       controller.signal,
-      onUpdate))
-      .catch(() => {
-        if (!closed) {
-          onError?.();
-        }
-      });
+      updates => {
+        if (closed) return;
+        watchActivity();
+        onUpdate(updates);
+      }))
+      // Ended or stalled streams both fall back to the page's status polling.
+      .then(finish, finish);
 
     return {
       close: () => {
         closed = true;
+        clearTimeout(activityTimeout);
         controller.abort();
       }
     };
@@ -303,31 +320,31 @@ async getOutfits(options: ApiReadOptions = {}): Promise<OutfitDto[]> {
 
   async deleteOutfit(id: string): Promise<void> {
     this.requireOnline();
-    await this.authorized(() => firstValueFrom(this.http.delete<void>(this.url(`/api/outfits/${id}`), this.authOptions())));
+    await this.authorized(() => firstValueFrom(this.http.delete<void>(this.url(`/api/outfits/${id}`), this.authOptions()).pipe(timeout(30_000))));
     this.clearOutfitCaches();
   }
 
   async deleteOutfits(ids: string[]): Promise<BulkDeleteResponse> {
     this.requireOnline();
-    const response = await this.authorized(() => firstValueFrom(this.http.post<BulkDeleteResponse>(this.url('/api/outfits/bulk-delete'), { ids }, this.authOptions())));
+    const response = await this.authorized(() => firstValueFrom(this.http.post<BulkDeleteResponse>(this.url('/api/outfits/bulk-delete'), { ids }, this.authOptions()).pipe(timeout(30_000))));
     this.clearOutfitCaches();
     return response;
   }
 
   async markWorn(id: string): Promise<void> {
     this.requireOnline();
-    await this.authorized(() => firstValueFrom(this.http.post(this.url(`/api/outfits/${id}/wear-logs`), {}, this.authOptions())));
+    await this.authorized(() => firstValueFrom(this.http.post(this.url(`/api/outfits/${id}/wear-logs`), {}, this.authOptions()).pipe(timeout(30_000))));
     this.clearOutfitCaches();
   }
 
   async markItemWorn(id: string): Promise<void> {
     this.requireOnline();
-    await this.authorized(() => firstValueFrom(this.http.post(this.url(`/api/wardrobe/items/${id}/wear-logs`), {}, this.authOptions())));
+    await this.authorized(() => firstValueFrom(this.http.post(this.url(`/api/wardrobe/items/${id}/wear-logs`), {}, this.authOptions()).pipe(timeout(30_000))));
     this.clearWardrobeCaches();
   }
 
   async getAiUsageCostSummary(): Promise<AiUsageCostSummaryDto> {
-    return this.authorized(() => firstValueFrom(this.http.get<AiUsageCostSummaryDto>(this.url('/api/usage/ai'), this.authOptions())));
+    return this.authorized(() => firstValueFrom(this.http.get<AiUsageCostSummaryDto>(this.url('/api/usage/ai'), this.authOptions()).pipe(timeout(30_000))));
   }
 
   async getAnalyticsSummary(): Promise<AnalyticsSummaryDto> {
@@ -461,7 +478,7 @@ private authOptions(): { headers: HttpHeaders } {
 
   private setCached<T>(cache: Map<string, CachedApiResponse<T>>, key: string, request: () => Promise<T>): Promise<T> {
     const promise = request().catch((error) => {
-      cache.delete(key);
+      if (cache.get(key)?.promise === promise) cache.delete(key);
       throw error;
     });
 
@@ -490,55 +507,31 @@ private authOptions(): { headers: HttpHeaders } {
     this.searchOutfitsCache.clear();
   }
 
-  private async waitForOutfitImage(outfitId: string): Promise<OutfitDto> {
-    const deadline = Date.now() + 120_000;
-    while (Date.now() < deadline) {
-      const outfits = await this.getOutfits({ forceRefresh: true, includePending: true });
-      const outfit = outfits.find((candidate) => candidate.id === outfitId);
-      if (!outfit) {
-        throw new Error('Outfit image generation did not return a saved outfit.');
-      }
-
-      if (outfit.imageUrl) {
-        this.clearOutfitCaches();
-        return outfit;
-      }
-
-      if (outfit.imageGenerationStatus === 'failed') {
-        await this.removePendingOutfit(outfitId);
-        throw new Error('Outfit image generation failed.');
-      }
-
-      await this.delay(1800);
-    }
-
-    await this.removePendingOutfit(outfitId);
-    throw new Error('Outfit image generation did not finish in time.');
-  }
-
-  private delay(milliseconds: number): Promise<void> {
-    return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-  }
-
-  private async removePendingOutfit(outfitId: string): Promise<void> {
-    try {
-      await this.deleteOutfit(outfitId);
-    } catch {
-      // If cleanup fails, keep the user-facing failure focused on image generation.
-    }
-  }
-
   private async authorized<T>(request: () => Promise<T>): Promise<T> {
+    const generation = this.auth.sessionVersion;
+    const accessToken = this.auth.token;
+    const assertCurrentSession = () => {
+      if (generation !== this.auth.sessionVersion) throw new Error('Your session changed. Please try again.');
+    };
     try {
-      return await request();
+      const result = await request();
+      assertCurrentSession();
+      return result;
     } catch (error) {
+      assertCurrentSession();
       if (this.isUnauthorized(error)) {
-        const refreshed = await this.auth.refreshSession();
+        // Another request may already have renewed the rejected access token.
+        const refreshed = this.auth.token !== accessToken || await this.auth.refreshSession();
+        assertCurrentSession();
         if (refreshed) {
+          const retryToken = this.auth.token;
           try {
-            return await request();
+            const result = await request();
+            assertCurrentSession();
+            return result;
           } catch (retryError) {
-            await this.auth.handleUnauthorized(retryError);
+            assertCurrentSession();
+            if (this.auth.token === retryToken) await this.auth.handleUnauthorized(retryError);
             throw retryError;
           }
         }
@@ -734,63 +727,63 @@ async setFavourite(targetType: 'item' | 'outfit', targetId: string, isFavourite:
 
 async getWearEvents(params: { itemId?: string; outfitId?: string } = {}): Promise<WearEventDto[]> {
   const query = this.queryString(params);
-  const response = await this.authorized(() => firstValueFrom(this.http.get<{ wearEvents: WearEventDto[] }>(this.url(`/api/wardrobe/wear-events${query ? `?${query}` : ''}`), this.authOptions())));
+  const response = await this.authorized(() => firstValueFrom(this.http.get<{ wearEvents: WearEventDto[] }>(this.url(`/api/wardrobe/wear-events${query ? `?${query}` : ''}`), this.authOptions()).pipe(timeout(30_000))));
   return response.wearEvents;
 }
 
 async createWearEvent(targetType: 'item' | 'outfit', id: string, wornAt?: string): Promise<WearEventDto> {
   this.requireOnline();
   const base = targetType === 'item' ? `/api/wardrobe/items/${id}` : `/api/outfits/${id}`;
-  const result = await this.authorized(() => firstValueFrom(this.http.post<WearEventDto>(this.url(`${base}/wear-events`), wornAt ? { wornAt } : {}, this.authOptions())));
+  const result = await this.authorized(() => firstValueFrom(this.http.post<WearEventDto>(this.url(`${base}/wear-events`), wornAt ? { wornAt } : {}, this.authOptions()).pipe(timeout(30_000))));
   this.clearWardrobeCaches();
   return result;
 }
 
 async updateWearEvent(id: string, wornAt: string): Promise<WearEventDto> {
   this.requireOnline();
-  const result = await this.authorized(() => firstValueFrom(this.http.put<WearEventDto>(this.url(`/api/wardrobe/wear-events/${id}`), { wornAt }, this.authOptions())));
+  const result = await this.authorized(() => firstValueFrom(this.http.put<WearEventDto>(this.url(`/api/wardrobe/wear-events/${id}`), { wornAt }, this.authOptions()).pipe(timeout(30_000))));
   this.clearWardrobeCaches();
   return result;
 }
 
 async deleteWearEvent(id: string): Promise<void> {
   this.requireOnline();
-  await this.authorized(() => firstValueFrom(this.http.delete<void>(this.url(`/api/wardrobe/wear-events/${id}`), this.authOptions())));
+  await this.authorized(() => firstValueFrom(this.http.delete<void>(this.url(`/api/wardrobe/wear-events/${id}`), this.authOptions()).pipe(timeout(30_000))));
   this.clearWardrobeCaches();
 }
 
 async getScheduledOutfits(from?: string, to?: string): Promise<ScheduledOutfitDto[]> {
   const query = this.queryString({ from, to });
-  const response = await this.authorized(() => firstValueFrom(this.http.get<{ scheduledOutfits: ScheduledOutfitDto[] }>(this.url(`/api/wardrobe/scheduled-outfits${query ? `?${query}` : ''}`), this.authOptions())));
+  const response = await this.authorized(() => firstValueFrom(this.http.get<{ scheduledOutfits: ScheduledOutfitDto[] }>(this.url(`/api/wardrobe/scheduled-outfits${query ? `?${query}` : ''}`), this.authOptions()).pipe(timeout(30_000))));
   return response.scheduledOutfits;
 }
 
 async scheduleOutfit(outfitId: string, scheduledDate: string, note?: string): Promise<ScheduledOutfitDto> {
   this.requireOnline();
-  return this.authorized(() => firstValueFrom(this.http.post<ScheduledOutfitDto>(this.url('/api/wardrobe/scheduled-outfits'), { outfitId, scheduledDate, note }, this.authOptions())));
+  return this.authorized(() => firstValueFrom(this.http.post<ScheduledOutfitDto>(this.url('/api/wardrobe/scheduled-outfits'), { outfitId, scheduledDate, note }, this.authOptions()).pipe(timeout(30_000))));
 }
 
 async updateScheduledOutfit(id: string, request: { outfitId?: string; scheduledDate?: string; note?: string }): Promise<ScheduledOutfitDto> {
   this.requireOnline();
-  return this.authorized(() => firstValueFrom(this.http.put<ScheduledOutfitDto>(this.url(`/api/wardrobe/scheduled-outfits/${id}`), request, this.authOptions())));
+  return this.authorized(() => firstValueFrom(this.http.put<ScheduledOutfitDto>(this.url(`/api/wardrobe/scheduled-outfits/${id}`), request, this.authOptions()).pipe(timeout(30_000))));
 }
 
 async deleteScheduledOutfit(id: string): Promise<void> {
   this.requireOnline();
-  await this.authorized(() => firstValueFrom(this.http.delete<void>(this.url(`/api/wardrobe/scheduled-outfits/${id}`), this.authOptions())));
+  await this.authorized(() => firstValueFrom(this.http.delete<void>(this.url(`/api/wardrobe/scheduled-outfits/${id}`), this.authOptions()).pipe(timeout(30_000))));
 }
 
 async getLaundryStatuses(): Promise<LaundryStatusDto[]> {
-  const response = await this.authorized(() => firstValueFrom(this.http.get<{ laundryStatuses: LaundryStatusDto[] }>(this.url('/api/wardrobe/laundry'), this.authOptions())));
+  const response = await this.authorized(() => firstValueFrom(this.http.get<{ laundryStatuses: LaundryStatusDto[] }>(this.url('/api/wardrobe/laundry'), this.authOptions()).pipe(timeout(30_000))));
   return response.laundryStatuses;
 }
 
 async updateLaundryStatus(id: string, isUnavailable: boolean, availableAt?: string | null): Promise<LaundryStatusDto> {
   this.requireOnline();
-  return this.authorized(() => firstValueFrom(this.http.put<LaundryStatusDto>(this.url(`/api/wardrobe/items/${id}/laundry`), { isUnavailable, availableAt }, this.authOptions())));
+  return this.authorized(() => firstValueFrom(this.http.put<LaundryStatusDto>(this.url(`/api/wardrobe/items/${id}/laundry`), { isUnavailable, availableAt }, this.authOptions()).pipe(timeout(30_000))));
 }
 
 async exportUserData(): Promise<WardrobeExportDto> {
-  return this.authorized(() => firstValueFrom(this.http.get<WardrobeExportDto>(this.url('/api/wardrobe/export'), this.authOptions())));
+  return this.authorized(() => firstValueFrom(this.http.get<WardrobeExportDto>(this.url('/api/wardrobe/export'), this.authOptions()).pipe(timeout(30_000))));
 }
 }

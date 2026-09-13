@@ -135,6 +135,7 @@
         <div class="lookbook-body">
           <div class="lookbook-info" (click)="!isSelectionMode && open(card.outfit, $event)">
             <h3 class="lookbook-title">{{ card.outfit.name }}</h3>
+            <p class="status-note" *ngIf="card.previewStatus" role="status" aria-live="polite">{{ card.previewStatus }}</p>
             <p class="lookbook-subtitle">{{ card.outfit.explanation || (card.outfit.items.length + ' pieces from your wardrobe') }}</p>
           </div>
 
@@ -221,7 +222,8 @@
           </div>
 
           <div class="detail-header-block">
-            <h1 class="detail-title">{{ selectedOutfit.name }}</h1>
+          <h1 class="detail-title">{{ selectedOutfit.name }}</h1>
+          <p class="status-note" *ngIf="previewStatus(selectedOutfit)" role="status">{{ previewStatus(selectedOutfit) }}</p>
             <p class="detail-meta">{{ selectedOutfit.items.length }} {{ selectedOutfit.items.length === 1 ? 'piece' : 'pieces' }}</p>
           </div>
 

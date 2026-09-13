@@ -47,6 +47,9 @@ export class AddItemPage implements OnDestroy {
   statusMessage = '';
   isSaving = false;
   isPreparing = false;
+  isPicking = false;
+  private isViewActive = true;
+  private destroyed = false;
   uploadError = false;
   hasAiConsent = false;
   batchFiles: PreparedUploadFile[] = [];
@@ -54,6 +57,7 @@ export class AddItemPage implements OnDestroy {
   isBatchSaving = false;
 
   async ionViewWillEnter(): Promise<void> {
+    this.isViewActive = true;
     this.hasAiConsent = await hasAiConsent();
   }
 
@@ -80,10 +84,12 @@ export class AddItemPage implements OnDestroy {
   }
 
   get isScanning(): boolean {
-    return this.isSaving || this.isBatchSaving || this.isPreparing;
+    return this.isSaving || this.isBatchSaving || this.isPreparing || this.isPicking;
   }
 
   get scanningStatusText(): string {
+    if (this.isPicking && !this.isPreparing) return 'Opening your photos...';
+    if (this.statusMessage) return this.statusMessage;
     if (this.isPreparing) {
       return 'Optimising photo for analysis...';
     }
@@ -120,6 +126,7 @@ export class AddItemPage implements OnDestroy {
   }
 
   async pickFromPhotoLibrary(): Promise<void> {
+    if (this.isScanning) return;
     this.message = '';
     this.statusMessage = '';
     this.uploadError = false;
@@ -137,6 +144,7 @@ export class AddItemPage implements OnDestroy {
         return;
       }
 
+      this.isPicking = true;
       const result = await Camera.pickImages({ quality: 90, limit: remainingCount });
       if (!result?.photos?.length) {
         return;
@@ -145,8 +153,7 @@ export class AddItemPage implements OnDestroy {
       const files: File[] = [];
       for (const [index, photo] of result.photos.entries()) {
         if (photo.webPath) {
-          const response = await fetch(photo.webPath);
-          const blob = await response.blob();
+          const blob = await this.readSelectedPhoto(photo.webPath);
           const ext = photo.format || 'jpg';
           const fileName = `wardrobe-photo-${Date.now()}-${index}.${ext}`;
           files.push(new File([blob], fileName, { type: blob.type || `image/${ext === 'png' ? 'png' : 'jpeg'}` }));
@@ -156,12 +163,13 @@ export class AddItemPage implements OnDestroy {
       if (files.length) {
         await this.addSelectedFiles(files);
       }
-    } catch {
-      try {
-        await this.capture(CameraSource.Photos);
-      } catch {
-        this.openBatchPicker();
+    } catch (error) {
+      if (!this.isPickerCancellation(error)) {
+        this.message = 'Could not open the selected photos. Check photo permissions in Settings and try again.';
+        this.uploadError = true;
       }
+    } finally {
+      this.isPicking = false;
     }
   }
 
@@ -197,6 +205,7 @@ export class AddItemPage implements OnDestroy {
   }
 
   async capture(source: CameraSource.Camera | CameraSource.Photos): Promise<void> {
+    if (this.isScanning) return;
     this.message = '';
     this.statusMessage = '';
     this.uploadError = false;
@@ -206,6 +215,7 @@ export class AddItemPage implements OnDestroy {
     }
 
     try {
+      this.isPicking = true;
       const photo = await Camera.getPhoto({ source, resultType: CameraResultType.DataUrl, quality: 90 });
       if (!photo.dataUrl) {
         return;
@@ -215,9 +225,12 @@ export class AddItemPage implements OnDestroy {
       const fileName = `wardrobe-item.${photo.format || 'jpg'}`;
       const sourceImage = new File([sourceBlob], fileName, { type: sourceBlob.type || 'image/jpeg' });
       await this.addSelectedFiles([sourceImage]);
-    } catch {
+    } catch (error) {
+      if (this.isPickerCancellation(error)) return;
       this.message = source === CameraSource.Camera ? 'Camera was not available.' : 'Could not open photo library.';
       this.uploadError = true;
+    } finally {
+      this.isPicking = false;
     }
   }
 
@@ -243,11 +256,13 @@ export class AddItemPage implements OnDestroy {
     await this.addSelectedFiles(files);
   }
 
-  ionViewDidLeave(): void {
-    this.revokeBatchPreviewUrls();
+  ionViewWillLeave(): void {
+    this.isViewActive = false;
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
+    this.isViewActive = false;
     this.revokeBatchPreviewUrls();
   }
 
@@ -260,11 +275,12 @@ export class AddItemPage implements OnDestroy {
   }
 
   async uploadSelectedPhotos(): Promise<void> {
-    if (this.isSaving || this.isBatchSaving || this.isPreparing || !this.batchFiles.length) {
+    if (this.isScanning || !this.batchFiles.length) {
       return;
     }
 
     this.isSaving = true;
+    this.statusMessage = 'Checking photo-processing permission...';
     try {
       const consentGiven = await ensureAiConsentWithAlert(
         this.alertController,
@@ -277,6 +293,7 @@ export class AddItemPage implements OnDestroy {
         return;
       }
 
+      this.hasAiConsent = true;
       this.isSaving = false;
 
       if (this.batchFiles.length === 1) {
@@ -285,8 +302,12 @@ export class AddItemPage implements OnDestroy {
       }
 
       await this.uploadPreparedPhotos();
+    } catch (error) {
+      this.message = readMessage(error, 'Could not start photo processing. Please try again.');
+      this.uploadError = true;
     } finally {
       this.isSaving = false;
+      if (this.uploadError) this.statusMessage = '';
     }
   }
 
@@ -345,6 +366,7 @@ export class AddItemPage implements OnDestroy {
   }
 
   private async addSelectedFiles(files: File[]): Promise<void> {
+    if (this.isPreparing || this.isSaving || this.isBatchSaving || this.destroyed) return;
     this.message = '';
     this.statusMessage = '';
     this.uploadError = false;
@@ -363,6 +385,7 @@ export class AddItemPage implements OnDestroy {
       }
 
       const preparedFiles = await this.prepareBatchImages(files.slice(0, remainingCount));
+      if (this.destroyed) return;
       if (!preparedFiles.length) {
         if (!this.message) {
           this.message = 'No valid images in selection.';
@@ -386,6 +409,7 @@ export class AddItemPage implements OnDestroy {
       void warningFeedback();
     } finally {
       this.isPreparing = false;
+      if (this.uploadError || this.message) this.statusMessage = '';
     }
   }
 
@@ -396,32 +420,21 @@ export class AddItemPage implements OnDestroy {
 
     this.isSaving = true;
     this.message = '';
-    this.statusMessage = 'Uploading photo...';
+    this.statusMessage = 'Uploading and analysing your photo...';
     this.uploadError = false;
 
     try {
       const created = await this.api.createItem(photo.file, photo.name);
       const itemsCreated = created?.items?.length ? created.items : (created?.id ? [created] : []);
-      if (itemsCreated.length > 1) {
-        await this.router.navigate(['/tabs/wardrobe'], {
-          queryParams: { newlyAddedCount: itemsCreated.length }
-        });
-      } else if (created?.id) {
-        await this.router.navigate(['/tabs/wardrobe', created.id], {
-          queryParams: { mode: 'edit', newlyAdded: 'true' }
-        });
-      } else {
-        await this.router.navigateByUrl('/tabs/wardrobe');
-      }
-      this.clearBatchSelection();
-      void successFeedback();
+      if (!itemsCreated.length) throw new Error('Could not confirm the upload. Check your wardrobe before uploading this photo again.');
+      await this.completeUpload(itemsCreated.length, itemsCreated.length === 1 ? itemsCreated[0].id : undefined);
     } catch (error) {
-      this.message = readMessage(error, 'Could not upload photo. Try again.');
+      this.message = this.uploadFailureMessage(error, 'Could not upload photo. Try again.');
       this.uploadError = true;
       void warningFeedback();
     } finally {
       this.isSaving = false;
-      this.statusMessage = '';
+      if (this.uploadError) this.statusMessage = '';
     }
   }
 
@@ -432,10 +445,14 @@ export class AddItemPage implements OnDestroy {
 
     this.isBatchSaving = true;
     this.message = '';
-    this.statusMessage = `Uploading ${this.batchFiles.length} photos...`;
+    this.statusMessage = `Uploading and analysing ${this.batchFiles.length} photos. This may take a few minutes...`;
     this.uploadError = false;
     try {
       const result = await this.api.createItems(this.batchFiles.map((entry) => entry.file));
+      if (result.results.length !== this.batchFiles.length || result.results.some(entry =>
+        entry.success && !(entry.items?.length || entry.item))) {
+        throw new Error('Could not confirm every upload. Check your wardrobe before uploading these photos again.');
+      }
       const failures = result.results.filter((entry) => !entry.success);
 
       const totalItemsCreated = result.results.reduce((count, r) => {
@@ -444,11 +461,7 @@ export class AddItemPage implements OnDestroy {
       }, 0);
 
       if (!failures.length) {
-        void successFeedback();
-        await this.router.navigate(['/tabs/wardrobe'], {
-          queryParams: { newlyAddedCount: totalItemsCreated }
-        });
-        this.clearBatchSelection();
+        await this.completeUpload(totalItemsCreated);
         return;
       }
 
@@ -489,12 +502,12 @@ export class AddItemPage implements OnDestroy {
       this.uploadError = true;
       void warningFeedback();
     } catch (error) {
-      this.message = readMessage(error, 'Could not upload photos. Try again.');
+      this.message = this.uploadFailureMessage(error, 'Could not upload photos. Try again.');
       this.uploadError = true;
       void warningFeedback();
     } finally {
       this.isBatchSaving = false;
-      this.statusMessage = '';
+      if (this.uploadError) this.statusMessage = '';
     }
   }
 
@@ -502,7 +515,9 @@ export class AddItemPage implements OnDestroy {
     const prepared: PreparedUploadFile[] = [];
     const skippedMessages: string[] = [];
 
-    for (const file of files) {
+    for (const [index, file] of files.entries()) {
+      if (this.destroyed) break;
+      this.statusMessage = `Preparing photo ${index + 1} of ${files.length}...`;
       const validationMessage = this.validateImageFile(file);
       if (validationMessage) {
         skippedMessages.push(files.length === 1 ? validationMessage : `${file.name}: ${validationMessage}`);
@@ -528,6 +543,34 @@ export class AddItemPage implements OnDestroy {
     return prepared;
   }
 
+  private isPickerCancellation(error: unknown): boolean {
+    return /cancelled|canceled|cancel/i.test(String((error as { message?: string })?.message ?? error));
+  }
+
+  private uploadFailureMessage(error: unknown, fallback: string): string {
+    const failure = error as { status?: number; name?: string };
+    if (failure?.status === 0 || failure?.name === 'TimeoutError') {
+      return 'The upload response was interrupted. Your photos may already be saved. Check your wardrobe before uploading them again.';
+    }
+    return readMessage(error, fallback);
+  }
+
+  private async completeUpload(count: number, itemId?: string): Promise<void> {
+    // Clear acknowledged uploads before navigation so a navigation failure cannot invite a duplicate upload.
+    this.clearBatchSelection();
+    this.statusMessage = `${count} garment${count === 1 ? '' : 's'} added. Cleaned previews may still be processing.`;
+    void successFeedback();
+    if (!this.isViewActive || this.destroyed) return;
+    try {
+      const navigated = itemId
+        ? await this.router.navigate(['/tabs/wardrobe', itemId], { queryParams: { mode: 'edit', newlyAdded: 'true' } })
+        : await this.router.navigate(['/tabs/wardrobe'], { queryParams: { newlyAddedCount: count } });
+      if (!navigated) this.statusMessage += ' Open Wardrobe to view them.';
+    } catch {
+      this.statusMessage += ' Open Wardrobe to view them.';
+    }
+  }
+
   private dataUrlToBlob(dataUrl: string): Blob {
     const [header, data] = dataUrl.split(',', 2);
     const mimeType = /^data:(.*);base64$/.exec(header)?.[1] ?? 'image/jpeg';
@@ -548,9 +591,9 @@ export class AddItemPage implements OnDestroy {
 
     const type = (file.type || '').toLowerCase();
     const name = (file.name || '').toLowerCase();
-    const hasImageExtension = /\.(jpe?g|png|webp|heic|heif|bmp|tiff?)$/i.test(name);
+    const hasImageExtension = /\.(jpe?g|png|webp|heic|heif|bmp|tiff?|gif)$/i.test(name);
 
-    if (!type.startsWith('image/') && !hasImageExtension) {
+    if ((!/^image\/(jpeg|jpg|png|webp|heic|heif|bmp|tiff?|gif)$/.test(type) && type !== '' && type !== 'application/octet-stream') || (!type.startsWith('image/') && !hasImageExtension)) {
       return 'Unsupported file format. Please select a photo (JPEG, PNG, WebP, or HEIC).';
     }
 
@@ -576,7 +619,10 @@ export class AddItemPage implements OnDestroy {
         throw new Error(`Photo is too small (${image.naturalWidth}×${image.naturalHeight}px). Please select a photo at least 600×600 pixels for garment classification.`);
       }
 
-      if (originalBytes <= IMAGE_COMPRESSION_TRIGGER_BYTES) {
+      const sourceMaxSide = Math.max(image.naturalWidth, image.naturalHeight);
+      const mustConvert = !/^image\/(jpeg|png|webp)$/.test(file.type.toLowerCase());
+      const mustResize = sourceMaxSide > IMAGE_COMPRESSION_MAX_SIDES[0];
+      if (!mustConvert && !mustResize && originalBytes <= IMAGE_COMPRESSION_TRIGGER_BYTES) {
         return {
           file,
           name: fileName,
@@ -593,12 +639,13 @@ export class AddItemPage implements OnDestroy {
 
       let smallestBlob: Blob | null = null;
       for (const maxSide of IMAGE_COMPRESSION_MAX_SIDES) {
-        const sourceMaxSide = Math.max(image.naturalWidth, image.naturalHeight);
         const scale = Math.min(1, maxSide / sourceMaxSide);
         const targetWidth = Math.max(1, Math.round(image.naturalWidth * scale));
         const targetHeight = Math.max(1, Math.round(image.naturalHeight * scale));
         canvas.width = targetWidth;
         canvas.height = targetHeight;
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, targetWidth, targetHeight);
         context.drawImage(image, 0, 0, targetWidth, targetHeight);
 
         for (const quality of IMAGE_COMPRESSION_QUALITIES) {
@@ -607,7 +654,7 @@ export class AddItemPage implements OnDestroy {
             smallestBlob = compressedBlob;
           }
 
-          if (compressedBlob.size && compressedBlob.size <= MAX_UPLOAD_FILE_BYTES && compressedBlob.size < originalBytes) {
+          if (compressedBlob.size && compressedBlob.size <= MAX_UPLOAD_FILE_BYTES && (mustConvert || mustResize || compressedBlob.size < originalBytes)) {
             const preparedName = this.normaliseUploadFileName(fileName, MIME_IMAGE_OUTPUT_EXTENSION);
             const preparedFile = new File([compressedBlob], preparedName, { type: `image/${MIME_IMAGE_OUTPUT_EXTENSION}` });
             return {
@@ -620,7 +667,7 @@ export class AddItemPage implements OnDestroy {
         }
       }
 
-      if (originalBytes <= MAX_UPLOAD_FILE_BYTES && (!smallestBlob || smallestBlob.size >= originalBytes)) {
+      if (!mustConvert && !mustResize && originalBytes <= MAX_UPLOAD_FILE_BYTES && (!smallestBlob || smallestBlob.size >= originalBytes)) {
         return {
           file,
           name: fileName,
@@ -638,23 +685,48 @@ export class AddItemPage implements OnDestroy {
   private decodeImage(url: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error('Could not decode or display this image format. Please select a JPEG, PNG, or WebP photo.'));
+      const timer = setTimeout(() => {
+        image.onload = null;
+        image.onerror = null;
+        image.src = '';
+        reject(new Error('This photo took too long to open. Try a smaller photo or export it as JPEG.'));
+      }, 15_000);
+      image.onload = () => { clearTimeout(timer); resolve(image); };
+      image.onerror = () => { clearTimeout(timer); reject(new Error('Could not decode or display this image format. Please select a JPEG, PNG, or WebP photo.')); };
       image.src = url;
     });
   }
 
   private toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob> {
     return new Promise((resolve, reject) => {
-      canvas.toBlob((value) => {
+      const timer = setTimeout(() => reject(new Error('Photo conversion took too long. Try a smaller photo.')), 15_000);
+      try {
+        canvas.toBlob((value) => {
+        clearTimeout(timer);
         if (!value) {
           reject(new Error('Could not compress image.'));
           return;
         }
 
         resolve(value);
-      }, type, quality);
+        }, type, quality);
+      } catch (error) {
+        clearTimeout(timer);
+        reject(error);
+      }
     });
+  }
+
+  private async readSelectedPhoto(url: string): Promise<Blob> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15_000);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) throw new Error('Could not read the selected photo. Please choose it again.');
+      return await response.blob();
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private normaliseUploadFileName(fileName: string, extension: string): string {

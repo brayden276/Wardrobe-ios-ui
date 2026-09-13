@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AlertController, ToastController } from '@ionic/angular';
-import { GeneratedOutfitDto, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
+import { GeneratedOutfitDto, OutfitDto, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import {
   ensureAiConsentWithAlert,
@@ -79,6 +79,8 @@ export class BuilderPage {
   hasGeneratedSearchRun = false;
   private savingGeneratedOutfitKeys = new Set<string>();
   private savedGeneratedOutfitKeys = new Set<string>();
+  private savedGeneratedOutfits = new Map<string, OutfitDto>();
+  private wornGeneratedOutfitKeys = new Set<string>();
   private failedGeneratedOutfitKeys = new Set<string>();
   private readonly builderItemRenderIncrement = 60;
   private readonly generatedOutfitImagePreloadLimit = 4;
@@ -257,27 +259,23 @@ export class BuilderPage {
   }
 
   async search(): Promise<void> {
-    if (this.isBuildingOutfits || !this.canGenerate) {
-      return;
-    }
-
-    if (!await ensureAiConsentWithAlert(
-      this.alertController,
-      'Wardrobe AI uses Google Gemini to interpret your outfit request and generate outfit suggestions from your wardrobe. Do you want to continue with AI processing for this device?'))
-    {
-      this.message = 'Gemini consent is required before Wardrobe AI can build outfit suggestions.';
-      void warningFeedback();
+    if (this.isBusy || !this.canGenerate) {
       return;
     }
 
     this.isBuildingOutfits = true;
     this.message = '';
-    this.hasGeneratedSearchRun = true;
-    this.results = [];
-    this.resultCards = [];
-    this.savedGeneratedOutfitKeys.clear();
-    this.failedGeneratedOutfitKeys.clear();
+    const prompt = this.buildOutfitQuery();
+    const requiredItemId = this.requiredItemId;
     try {
+      if (!await ensureAiConsentWithAlert(
+        this.alertController,
+        'Wardrobe AI uses Google Gemini to interpret your outfit request and generate outfit suggestions from your wardrobe. Do you want to continue with AI processing for this device?')) {
+        this.message = 'Gemini consent is required before Wardrobe AI can build outfit suggestions.';
+        void warningFeedback();
+        return;
+      }
+      this.hasGeneratedSearchRun = true;
       const [lookups, items] = await Promise.all([
         this.lookups ? Promise.resolve(this.lookups) : this.api.getLookups(),
         this.api.getItems()
@@ -287,24 +285,20 @@ export class BuilderPage {
       this.rebuildItemIndexes();
       this.pruneBuilderSelections();
       this.updateBuilderItemViews();
-      const prompt = this.buildOutfitQuery();
-      this.lastGeneratedPrompt = prompt;
-      const generatedOutfits = await this.api.searchOutfits(prompt, this.requiredItemId);
+      const generatedOutfits = await this.api.searchOutfits(prompt, requiredItemId);
       const readyOutfits = generatedOutfits.filter((outfit) => !!outfit.displayImageUrl || !!outfit.imageUrl);
       if (readyOutfits.length) {
         void this.preloadGeneratedOutfitImages(readyOutfits);
       }
-      this.results = readyOutfits;
+      this.lastGeneratedPrompt = prompt;
+      this.savedGeneratedOutfitKeys.clear();
+      this.savedGeneratedOutfits.clear();
+      this.wornGeneratedOutfitKeys.clear();
+      this.failedGeneratedOutfitKeys.clear();
+      this.results = generatedOutfits;
       this.updateGeneratedOutfitCards();
-      if (!this.results.length) {
-        this.message = generatedOutfits.length
-          ? 'Could not generate outfit previews for that request. Try again with a different outfit brief.'
-          : '';
-      }
       void lightImpact();
     } catch (error) {
-      this.results = [];
-      this.resultCards = [];
       this.message = readMessage(error, 'Could not build an outfit from the current wardrobe.');
       void warningFeedback();
     } finally {
@@ -313,24 +307,27 @@ export class BuilderPage {
   }
 
   async saveManual(): Promise<void> {
+    if (this.isBusy) return;
     if (!this.manualCanSave) {
       this.message = this.manualHint || 'Add more clothing items to build complete outfits.';
       return;
     }
 
     this.isSavingManualOutfit = true;
+    const selectedIds = [...this.manualItemIds];
+    const selectedName = this.manualName;
     this.message = '';
     try {
       const selected = this.selectedManualItems();
       const explanation = this.isValidManualOutfit(selected)
         ? 'Built manually from selected wardrobe items.'
         : `Saved as a partial manual look from selected wardrobe items. ${this.manualHint}`;
-      await this.api.saveOutfit(this.manualName.trim() || 'Manual outfit', null, explanation.trim(), this.manualItemIds);
-      this.message = 'Outfit saved.';
+      const saved = await this.api.saveOutfit(selectedName.trim() || 'Manual outfit', null, explanation.trim(), selectedIds);
+      this.message = saved.imageUrl ? 'Outfit saved.' : 'Outfit saved. Its preview will appear in your lookbook when ready.';
       void successFeedback();
-      this.manualItemIds = [];
-      this.manualItemIdSet.clear();
-      this.manualName = 'Manual outfit';
+      this.manualItemIds = this.manualItemIds.filter(id => !selectedIds.includes(id));
+      this.manualItemIdSet = new Set(this.manualItemIds);
+      if (this.manualName === selectedName) this.manualName = 'Manual outfit';
       this.updateBuilderItemViews();
       const toast = await this.toastController.create({
         message: 'Outfit saved to lookbook.',
@@ -356,7 +353,7 @@ export class BuilderPage {
 
   async save(outfit: GeneratedOutfitDto): Promise<void> {
     const key = this.generatedOutfitKey(outfit);
-    if (this.savingGeneratedOutfitKeys.has(key)) {
+    if (this.isBuildingOutfits || this.savingGeneratedOutfitKeys.has(key) || this.savedGeneratedOutfitKeys.has(key)) {
       return;
     }
 
@@ -366,13 +363,7 @@ export class BuilderPage {
     this.updateGeneratedOutfitCards();
     this.message = '';
     try {
-      await this.api.saveOutfit(
-        outfit.title,
-        this.lastGeneratedPrompt || this.buildOutfitQuery(),
-        outfit.explanation,
-        outfit.itemIds,
-        outfit.imageUrl || outfit.displayImageUrl || null);
-      this.savedGeneratedOutfitKeys.add(key);
+      await this.getOrSaveGeneratedOutfit(outfit, key);
       this.updateGeneratedOutfitCards();
       void successFeedback();
     } catch (error) {
@@ -687,6 +678,7 @@ export class BuilderPage {
         saveState,
         saveLabel: this.generatedSaveLabelForState(outfit, saveState),
         saveStatusMessage: this.generatedSaveStatusMessageForState(outfit, saveState),
+        isWornToday: this.wornGeneratedOutfitKeys.has(this.generatedOutfitKey(outfit)),
         missingCategorySummary: this.missingCategorySummary(outfit),
         relaxedConstraintSummary: this.relaxedConstraintSummary(outfit),
         itemNames: outfit.itemIds.map((id) => this.nameFor(id)),
@@ -696,36 +688,42 @@ export class BuilderPage {
   }
 
   async wearGeneratedOutfit(card: GeneratedOutfitCard): Promise<void> {
-    if (card.saveState === 'saving' || card.isWornToday) return;
+    const key = card.key;
+    if (this.isBuildingOutfits || this.savingGeneratedOutfitKeys.has(key) || this.wornGeneratedOutfitKeys.has(key)) return;
+    this.savingGeneratedOutfitKeys.add(key);
+    this.updateGeneratedOutfitCards();
     try {
-      card.saveState = 'saving';
-      card.saveStatusMessage = 'Saving and logging wear...';
-      const saved = await this.api.saveOutfit(
-        card.outfit.title,
-        this.lastGeneratedPrompt || this.buildOutfitQuery(),
-        card.outfit.explanation,
-        card.outfit.itemIds,
-        card.outfit.imageUrl || card.outfit.displayImageUrl || null
-      );
-      if (saved?.id) {
-        await this.api.markWorn(saved.id);
-      }
-      this.savedGeneratedOutfitKeys.add(card.key);
-      card.saveState = 'saved';
-      card.isWornToday = true;
-      card.saveStatusMessage = '✓ Worn today!';
+      const saved = await this.getOrSaveGeneratedOutfit(card.outfit, key);
+      await this.api.markWorn(saved.id);
+      this.wornGeneratedOutfitKeys.add(key);
       void successFeedback();
     } catch (error) {
-      card.saveState = 'failed';
+      if (!this.savedGeneratedOutfits.has(key)) this.failedGeneratedOutfitKeys.add(key);
       this.message = readMessage(error, 'Could not log outfit as worn.');
       void warningFeedback();
+    } finally {
+      this.savingGeneratedOutfitKeys.delete(key);
+      this.updateGeneratedOutfitCards();
     }
+  }
+
+  private async getOrSaveGeneratedOutfit(outfit: GeneratedOutfitDto, key: string): Promise<OutfitDto> {
+    const existing = this.savedGeneratedOutfits.get(key);
+    if (existing) return existing;
+    const saved = await this.api.saveOutfit(
+      outfit.title, this.lastGeneratedPrompt || this.buildOutfitQuery(), outfit.explanation,
+      outfit.itemIds, outfit.imageUrl || outfit.displayImageUrl || null);
+    if (!saved?.id) throw new Error('Could not confirm the saved outfit. Check your lookbook before saving again.');
+    this.savedGeneratedOutfits.set(key, saved);
+    this.savedGeneratedOutfitKeys.add(key);
+    this.failedGeneratedOutfitKeys.delete(key);
+    return saved;
   }
 
   private generatedSaveLabelForState(outfit: GeneratedOutfitDto, saveState: GeneratedOutfitSaveState): string {
     switch (saveState) {
       case 'saving':
-        return 'Generating...';
+        return 'Saving...';
       case 'saved':
         return 'Saved';
       default:
@@ -736,9 +734,9 @@ export class BuilderPage {
   private generatedSaveStatusMessageForState(outfit: GeneratedOutfitDto, saveState: GeneratedOutfitSaveState): string {
     switch (saveState) {
       case 'saving':
-        return `Generating image for "${outfit.title}"...`;
+        return `Saving "${outfit.title}"...`;
       case 'saved':
-        return 'Saved to outfits.';
+        return this.wornGeneratedOutfitKeys.has(this.generatedOutfitKey(outfit)) ? 'Worn today.' : 'Saved to outfits.';
       case 'failed':
         return 'Could not save.';
       default:

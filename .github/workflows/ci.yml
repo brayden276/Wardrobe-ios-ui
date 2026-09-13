@@ -30,6 +30,7 @@ jobs:
         run: |
           node scripts/sync-environment.js
           grep -q 'https://api.example.com' src/environments/environment.prod.ts
+          node --test scripts/sync-environment.test.js
 
       - name: Lint
         run: npm run lint
@@ -38,3 +39,8 @@ jobs:
         env:
           CI: true
         run: npm test -- --configuration=ci --watch=false --browsers=ChromeHeadlessNoSandbox
+
+      - name: Build production UI
+        env:
+          UI_API_BASE_URL: https://api.example.com
+        run: npm run build -- --configuration=production

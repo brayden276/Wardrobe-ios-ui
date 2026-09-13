@@ -2,6 +2,7 @@ import { fakeAsync, flushMicrotasks, TestBed, tick as advanceTime } from '@angul
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Preferences } from '@capacitor/preferences';
+import { PreferencesWeb } from '@capacitor/preferences/dist/esm/web';
 import { AuthService } from './auth.service';
 import { DeviceImageCacheService } from './device-image-cache.service';
 import { OfflineDataService } from './offline-data.service';
@@ -507,6 +508,182 @@ describe('AuthService', () => {
       expect(request.cancelled).toBeTrue();
       expect(completed).toBeTrue();
       expect(service.token).toBeNull();
+    }));
+  });
+
+  describe('Session ownership during asynchronous operations', () => {
+    const nextSession: AuthResponse = {
+      ...mockAuthResponse,
+      accessToken: 'next-access-token',
+      refreshToken: 'next-refresh-token',
+      user: { ...mockUser, id: 'next-user', email: 'next@example.com' }
+    };
+
+    async function signIn(response = mockAuthResponse): Promise<void> {
+      const pending = service.login(response.user.email, 'Pass123');
+      httpTesting.expectOne(`${baseUrl}/api/auth/login`).flush(response);
+      await pending;
+    }
+
+    for (const outcome of ['success', 'unauthorized']) {
+      it(`ignores an earlier session validation returning ${outcome} after a new sign-in`, async () => {
+        await Preferences.set({ key: 'wardrobe-session', value: JSON.stringify(mockAuthResponse) });
+        const restoring = service.restore();
+        await tick();
+        const validation = httpTesting.expectOne(`${baseUrl}/api/auth/me`);
+        await signIn(nextSession);
+        if (outcome === 'success') validation.flush(mockUser);
+        else validation.flush({}, { status: 401, statusText: 'Unauthorized' });
+        await restoring;
+        expect(service.session).toEqual(nextSession);
+        httpTesting.expectNone(`${baseUrl}/api/auth/refresh`);
+      });
+    }
+
+    it('ignores stored credentials read after a newer sign-in', async () => {
+      let completeRead!: (value: { value: string | null }) => void;
+      spyOn(PreferencesWeb.prototype, 'get').and.returnValue(new Promise(resolve => completeRead = resolve));
+      const restoring = service.restore();
+      await signIn(nextSession);
+      completeRead({ value: JSON.stringify(mockAuthResponse) });
+      await restoring;
+      expect(service.session).toEqual(nextSession);
+      httpTesting.expectNone(`${baseUrl}/api/auth/me`);
+    });
+
+    it('rejects an older sign-in response without replacing the latest sign-in', async () => {
+      const firstLogin = service.login(mockUser.email, 'Pass123');
+      const firstRequest = httpTesting.expectOne(`${baseUrl}/api/auth/login`);
+      const rejected = expectAsync(firstLogin).toBeRejectedWithError('Your session changed. Please try again.');
+      await signIn(nextSession);
+      firstRequest.flush(mockAuthResponse);
+      await rejected;
+      expect(service.session).toEqual(nextSession);
+    });
+
+    it('does not apply a profile response to a newer account', async () => {
+      await signIn();
+      const update = service.updateProfile({ displayName: 'Edited', email: mockUser.email });
+      const request = httpTesting.expectOne(`${baseUrl}/api/auth/profile`);
+      const rejected = expectAsync(update).toBeRejectedWithError('Your session changed. Please try again.');
+      await signIn(nextSession);
+      request.flush({ ...mockUser, displayName: 'Edited' });
+      await rejected;
+      expect(service.session).toEqual(nextSession);
+    });
+
+    it('keeps rotated credentials when a profile update finishes during their storage write', async () => {
+      await signIn();
+      const originalSet = PreferencesWeb.prototype.set;
+      let finishRotation!: () => void;
+      const set = spyOn(PreferencesWeb.prototype, 'set').and.callFake(function (this: PreferencesWeb, options) {
+        if (options.value.includes('rotated-token')) {
+          return new Promise<void>(resolve => finishRotation = () => { void originalSet.call(this, options).then(resolve); });
+        }
+        return originalSet.call(this, options);
+      });
+      const update = service.updateProfile({ displayName: 'Edited', email: mockUser.email });
+      const profile = httpTesting.expectOne(`${baseUrl}/api/auth/profile`);
+      const refresh = service.refreshSession();
+      httpTesting.expectOne(`${baseUrl}/api/auth/refresh`).flush({ ...mockAuthResponse, accessToken: 'rotated-token' });
+      await tick();
+      // Only delay the refresh write; the queued profile write must retain it.
+      set.and.callThrough();
+      profile.flush({ ...mockUser, displayName: 'Edited' });
+      await tick();
+      finishRotation();
+      await Promise.all([refresh, update]);
+      expect(service.token).toBe('rotated-token');
+      expect(service.session?.user.displayName).toBe('Edited');
+      expect(JSON.parse((await Preferences.get({ key: 'wardrobe-session' })).value!).accessToken).toBe('rotated-token');
+    });
+
+    for (const action of ['logout', 'deleteAccount'] as const) {
+      it(`preserves a newer sign-in and prevents success navigation when ${action} completes`, async () => {
+        await signIn();
+        const pending = service[action]();
+        const rejected = expectAsync(pending).toBeRejectedWithError('Your session changed. Please try again.');
+        const request = httpTesting.expectOne(`${baseUrl}/api/auth/${action === 'logout' ? 'logout' : 'account'}`);
+        await signIn(nextSession);
+        request.flush({});
+        await rejected;
+        expect(service.session).toEqual(nextSession);
+        expect(JSON.parse((await Preferences.get({ key: 'wardrobe-session' })).value!)).toEqual(nextSession);
+      });
+    }
+
+    it('preserves credentials and offline data when account deletion fails', async () => {
+      await signIn();
+      const cleanup = spyOn(TestBed.inject(OfflineDataService), 'clearUser').and.resolveTo();
+      const pending = service.deleteAccount();
+      const rejected = expectAsync(pending).toBeRejected();
+      httpTesting.expectOne(`${baseUrl}/api/auth/account`).flush({}, { status: 503, statusText: 'Unavailable' });
+      await rejected;
+      expect(service.session).toEqual(mockAuthResponse);
+      expect(cleanup).not.toHaveBeenCalled();
+      expect((await Preferences.get({ key: 'wardrobe-session' })).value).not.toBeNull();
+    });
+
+    it('orders a delayed credential write before sign-out removal without restoring the session', async () => {
+      await signIn();
+      const originalSet = PreferencesWeb.prototype.set;
+      let completeWrite!: () => void;
+      spyOn(PreferencesWeb.prototype, 'set').and.callFake(function (this: PreferencesWeb, options) {
+        return new Promise<void>(resolve => {
+          completeWrite = () => { void originalSet.call(this, options).then(resolve); };
+        });
+      });
+      const refresh = service.refreshSession();
+      httpTesting.expectOne(`${baseUrl}/api/auth/refresh`).flush({ ...mockAuthResponse, accessToken: 'rotated-token' });
+      await tick();
+      const logout = service.logout();
+      httpTesting.expectOne(`${baseUrl}/api/auth/logout`).flush({});
+      await tick();
+      completeWrite();
+      expect(await refresh).toBeFalse();
+      await logout;
+      expect(service.session).toBeNull();
+      expect((await Preferences.get({ key: 'wardrobe-session' })).value).toBeNull();
+    });
+
+    it('treats a stored JSON null as an invalid session', async () => {
+      await Preferences.set({ key: 'wardrobe-session', value: 'null' });
+      await service.restore();
+      expect(service.session).toBeNull();
+      expect((await Preferences.get({ key: 'wardrobe-session' })).value).toBeNull();
+    });
+
+    it('does not retain a superseded credential write when the newer sign-in fails', async () => {
+      const originalSet = PreferencesWeb.prototype.set;
+      let completeWrite!: () => void;
+      spyOn(PreferencesWeb.prototype, 'set').and.callFake(function (this: PreferencesWeb, options) {
+        return new Promise<void>(resolve => {
+          completeWrite = () => { void originalSet.call(this, options).then(resolve); };
+        });
+      });
+      const first = service.login(mockUser.email, 'Pass123');
+      const firstRejected = expectAsync(first).toBeRejectedWithError('Your session changed. Please try again.');
+      httpTesting.expectOne(`${baseUrl}/api/auth/login`).flush(mockAuthResponse);
+      await tick();
+      const second = service.login(nextSession.user.email, 'WrongPassword');
+      const secondRejected = expectAsync(second).toBeRejected();
+      httpTesting.expectOne(`${baseUrl}/api/auth/login`).flush({}, { status: 401, statusText: 'Unauthorized' });
+      await secondRejected;
+      completeWrite();
+      await firstRejected;
+      expect(service.session).toBeNull();
+      expect((await Preferences.get({ key: 'wardrobe-session' })).value).toBeNull();
+    });
+
+    it('times out a stalled login so its loading state can recover', fakeAsync(() => {
+      let failure: Error | undefined;
+      void service.login(mockUser.email, 'Pass123').catch(error => failure = error);
+      const request = httpTesting.expectOne(`${baseUrl}/api/auth/login`);
+      advanceTime(10_001);
+      flushMicrotasks();
+      expect(request.cancelled).toBeTrue();
+      expect(failure?.name).toBe('TimeoutError');
+      expect(service.session).toBeNull();
     }));
   });
 

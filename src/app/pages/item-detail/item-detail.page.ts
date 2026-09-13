@@ -44,6 +44,9 @@ export class ItemDetailPage implements OnDestroy {
   private readonly imageGenerationPollingIntervalMs = 1800;
   private imageGenerationPollTimeout: ReturnType<typeof setTimeout> | null = null;
   private isRefreshingImageGeneration = false;
+  private isViewActive = false;
+  private imageRefreshVersion = 0;
+  private needsImageRefresh = false;
 
   get selectedSubcategories(): { id: string; label: string }[] {
     return this.lookups?.categories.find((category) => category.id === this.form.categoryId)?.subcategories ?? [];
@@ -124,13 +127,13 @@ export class ItemDetailPage implements OnDestroy {
   }
 
   async ionViewWillEnter(): Promise<void> {
+    this.isViewActive = true;
     await this.loadItem();
-    if (this.shouldPollImageGeneration()) {
-      this.startImageGenerationStreaming();
-    }
   }
 
   ionViewWillLeave(): void {
+    this.isViewActive = false;
+    this.imageRefreshVersion++;
     this.stopImageGenerationStreaming();
     this.stopImageGenerationPolling();
   }
@@ -145,11 +148,15 @@ export class ItemDetailPage implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.isViewActive = false;
+    this.imageRefreshVersion++;
     this.stopImageGenerationStreaming();
     this.stopImageGenerationPolling();
   }
 
   private async loadItem(): Promise<void> {
+    const version = ++this.imageRefreshVersion;
+    this.needsImageRefresh = false;
     this.stopImageGenerationStreaming();
     this.stopImageGenerationPolling();
     this.isLoading = true;
@@ -170,6 +177,7 @@ export class ItemDetailPage implements OnDestroy {
         this.api.getItem(id)
       ]);
       this.lookups = lookups;
+      if (!this.isViewActive || version !== this.imageRefreshVersion) return;
       this.item = item;
       this.form = this.toFormState(item);
       this.startImageGenerationStreaming();
@@ -187,7 +195,7 @@ export class ItemDetailPage implements OnDestroy {
   }
 
   private startImageGenerationStreaming(): void {
-    if (!this.item) {
+    if (!this.isViewActive || !this.item) {
       return;
     }
 
@@ -216,7 +224,7 @@ export class ItemDetailPage implements OnDestroy {
   }
 
   private applyImageGenerationStreamUpdates(updates: ImageGenerationStreamUpdate[]): void {
-    if (!this.item) {
+    if (!this.isViewActive || !this.item) {
       return;
     }
 
@@ -235,24 +243,29 @@ export class ItemDetailPage implements OnDestroy {
     }
 
     if (!this.shouldPollImageGeneration()) {
+      this.needsImageRefresh = true;
       this.stopImageGenerationStreaming();
       void this.refreshItemAfterImageGeneration();
     }
   }
 
   private async refreshItemAfterImageGeneration(): Promise<void> {
-    if (!this.item) {
+    if (!this.isViewActive || !this.item) {
       return;
     }
 
+    const version = this.imageRefreshVersion;
     try {
       const latestItem = await this.api.getItem(this.item.id);
+      if (!this.isViewActive || version !== this.imageRefreshVersion) return;
+      this.needsImageRefresh = false;
       this.item = latestItem;
       if (!this.isEditModalOpen) {
         this.form = this.toFormState(latestItem);
       }
     } catch {
-      // Ignore temporary network issues after image generation completes.
+      // Completion is not visible until the refreshed image URL arrives.
+      if (version === this.imageRefreshVersion) this.startImageGenerationPolling();
     }
   }
 
@@ -265,7 +278,7 @@ export class ItemDetailPage implements OnDestroy {
 
   private startImageGenerationPolling(): void {
     this.stopImageGenerationPolling();
-    if (!this.api.isOnline || !this.shouldPollImageGeneration()) {
+    if (!this.isViewActive || !this.shouldPollImageGeneration()) {
       return;
     }
 
@@ -278,6 +291,7 @@ export class ItemDetailPage implements OnDestroy {
   private async pollImageGeneration(): Promise<void> {
     if (!this.api.isOnline) {
       this.isRefreshingImageGeneration = false;
+      this.startImageGenerationPolling();
       return;
     }
 
@@ -291,8 +305,11 @@ export class ItemDetailPage implements OnDestroy {
     }
 
     this.isRefreshingImageGeneration = true;
+    const version = this.imageRefreshVersion;
     try {
       const latestItem = await this.api.getItem(this.item.id);
+      if (!this.isViewActive || version !== this.imageRefreshVersion) return;
+      this.needsImageRefresh = false;
       this.item = latestItem;
       if (!this.isEditModalOpen) {
         this.form = this.toFormState(latestItem);
@@ -300,8 +317,10 @@ export class ItemDetailPage implements OnDestroy {
     } catch {
       // Ignore temporary network issues while polling for image-generation state.
     } finally {
-      this.isRefreshingImageGeneration = false;
-      this.startImageGenerationPolling();
+      if (version === this.imageRefreshVersion) {
+        this.isRefreshingImageGeneration = false;
+        this.startImageGenerationPolling();
+      }
     }
   }
 
@@ -314,7 +333,7 @@ export class ItemDetailPage implements OnDestroy {
   }
 
   private shouldPollImageGeneration(): boolean {
-    return this.isImageGenerationInProgress(this.item?.imageGenerationStatus ?? null);
+    return this.needsImageRefresh || this.isImageGenerationInProgress(this.item?.imageGenerationStatus ?? null);
   }
 
   imageGenerationMessage(status: string | null): string | null {

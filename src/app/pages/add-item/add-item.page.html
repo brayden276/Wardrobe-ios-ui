@@ -39,17 +39,22 @@
 
       <!-- Quick Action Row -->
       <div class="quick-action-row">
-        <ion-button class="primary-button olive-button flex-1" expand="block" (click)="captureCamera()">
+        <ion-button class="primary-button olive-button flex-1" expand="block" (click)="captureCamera()" [disabled]="isScanning">
           <ion-icon name="camera-outline" slot="start"></ion-icon>
           Take Photo
         </ion-button>
-        <ion-button class="secondary-button flex-1" expand="block" fill="outline" (click)="openPhotoLibrary()">
+        <ion-button class="secondary-button flex-1" expand="block" fill="outline" (click)="openPhotoLibrary()" [disabled]="isScanning">
           <ion-icon name="images-outline" slot="start"></ion-icon>
           Photo Library
         </ion-button>
       </div>
 
       <!-- Privacy & AI Pill -->
+      <p class="status-note center-message" *ngIf="isScanning || statusMessage" role="status" aria-live="polite">
+        <ion-spinner *ngIf="isScanning" name="crescent"></ion-spinner>
+        {{ isScanning ? scanningStatusText : statusMessage }}
+      </p>
+      <ion-button *ngIf="statusMessage && !isScanning" fill="outline" routerLink="/tabs/wardrobe">View Wardrobe</ion-button>
       <div class="ai-status-pill">
         <ion-icon name="sparkles-outline"></ion-icon>
         <span>Automated classification & cutout</span>
@@ -69,7 +74,7 @@
         </div>
 
         <!-- Floating Status Pill during Scan -->
-        <div class="scanning-status-pill" *ngIf="isScanning">
+        <div class="scanning-status-pill" *ngIf="isScanning" role="status" aria-live="polite">
           <ion-spinner name="crescent"></ion-spinner>
           <span>{{ scanningStatusText }}</span>
         </div>
@@ -107,10 +112,10 @@
       <div class="error-guidance-card" *ngIf="uploadError && message">
         <ion-icon name="alert-circle-outline"></ion-icon>
         <div class="error-info">
-          <h4>Could not scan garment</h4>
+          <h4>Some photos need attention</h4>
           <p>{{ message }}</p>
         </div>
-        <ion-button size="small" fill="outline" (click)="openAddPhotoOptions()">Retake</ion-button>
+        <ion-button size="small" fill="outline" routerLink="/tabs/wardrobe">View Wardrobe</ion-button>
       </div>
 
       <!-- Action Footer: Analyze Garment -->

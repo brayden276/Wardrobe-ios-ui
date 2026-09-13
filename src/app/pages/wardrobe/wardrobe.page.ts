@@ -95,6 +95,9 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   private hasPendingResetScroll = false;
   private imageGenerationStatusStream: ImageGenerationStatusStream | null = null;
   private readonly itemImageGenerationPollingIntervalMs = 1800;
+  private isViewActive = false;
+  private imageRefreshVersion = 0;
+  private needsImageRefresh = false;
   private itemImageGenerationPollTimeout: ReturnType<typeof setTimeout> | null = null;
   private isRefreshingImageGeneration = false;
   private itemLongPressHandle: ReturnType<typeof setTimeout> | null = null;
@@ -166,6 +169,7 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   }
 
   async ionViewWillEnter(): Promise<void> {
+    this.isViewActive = true;
     await this.load();
     if (this.hasItemImageGenerationInProgress()) {
       this.startImageGenerationStreaming();
@@ -192,6 +196,8 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   }
 
   ionViewWillLeave(): void {
+    this.isViewActive = false;
+    this.imageRefreshVersion++;
     this.stopItemImageGenerationStreaming();
     this.stopItemImageGenerationPolling();
   }
@@ -223,6 +229,8 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   }
 
   ngOnDestroy(): void {
+    this.isViewActive = false;
+    this.imageRefreshVersion++;
     if (this.loadDebounceHandle) {
       clearTimeout(this.loadDebounceHandle);
     }
@@ -272,6 +280,8 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   }
 
   private async loadCore(forceRefresh: boolean, resetScroll: boolean): Promise<void> {
+    this.imageRefreshVersion++;
+    this.needsImageRefresh = false;
     this.stopItemImageGenerationStreaming();
     this.stopItemImageGenerationPolling();
     this.isLoading = true;
@@ -501,6 +511,7 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   }
 
   private startImageGenerationStreaming(): void {
+    if (!this.isViewActive) return;
     this.stopItemImageGenerationStreaming();
     this.stopItemImageGenerationPolling();
 
@@ -530,7 +541,7 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   }
 
   private applyImageGenerationStreamUpdates(updates: ImageGenerationStreamUpdate[]): void {
-    if (!updates.length || this.items.length === 0) {
+    if (!this.isViewActive || !updates.length || this.items.length === 0) {
       return;
     }
 
@@ -546,19 +557,24 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
     this.updateVisibleItemCards();
 
     if (!this.hasItemImageGenerationInProgress()) {
+      this.needsImageRefresh = true;
       this.stopItemImageGenerationStreaming();
       void this.refreshWardrobeItemsAfterImageGeneration();
     }
   }
 
   private async refreshWardrobeItemsAfterImageGeneration(): Promise<void> {
+    const version = this.imageRefreshVersion;
     try {
-      this.items = await this.api.getItems(this.buildPagedItemFilterParams(0), { forceRefresh: true });
+      const items = await this.api.getItems(this.buildPagedItemFilterParams(0), { forceRefresh: true });
+      if (!this.isViewActive || version !== this.imageRefreshVersion) return;
+      this.items = items;
+      this.needsImageRefresh = false;
       this.canLoadMore = this.items.length === this.wardrobePageSize;
       this.pruneSelectedItems();
       this.resetVirtualWindow();
     } catch {
-      // Ignore temporary network issues after image generation completes.
+      if (version === this.imageRefreshVersion) this.startItemImageGenerationPolling();
     }
   }
 
@@ -570,11 +586,14 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   }
 
   private startItemImageGenerationPolling(): void {
-    if (!this.api.isOnline || !this.hasItemImageGenerationInProgress()) {
+    if (this.itemImageGenerationPollTimeout) clearTimeout(this.itemImageGenerationPollTimeout);
+    this.itemImageGenerationPollTimeout = null;
+    if (!this.isViewActive || !this.hasItemImageGenerationInProgress()) {
       return;
     }
 
     this.itemImageGenerationPollTimeout = setTimeout(() => {
+      this.itemImageGenerationPollTimeout = null;
       void this.refreshItemImageGenerationStatuses();
     }, this.itemImageGenerationPollingIntervalMs);
   }
@@ -582,6 +601,7 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   private async refreshItemImageGenerationStatuses(): Promise<void> {
     if (!this.api.isOnline) {
       this.isRefreshingImageGeneration = false;
+      this.startItemImageGenerationPolling();
       return;
     }
 
@@ -595,16 +615,22 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
     }
 
     this.isRefreshingImageGeneration = true;
+    const version = this.imageRefreshVersion;
     try {
-      this.items = await this.api.getItems(this.buildPagedItemFilterParams(0), { forceRefresh: true });
+      const items = await this.api.getItems(this.buildPagedItemFilterParams(0), { forceRefresh: true });
+      if (!this.isViewActive || version !== this.imageRefreshVersion) return;
+      this.items = items;
+      this.needsImageRefresh = false;
       this.canLoadMore = this.items.length === this.wardrobePageSize;
       this.pruneSelectedItems();
       this.resetVirtualWindow();
     } catch {
       // Ignore temporary network issues while polling for image-generation states.
     } finally {
-      this.isRefreshingImageGeneration = false;
-      this.startItemImageGenerationPolling();
+      if (version === this.imageRefreshVersion) {
+        this.isRefreshingImageGeneration = false;
+        this.startItemImageGenerationPolling();
+      }
     }
   }
 
@@ -617,7 +643,7 @@ export class WardrobePage implements AfterViewChecked, AfterViewInit, OnDestroy 
   }
 
   private hasItemImageGenerationInProgress(): boolean {
-    return this.items.some((item) => this.isImageGenerationInProgress(item.imageGenerationStatus));
+    return this.needsImageRefresh || this.items.some((item) => this.isImageGenerationInProgress(item.imageGenerationStatus));
   }
 
   setCategory(categoryId: string | null): void {

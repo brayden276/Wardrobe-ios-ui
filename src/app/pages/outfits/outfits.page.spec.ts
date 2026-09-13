@@ -51,7 +51,61 @@ describe('Saved outfit workflows', () => {
     page.updateVisibleOutfits();
   });
 
+
+  it('shows queued and failed previews without hiding saved outfits', async () => {
+    const pending = page.ionViewWillEnter();
+    http.expectOne(`${baseUrl}/api/lookups/wardrobe`).flush({ categories: [] });
+    http.expectOne(`${baseUrl}/api/outfits?includePending=true`).flush({ outfits: [
+      { ...outfit, imageGenerationStatus: 'queued' },
+      { ...outfit, id: 'failed-1', imageGenerationStatus: 'failed' }
+    ] });
+    await pending;
+    expect(page.visibleOutfits.length).toBe(2);
+    expect(page.previewStatus(page.outfits[0])).toContain('queued');
+    expect(page.previewStatus(page.outfits[1])).toContain('saved and ready to wear');
+  });
+
+  it('recovers pending previews after a refresh failure and stops polling after completion', fakeAsync(() => {
+    void page.ionViewWillEnter();
+    http.expectOne(`${baseUrl}/api/lookups/wardrobe`).flush({ categories: [] });
+    http.expectOne(`${baseUrl}/api/outfits?includePending=true`).flush({
+      outfits: [{ ...outfit, imageGenerationStatus: 'generating' }]
+    });
+    flushMicrotasks();
+    tick(3000);
+    http.expectOne(`${baseUrl}/api/outfits?includePending=true`).flush({}, { status: 503, statusText: 'Unavailable' });
+    flushMicrotasks();
+    expect(page.outfits.length).toBe(1);
+    tick(3000);
+    http.expectOne(`${baseUrl}/api/outfits?includePending=true`).flush({
+      outfits: [{ ...outfit, imageUrl: '/uploads/ready.jpg' }]
+    });
+    flushMicrotasks();
+    expect(page.outfits[0].imageUrl).toContain('/uploads/ready.jpg');
+    expect(page.previewStatus(page.outfits[0])).toBe('');
+    tick(6000);
+    http.expectNone(`${baseUrl}/api/outfits?includePending=true`);
+  }));
+
+  it('ignores a late preview response after leaving the lookbook', fakeAsync(() => {
+    void page.ionViewWillEnter();
+    http.expectOne(`${baseUrl}/api/lookups/wardrobe`).flush({ categories: [] });
+    http.expectOne(`${baseUrl}/api/outfits?includePending=true`).flush({
+      outfits: [{ ...outfit, imageGenerationStatus: 'queued' }]
+    });
+    flushMicrotasks();
+    tick(3000);
+    const refresh = http.expectOne(`${baseUrl}/api/outfits?includePending=true`);
+    page.ionViewWillLeave();
+    refresh.flush({ outfits: [{ ...outfit, imageUrl: '/uploads/late.jpg' }] });
+    flushMicrotasks();
+    expect(page.outfits[0].imageUrl).toBeNull();
+    tick(6000);
+    http.expectNone(`${baseUrl}/api/outfits?includePending=true`);
+  }));
+
   afterEach(() => {
+    page.ngOnDestroy();
     http.verify();
     localStorage.removeItem(favouriteKey);
     localStorage.removeItem(`${favouriteKey}_synced`);
@@ -62,7 +116,7 @@ describe('Saved outfit workflows', () => {
     localStorage.setItem(favouriteKey, JSON.stringify([outfit.id]));
     const load = page.ionViewWillEnter();
     http.expectOne(`${baseUrl}/api/lookups/wardrobe`).flush({ categories: [] });
-    http.expectOne(`${baseUrl}/api/outfits`).flush({ outfits: [outfit, { ...outfit, id: 'outfit-2' }] });
+    http.expectOne(`${baseUrl}/api/outfits?includePending=true`).flush({ outfits: [outfit, { ...outfit, id: 'outfit-2' }] });
     await settle();
     http.expectOne(`${baseUrl}/api/wardrobe/favourites`).flush({ favourites: [{ targetType: 'outfit', targetId: 'outfit-2' }] });
     await settle();

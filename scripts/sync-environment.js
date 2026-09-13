@@ -43,6 +43,10 @@ if (enforceProductionApi && !process.env.UI_API_BASE_URL) {
 if (enforceProductionApi && isLocalhost(apiBaseUrl)) {
   throw new Error('Release builds must not use localhost for UI_API_BASE_URL.');
 }
+
+if (enforceProductionApi && new URL(apiBaseUrl).protocol !== 'https:') {
+  throw new Error('Release builds require an HTTPS UI_API_BASE_URL.');
+}
 const output = `// This file is generated from .env by scripts/sync-environment.js.
 // Update UI_API_BASE_URL in .env or the process environment, then run npm start or npm run build.
 
@@ -75,7 +79,7 @@ function normaliseApiBaseUrl(value) {
 function isLocalhost(value) {
   try {
     const parsed = new URL(value);
-    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1';
+    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '[::1]';
   } catch {
     return true;
   }

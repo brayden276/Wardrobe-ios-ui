@@ -15,26 +15,34 @@ export class OfflineDataService {
   private readonly prefix = 'wardrobe-offline-v1';
 
   async read<T>(userId: string, resource: string, maxAgeMs = OFFLINE_DATA_TTL_MS): Promise<T | null> {
-    const stored = await Preferences.get({ key: this.key(userId, resource) });
-    if (!stored.value) return null;
+    const key = this.key(userId, resource);
     try {
+      const stored = await Preferences.get({ key });
+      if (!stored.value) return null;
       const parsed = JSON.parse(stored.value) as OfflineEnvelope<T>;
       if (parsed.userId !== userId) return null;
       const savedAt = Date.parse(parsed.savedAt);
-      if (!Number.isNaN(savedAt) && Date.now() - savedAt > maxAgeMs) {
-        await Preferences.remove({ key: this.key(userId, resource) });
+      if (!Number.isFinite(savedAt) || savedAt > Date.now() || Date.now() - savedAt > maxAgeMs) {
+        await this.removeSnapshot(key);
         return null;
       }
-      return parsed.value;
+      return parsed.value ?? null;
     } catch {
-      await Preferences.remove({ key: this.key(userId, resource) });
+      // Offline snapshots are optional: an unreadable cache is a cache miss.
+      await this.removeSnapshot(key);
       return null;
     }
   }
 
   async write<T>(userId: string, resource: string, value: T): Promise<void> {
     const envelope: OfflineEnvelope<T> = { userId, savedAt: new Date().toISOString(), value };
-    await Preferences.set({ key: this.key(userId, resource), value: JSON.stringify(envelope) });
+    try {
+      await Preferences.set({ key: this.key(userId, resource), value: JSON.stringify(envelope) });
+    } catch {
+      // Keep a successful network operation usable if device storage is full.
+      // Discard the previous snapshot so it is not mistaken for the new data.
+      await this.removeSnapshot(this.key(userId, resource));
+    }
   }
 
   async clearUser(userId: string): Promise<void> {
@@ -46,5 +54,13 @@ export class OfflineDataService {
 
   private key(userId: string, resource: string): string {
     return `${this.prefix}:${encodeURIComponent(userId)}:${resource}`;
+  }
+
+  private async removeSnapshot(key: string): Promise<void> {
+    try {
+      await Preferences.remove({ key });
+    } catch {
+      // Recovery must also work when the storage backend itself is unavailable.
+    }
   }
 }

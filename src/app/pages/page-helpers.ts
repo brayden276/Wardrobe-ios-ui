@@ -270,10 +270,15 @@ export function readMessage(error: unknown, fallback: string): string {
   }
 
   const candidate = error as {
+    name?: string;
     error?: unknown;
     status?: number;
     message?: string;
   };
+
+  if (candidate.name === 'TimeoutError') {
+    return 'Wardrobe AI took too long to respond. Check whether your change was saved before trying again.';
+  }
 
   if (candidate.status === 0) {
     return 'Could not reach Wardrobe AI. Check your connection and try again.';

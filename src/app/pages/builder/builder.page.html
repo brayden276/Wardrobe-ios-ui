@@ -178,6 +178,7 @@
         <div class="look-copy-body">
           <h3 class="look-title">{{ card.outfit.title }}</h3>
           <p class="look-explanation">{{ card.outfit.explanation }}</p>
+          <p class="status-note" *ngIf="!card.imageUrl">Preview unavailable. You can still save and wear these pieces together.</p>
 
           <p class="fit-note" *ngIf="!card.outfit.isComplete && card.missingCategorySummary">
             Missing: {{ card.missingCategorySummary }}
@@ -204,7 +205,7 @@
             <ion-button
               class="primary-button flex-1"
               (click)="wearGeneratedOutfit(card)"
-              [disabled]="card.saveState === 'saving' || card.isWornToday">
+              [disabled]="isBuildingOutfits || card.saveState === 'saving' || card.isWornToday">
               <ion-icon name="shirt-outline" slot="start"></ion-icon>
               {{ card.isWornToday ? 'Worn Today ✓' : 'Wear Today' }}
             </ion-button>
@@ -213,7 +214,7 @@
               class="secondary-button flex-1"
               fill="outline"
               (click)="save(card.outfit)"
-              [disabled]="card.saveState === 'saving' || card.saveState === 'saved'">
+              [disabled]="isBuildingOutfits || card.saveState === 'saving' || card.saveState === 'saved'">
               <ion-icon name="bookmark-outline" slot="start"></ion-icon>
               {{ card.saveState === 'saved' ? 'Saved ✓' : 'Save Look' }}
             </ion-button>

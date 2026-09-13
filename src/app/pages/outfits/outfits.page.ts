@@ -1,4 +1,4 @@
-import { Component, HostListener, inject } from '@angular/core';
+import { Component, HostListener, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ActionSheetController, AlertController, ToastController } from '@ionic/angular';
 import { OutfitDto, WardrobeLookupsDto } from '../../models';
@@ -15,6 +15,7 @@ export interface OutfitCard {
   isFavorite: boolean;
   isFavoriting: boolean;
   actionMessage: string;
+  previewStatus: string;
 }
 
 @Component({
@@ -23,7 +24,7 @@ export interface OutfitCard {
   templateUrl: './outfits.page.html',
   styleUrls: ['./outfits.page.scss']
 })
-export class OutfitsPage {
+export class OutfitsPage implements OnDestroy {
   readonly formatLastWorn = formatLastWorn;
   private readonly api = inject(WardrobeApiService);
   private readonly auth = inject(AuthService);
@@ -60,6 +61,9 @@ export class OutfitsPage {
   private activeLoad: Promise<void> | null = null;
   private hasPendingLoad = false;
   private hasPendingForceRefresh = false;
+  private isViewActive = false;
+  private previewPollTimer: ReturnType<typeof setTimeout> | null = null;
+  private previewLoadId = 0;
 
   readonly skeletonPlaceholders = [0, 1, 2];
   visibleOutfitCount = this.outfitRenderIncrement;
@@ -151,8 +155,65 @@ export class OutfitsPage {
   }
 
   async ionViewWillEnter(): Promise<void> {
+    this.isViewActive = true;
     this.loadFavorites();
     await this.load();
+  }
+
+  ionViewWillLeave(): void {
+    this.isViewActive = false;
+    this.previewLoadId++;
+    if (this.previewPollTimer) clearTimeout(this.previewPollTimer);
+    this.previewPollTimer = null;
+  }
+
+  ngOnDestroy(): void {
+    this.ionViewWillLeave();
+    this.cancelOutfitPress();
+  }
+
+  previewStatus(outfit: OutfitDto): string {
+    if (outfit.imageUrl) return '';
+    if (this.isPreviewPending(outfit)) {
+      if (!this.api.isOnline) return 'Outfit saved. Reconnect to check its preview.';
+      return outfit.imageGenerationStatus === 'queued'
+        ? 'Outfit saved. Preview is queued.'
+        : 'Outfit saved. Preparing preview...';
+    }
+    return 'Preview unavailable. Your outfit is saved and ready to wear.';
+  }
+
+  private isPreviewPending(outfit: OutfitDto): boolean {
+    return outfit.imageGenerationStatus === 'queued' || outfit.imageGenerationStatus === 'generating';
+  }
+
+  private schedulePreviewRefresh(): void {
+    if (this.previewPollTimer) clearTimeout(this.previewPollTimer);
+    this.previewPollTimer = null;
+    if (!this.isViewActive || !this.outfits.some(outfit => this.isPreviewPending(outfit))) return;
+    this.previewPollTimer = setTimeout(() => {
+      this.previewPollTimer = null;
+      void this.refreshPreviews();
+    }, 3000);
+  }
+
+  private async refreshPreviews(): Promise<void> {
+    const loadId = ++this.previewLoadId;
+    try {
+      if (!this.api.isOnline) {
+        this.updateVisibleOutfits();
+        return;
+      }
+      const outfits = await this.api.getOutfits({ forceRefresh: true, includePending: true });
+      if (!this.isViewActive || loadId !== this.previewLoadId) return;
+      this.outfits = outfits;
+      if (this.selectedOutfit) this.selectedOutfit = outfits.find(outfit => outfit.id === this.selectedOutfit?.id) ?? null;
+      this.updateVisibleOutfits();
+    } catch {
+      // Keep saved compositions visible and retry a temporary preview-refresh failure.
+    } finally {
+      if (loadId === this.previewLoadId) this.schedulePreviewRefresh();
+    }
   }
 
   async refreshOutfits(event: Event): Promise<void> {
@@ -185,13 +246,16 @@ export class OutfitsPage {
   }
 
   private async loadCore(forceRefresh: boolean): Promise<void> {
+    this.previewLoadId++;
+    if (this.previewPollTimer) clearTimeout(this.previewPollTimer);
+    this.previewPollTimer = null;
     this.isLoading = true;
     this.message = '';
     const hadLoadedOutfits = this.outfits.length > 0;
     try {
       const [lookups, outfits] = await Promise.all([
         this.lookups ? Promise.resolve(this.lookups) : this.api.getLookups().catch(() => null),
-        this.api.getOutfits({ forceRefresh })
+        this.api.getOutfits({ forceRefresh, includePending: true })
       ]);
       this.lookups = lookups;
       this.outfits = outfits;
@@ -210,6 +274,7 @@ export class OutfitsPage {
       }
     } finally {
       this.isLoading = false;
+      this.schedulePreviewRefresh();
     }
   }
 
@@ -411,7 +476,7 @@ export class OutfitsPage {
     try {
       await this.api.markWorn(outfit.id);
       try {
-        const outfits = await this.api.getOutfits({ forceRefresh: true });
+        const outfits = await this.api.getOutfits({ forceRefresh: true, includePending: true });
         const selectedOutfitId = this.selectedOutfit?.id ?? null;
         this.outfits = outfits;
         this.selectedOutfit = selectedOutfitId ? outfits.find((candidate) => candidate.id === selectedOutfitId) ?? null : null;
@@ -711,7 +776,8 @@ export class OutfitsPage {
       const isRemoving = this.deletingOutfitIds.has(outfit.id);
       return {
         outfit,
-        imageUrl: outfit.thumbnailUrl || outfit.imageUrl,
+      imageUrl: outfit.thumbnailUrl || outfit.imageUrl,
+      previewStatus: this.previewStatus(outfit),
         isSelected: this.selectedOutfitIds.has(outfit.id),
         isMarking,
         isRemoving,

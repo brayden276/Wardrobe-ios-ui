@@ -25,7 +25,13 @@ export class AuthService {
   private readonly sessionSubject = new BehaviorSubject<Session | null>(null);
   private restorePromise: Promise<void> | null = null;
   private refreshRequest: { token: string | null; promise: Promise<boolean> } | null = null;
+  private sessionGeneration = 0;
+  private sessionStorageQueue: Promise<void> = Promise.resolve();
   readonly session$ = this.sessionSubject.asObservable();
+
+  get sessionVersion(): number {
+    return this.sessionGeneration;
+  }
 
   get session(): Session | null {
     return this.sessionSubject.value;
@@ -58,7 +64,9 @@ export class AuthService {
       return;
     }
 
+    const generation = this.sessionGeneration;
     const stored = await Preferences.get({ key: 'wardrobe-session' });
+    if (generation !== this.sessionGeneration || this.session) return;
     if (!stored.value) {
       return;
     }
@@ -71,7 +79,7 @@ export class AuthService {
       return;
     }
 
-    if (!session.accessToken || !session.refreshToken || !session.user) {
+    if (!session?.accessToken || !session.refreshToken || !session.user?.id) {
       await this.clearSession();
       return;
     }
@@ -86,6 +94,7 @@ export class AuthService {
       await this.validateSession();
       return;
     } catch (error) {
+      if (generation !== this.sessionGeneration) return;
       if (!this.isUnauthorized(error)) {
         return;
       }
@@ -98,7 +107,7 @@ export class AuthService {
       try {
         await this.validateSession();
       } catch (validationError) {
-        if (this.isUnauthorized(validationError)) {
+        if (generation === this.sessionGeneration && this.isUnauthorized(validationError)) {
           await this.clearSession();
         }
       }
@@ -106,80 +115,88 @@ export class AuthService {
   }
 
   async getProviders(): Promise<AuthProviderDto[]> {
-    return firstValueFrom(this.http.get<AuthProviderDto[]>(`${this.apiBaseUrl}/api/auth/providers`));
+    return firstValueFrom(this.http.get<AuthProviderDto[]>(`${this.apiBaseUrl}/api/auth/providers`).pipe(timeout(AuthService.authRequestTimeoutMs)));
   }
 
   async register(email: string, password: string, displayName: string): Promise<void> {
-    const response = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/api/auth/register`, { email, password, displayName }));
-    await this.setSession(response);
+    const generation = ++this.sessionGeneration;
+    const response = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/api/auth/register`, { email, password, displayName }).pipe(timeout(AuthService.authRequestTimeoutMs)));
+    await this.setSession(response, generation, true);
   }
 
   async login(email: string, password: string): Promise<void> {
-    const response = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/api/auth/login`, { email, password }));
-    await this.setSession(response);
+    const generation = ++this.sessionGeneration;
+    const response = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/api/auth/login`, { email, password }).pipe(timeout(AuthService.authRequestTimeoutMs)));
+    await this.setSession(response, generation, true);
   }
 
   async loginExternal(provider: string, identityToken: string): Promise<void> {
-    const response = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/api/auth/external`, { provider, identityToken }));
-    await this.setSession(response);
+    const generation = ++this.sessionGeneration;
+    const response = await firstValueFrom(this.http.post<AuthResponse>(`${this.apiBaseUrl}/api/auth/external`, { provider, identityToken }).pipe(timeout(AuthService.authRequestTimeoutMs)));
+    await this.setSession(response, generation, true);
   }
 
   async updatePersonalDetails(request: UpdatePersonalDetailsRequest): Promise<AuthUserDto> {
+    return this.updateUser('/api/auth/personal-details', request);
+  }
+
+  private async updateUser(path: string, request: UpdatePersonalDetailsRequest | UpdateProfileRequest): Promise<AuthUserDto> {
+    const generation = this.sessionGeneration;
     if (this.session && this.isExpired(this.session) && !await this.refreshSession()) {
       throw new Error('Could not refresh your session. Sign in again or retry when connected.');
     }
     const requestSession = this.session;
-    if (!requestSession?.accessToken) {
+    if (generation !== this.sessionGeneration || !requestSession?.accessToken) {
       throw new Error('Sign in before saving personal details.');
     }
 
-    const user = await firstValueFrom(this.http.put<AuthUserDto>(`${this.apiBaseUrl}/api/auth/personal-details`, request, {
+    const user = await firstValueFrom(this.http.put<AuthUserDto>(`${this.apiBaseUrl}${path}`, request, {
       headers: new HttpHeaders({ Authorization: `Bearer ${requestSession.accessToken}` })
     }).pipe(timeout(AuthService.authRequestTimeoutMs)));
 
     const session = this.session;
-    if (!session || session.refreshToken !== requestSession.refreshToken) {
+    if (!session || generation !== this.sessionGeneration) {
       throw new Error('Your session changed. Please try again.');
     }
-    await this.storeSession({ ...session, user });
+    await this.storeUser(user, generation);
 
     return user;
   }
 
   async requestPasswordReset(email: string): Promise<StatusMessageDto> {
-    return firstValueFrom(this.http.post<StatusMessageDto>(`${this.apiBaseUrl}/api/auth/password/forgot`, { email }));
+    return firstValueFrom(this.http.post<StatusMessageDto>(`${this.apiBaseUrl}/api/auth/password/forgot`, { email }).pipe(timeout(AuthService.authRequestTimeoutMs)));
   }
 
   async resetPassword(token: string, newPassword: string): Promise<StatusMessageDto> {
-    return firstValueFrom(this.http.post<StatusMessageDto>(`${this.apiBaseUrl}/api/auth/password/reset`, { token, newPassword }));
+    return firstValueFrom(this.http.post<StatusMessageDto>(`${this.apiBaseUrl}/api/auth/password/reset`, { token, newPassword }).pipe(timeout(AuthService.authRequestTimeoutMs)));
   }
 
   async changePassword(currentPassword: string, newPassword: string): Promise<StatusMessageDto> {
+    const generation = this.sessionGeneration;
     if (!this.session) throw new Error('Sign in before changing your password.');
     if (this.isExpired(this.session) && !await this.refreshSession()) {
       throw new Error('Could not refresh your session. Sign in again or retry when connected.');
     }
+    if (generation !== this.sessionGeneration) throw new Error('Your session changed. Please try again.');
     const requestSession = this.session;
     if (!requestSession) throw new Error('Sign in before changing your password.');
     const response = await firstValueFrom(this.http.put<StatusMessageDto>(`${this.apiBaseUrl}/api/auth/password`,
       { currentPassword, newPassword }, this.authOptions()).pipe(timeout(AuthService.authRequestTimeoutMs)));
-    if (this.session?.refreshToken !== requestSession.refreshToken) {
+    if (generation !== this.sessionGeneration) {
       throw new Error('Your session changed. Please try again.');
     }
-    await this.clearLocalSession(requestSession.user.id, requestSession.refreshToken);
+    await this.clearLocalSession(requestSession.user.id, generation);
     if (this.session) throw new Error('Your session changed. Please try again.');
     return response;
   }
 
   async updateProfile(request: UpdateProfileRequest): Promise<AuthUserDto> {
-    const user = await firstValueFrom(this.http.put<AuthUserDto>(`${this.apiBaseUrl}/api/auth/profile`, request, this.authOptions()));
-    const session = this.session;
-    if (session) await this.storeSession({ ...session, user });
-    return user;
+    return this.updateUser('/api/auth/profile', request);
   }
 
   async logout(): Promise<void> {
     const session = this.session;
+    const generation = this.sessionGeneration;
     try {
       if (session?.refreshToken && typeof navigator !== 'undefined' && navigator.onLine) {
         try {
@@ -190,22 +207,26 @@ export class AuthService {
         }
       }
     } finally {
-      await this.clearLocalSession(session?.user.id);
+      await this.clearLocalSession(session?.user.id, generation);
     }
+    if (this.session) throw new Error('Your session changed. Please try again.');
   }
 
   async deleteAccount(): Promise<void> {
-    const userId = this.session?.user.id;
-    const token = this.token;
-    try {
-      if (token) {
-        await firstValueFrom(this.http.delete(`${this.apiBaseUrl}/api/auth/account`, {
-          headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
-        }));
-      }
-    } finally {
-      await this.clearLocalSession(userId);
+    const generation = this.sessionGeneration;
+    if (this.session && this.isExpired(this.session) && !await this.refreshSession()) {
+      throw new Error('Could not refresh your session. Sign in again or retry when connected.');
     }
+    if (generation !== this.sessionGeneration) throw new Error('Your session changed. Please try again.');
+    const session = this.session;
+    if (session) {
+      await firstValueFrom(this.http.delete(`${this.apiBaseUrl}/api/auth/account`, {
+        headers: new HttpHeaders({ Authorization: `Bearer ${session.accessToken}` })
+      }).pipe(timeout(30_000)));
+    }
+    // A failed deletion must leave the account usable and the error visible.
+    await this.clearLocalSession(session?.user.id, generation);
+    if (this.session) throw new Error('Your session changed. Please try again.');
   }
 
   async handleUnauthorized(error: unknown): Promise<void> {
@@ -230,6 +251,7 @@ export class AuthService {
   }
 
   private async refreshCore(refreshToken: string | null): Promise<boolean> {
+    const generation = this.sessionGeneration;
     if (!refreshToken) {
       await this.clearSession();
       return false;
@@ -243,13 +265,13 @@ export class AuthService {
       );
       // The request belongs to the session that started it. A late response
       // must not undo sign-out or replace credentials from a newer sign-in.
-      if (this.session?.refreshToken !== refreshToken) {
+      if (generation !== this.sessionGeneration || this.session?.refreshToken !== refreshToken) {
         return false;
       }
-      await this.setSession(response);
+      await this.setSession(response, generation);
       return true;
     } catch (error) {
-      if (this.isUnauthorized(error) && this.session?.refreshToken === refreshToken) {
+      if (this.isUnauthorized(error) && generation === this.sessionGeneration && this.session?.refreshToken === refreshToken) {
         await this.clearSession();
       }
 
@@ -258,6 +280,7 @@ export class AuthService {
   }
 
   private async validateSession(): Promise<void> {
+    const generation = this.sessionGeneration;
     const token = this.token;
     if (!token) {
       await this.clearSession();
@@ -273,11 +296,11 @@ export class AuthService {
     );
 
     const session = this.session;
-    if (!session) {
+    if (!session || generation !== this.sessionGeneration) {
       return;
     }
 
-    await this.storeSession({ ...session, user });
+    await this.storeUser(user, generation);
   }
 
   private authOptions(): { headers: HttpHeaders } {
@@ -285,8 +308,8 @@ export class AuthService {
     return { headers: token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : new HttpHeaders() };
   }
 
-  private async clearLocalSession(userId = this.session?.user.id, expectedRefreshToken?: string): Promise<void> {
-    const isCurrentSession = () => expectedRefreshToken === undefined || this.session?.refreshToken === expectedRefreshToken;
+  private async clearLocalSession(userId = this.session?.user.id, generation = this.sessionGeneration): Promise<void> {
+    const isCurrentSession = () => generation === this.sessionGeneration;
     if (!isCurrentSession()) return;
     try {
       if (userId) await this.offlineData.clearUser(userId);
@@ -309,19 +332,20 @@ export class AuthService {
   }
 
   private async clearSession(): Promise<void> {
+    const generation = ++this.sessionGeneration;
     try {
-      await Preferences.remove({ key: 'wardrobe-session' });
+      await this.queueSessionStorage(() => Preferences.remove({ key: 'wardrobe-session' }));
     } finally {
       // Only emit on a real transition: notifying when there was no session
       // would bounce the user to /login without anything having changed
       // (e.g. a 401 fired before restore() finished loading the stored session).
-      if (this.sessionSubject.value !== null) {
+      if (generation === this.sessionGeneration && this.sessionSubject.value !== null) {
         this.sessionSubject.next(null);
       }
     }
   }
 
-  private async setSession(response: AuthResponse): Promise<void> {
+  private async setSession(response: AuthResponse, generation = this.sessionGeneration, startsSession = false): Promise<void> {
     const session = {
       accessToken: response.accessToken,
       refreshToken: response.refreshToken,
@@ -329,11 +353,35 @@ export class AuthService {
       expiresAt: response.expiresAt,
       user: response.user
     };
-    await this.storeSession(session);
+    await this.queueSessionStorage(() => this.persistSession(session, generation, startsSession));
   }
 
-  private async storeSession(session: Session): Promise<void> {
+  private async storeUser(user: AuthUserDto, generation: number): Promise<void> {
+    await this.queueSessionStorage(async () => {
+      const session = this.session;
+      if (!session || session.user.id !== user.id) throw new Error('Your session changed. Please try again.');
+      // Read the credentials after earlier queued token rotations have finished.
+      await this.persistSession({ ...session, user }, generation);
+    });
+  }
+
+  private async persistSession(session: Session, generation: number, startsSession = false): Promise<void> {
+    if (generation !== this.sessionGeneration) throw new Error('Your session changed. Please try again.');
     await Preferences.set({ key: 'wardrobe-session', value: JSON.stringify(session) });
+    if (generation !== this.sessionGeneration) {
+      // This write finished after its session was superseded. Remove it before
+      // the next queued write so a restart cannot restore rejected credentials.
+      await Preferences.remove({ key: 'wardrobe-session' });
+      throw new Error('Your session changed. Please try again.');
+    }
+    if (startsSession) this.sessionGeneration++;
     this.sessionSubject.next(session);
+  }
+
+  private queueSessionStorage(operation: () => Promise<void>): Promise<void> {
+    const pending = this.sessionStorageQueue.then(operation);
+    // Preserve ordering after a failed storage operation, while reporting it to its caller.
+    this.sessionStorageQueue = pending.catch(() => {});
+    return pending;
   }
 }

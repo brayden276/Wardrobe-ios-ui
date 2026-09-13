@@ -1,9 +1,12 @@
-import { TestBed } from '@angular/core/testing';
+import { fakeAsync, flushMicrotasks, TestBed, tick } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { WardrobeApiService } from './wardrobe-api.service';
 import { AuthService } from './auth.service';
 import { DeviceImageCacheService } from './device-image-cache.service';
+import { OfflineDataService } from './offline-data.service';
+import { PreferencesWeb } from '@capacitor/preferences/dist/esm/web';
+import { TimeoutError } from 'rxjs';
 import { apiBaseUrl } from './api-url';
 import { readMessage } from './pages/page-helpers';
 import {
@@ -93,7 +96,8 @@ describe('WardrobeApiService', () => {
 
   beforeEach(() => {
     mockAuthService = jasmine.createSpyObj<AuthService>('AuthService', ['refreshSession', 'handleUnauthorized'], {
-      token: 'valid-test-token'
+      token: 'valid-test-token',
+      sessionVersion: 1
     });
     mockAuthService.refreshSession.and.returnValue(Promise.resolve(true));
     mockAuthService.handleUnauthorized.and.returnValue(Promise.resolve());
@@ -533,7 +537,168 @@ describe('WardrobeApiService', () => {
   });
 
   describe('401 retry handling in authorized()', () => {
-    it('renews an expired image-status connection without logging out', async () => {
+    it('cancels a stalled outfit load and allows the next load to recover', fakeAsync(() => {
+      let failure: Error | undefined;
+      void service.getOutfits().catch(error => failure = error);
+      const stalled = httpTesting.expectOne(`${baseUrl}/api/outfits`);
+      tick(30_001);
+      flushMicrotasks();
+      expect(stalled.cancelled).toBeTrue();
+      expect(failure?.name).toBe('TimeoutError');
+
+      let loaded: OutfitDto[] | undefined;
+      void service.getOutfits().then(outfits => loaded = outfits);
+      httpTesting.expectOne(`${baseUrl}/api/outfits`).flush({ outfits: [] });
+      flushMicrotasks();
+      expect(loaded).toEqual([]);
+    }));
+
+    it('does not automatically repeat a write whose response timed out', fakeAsync(() => {
+      let failure: Error | undefined;
+      void service.markWorn('outfit-1').catch(error => failure = error);
+      const stalled = httpTesting.expectOne(`${baseUrl}/api/outfits/outfit-1/wear-logs`);
+      tick(30_001);
+      flushMicrotasks();
+      expect(stalled.cancelled).toBeTrue();
+      expect(failure?.name).toBe('TimeoutError');
+      httpTesting.expectNone(`${baseUrl}/api/outfits/outfit-1/wear-logs`);
+      expect(mockAuthService.refreshSession).not.toHaveBeenCalled();
+    }));
+
+    it('reuses a token renewed by another request instead of rotating it again', async () => {
+      const pending = service.getItems();
+      const request = httpTesting.expectOne(`${baseUrl}/api/wardrobe/items`);
+      const token = Object.getOwnPropertyDescriptor(mockAuthService, 'token')!.get as jasmine.Spy;
+      token.and.returnValue('renewed-token');
+      request.flush({}, { status: 401, statusText: 'Unauthorized' });
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const retry = httpTesting.expectOne(`${baseUrl}/api/wardrobe/items`);
+      expect(retry.request.headers.get('Authorization')).toBe('Bearer renewed-token');
+      retry.flush({ items: [] });
+      expect(await pending).toEqual([]);
+      expect(mockAuthService.refreshSession).not.toHaveBeenCalled();
+    });
+
+    for (const status of [200, 401]) {
+      it(`rejects an old session's ${status} response without refreshing the current account`, async () => {
+        const pending = service.getItems();
+        const rejected = expectAsync(pending).toBeRejectedWithError('Your session changed. Please try again.');
+        const request = httpTesting.expectOne(`${baseUrl}/api/wardrobe/items`);
+        const version = Object.getOwnPropertyDescriptor(mockAuthService, 'sessionVersion')!.get as jasmine.Spy;
+        version.and.returnValue(2);
+        if (status === 200) request.flush({ items: [mockItem] });
+        else request.flush({}, { status, statusText: 'Unauthorized' });
+        await rejected;
+        expect(mockAuthService.refreshSession).not.toHaveBeenCalled();
+        expect(mockAuthService.handleUnauthorized).not.toHaveBeenCalled();
+      });
+    }
+
+    it('does not sign out a newer session when a retried request returns 401', async () => {
+      const pending = service.getItems();
+      const rejected = expectAsync(pending).toBeRejectedWithError('Your session changed. Please try again.');
+      httpTesting.expectOne(`${baseUrl}/api/wardrobe/items`).flush({}, { status: 401, statusText: 'Unauthorized' });
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const retry = httpTesting.expectOne(`${baseUrl}/api/wardrobe/items`);
+      const version = Object.getOwnPropertyDescriptor(mockAuthService, 'sessionVersion')!.get as jasmine.Spy;
+      version.and.returnValue(2);
+      retry.flush({}, { status: 401, statusText: 'Unauthorized' });
+      await rejected;
+      expect(mockAuthService.handleUnauthorized).not.toHaveBeenCalled();
+    });
+
+    it('does not evict a fresh item cache when an older request fails', async () => {
+      const old = service.getItems();
+      const rejected = expectAsync(old).toBeRejected();
+      const oldRequest = httpTesting.expectOne(`${baseUrl}/api/wardrobe/items`);
+      const fresh = service.getItems({}, { forceRefresh: true });
+      httpTesting.expectOne(`${baseUrl}/api/wardrobe/items`).flush({ items: [mockItem] });
+      const items = await fresh;
+      oldRequest.flush({}, { status: 503, statusText: 'Unavailable' });
+      await rejected;
+      expect(await service.getItems()).toEqual(items);
+      httpTesting.expectNone(`${baseUrl}/api/wardrobe/items`);
+    });
+
+    it('does not evict fresh lookups when a request from a cleared cache fails', async () => {
+      const old = service.getLookups();
+      const rejected = expectAsync(old).toBeRejected();
+      const oldRequest = httpTesting.expectOne(`${baseUrl}/api/lookups/wardrobe`);
+      service.clearAllUserCaches();
+      const fresh = service.getLookups();
+      httpTesting.expectOne(`${baseUrl}/api/lookups/wardrobe`).flush(mockLookups);
+      await fresh;
+      oldRequest.flush({}, { status: 503, statusText: 'Unavailable' });
+      await rejected;
+      expect(await service.getLookups()).toEqual(mockLookups);
+      httpTesting.expectNone(`${baseUrl}/api/lookups/wardrobe`);
+    });
+
+    it('returns live wardrobe data even when the optional offline snapshot cannot be saved', async () => {
+      Object.defineProperty(mockAuthService, 'session', { value: { user: { id: 'quota-test-user' } } });
+      spyOn(PreferencesWeb.prototype, 'set').and.rejectWith(new Error('Quota exceeded'));
+      spyOn(PreferencesWeb.prototype, 'remove').and.resolveTo();
+      const save = spyOn(TestBed.inject(OfflineDataService), 'write').and.callThrough();
+      const pending = service.getItems();
+      httpTesting.expectOne(`${baseUrl}/api/wardrobe/items`).flush({ items: [mockItem] });
+      expect((await pending)[0].id).toBe(mockItem.id);
+      expect(save).toHaveBeenCalled();
+    });
+
+
+  it('returns a saved outfit immediately while its optional preview is queued', fakeAsync(() => {
+    let result: OutfitDto | undefined;
+    void service.saveOutfit('Look', null, null, ['item-1']).then(outfit => { result = outfit; });
+    httpTesting.expectOne(`${baseUrl}/api/outfits`).flush({
+      outfit: { ...mockOutfit, imageUrl: null, thumbnailUrl: null, imageGenerationStatus: 'queued' }
+    });
+    flushMicrotasks();
+    expect(result?.id).toBe(mockOutfit.id);
+    expect(result?.imageGenerationStatus).toBe('queued');
+    tick(125_000);
+    httpTesting.expectNone(req => req.method === 'DELETE' || req.url.includes('image-generation'));
+  }));
+
+  it('does not hold an acknowledged upload open for optional device image caching', async () => {
+    mockImageCache.resolve.and.returnValue(new Promise(() => {}));
+    const pending = service.createItem(new File(['photo'], 'photo.jpg', { type: 'image/jpeg' }), 'photo.jpg');
+    httpTesting.expectOne(`${baseUrl}/api/wardrobe/items`).flush({ item: mockItem });
+    const result = await pending;
+    expect(result.id).toBe(mockItem.id);
+    expect(mockImageCache.resolve).not.toHaveBeenCalled();
+  });
+
+  it('falls back once when an image status stream closes normally', async () => {
+    spyOn(window, 'fetch').and.resolveTo(new Response('', { status: 200 }));
+    const fallback = jasmine.createSpy('fallback');
+    const stream = service.streamImageGenerationStatuses(['item-1'], [], () => {}, fallback);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(fallback).toHaveBeenCalledTimes(1);
+    stream?.close();
+    expect(fallback).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts a stalled status connection and falls back once', fakeAsync(() => {
+    const fetchSpy = spyOn(window, 'fetch').and.returnValue(new Promise(() => {}));
+    const fallback = jasmine.createSpy('fallback');
+    service.streamImageGenerationStatuses(['item-1'], [], () => {}, fallback);
+    tick(15_000);
+    expect(fallback).toHaveBeenCalledTimes(1);
+    expect((fetchSpy.calls.mostRecent().args[1]?.signal as AbortSignal).aborted).toBeTrue();
+    tick(15_000);
+    expect(fallback).toHaveBeenCalledTimes(1);
+  }));
+
+  it('cancels the watchdog without fallback when a page closes its stream', fakeAsync(() => {
+    spyOn(window, 'fetch').and.returnValue(new Promise(() => {}));
+    const fallback = jasmine.createSpy('fallback');
+    const stream = service.streamImageGenerationStatuses(['item-1'], [], () => {}, fallback);
+    stream?.close();
+    tick(30_000);
+    expect(fallback).not.toHaveBeenCalled();
+  }));
+
+  it('renews an expired image-status connection without logging out', async () => {
       const fetchSpy = spyOn(window, 'fetch').and.returnValues(
         Promise.resolve(new Response(null, { status: 401 })),
         Promise.resolve(new Response(null, { status: 503 }))
@@ -598,6 +763,11 @@ describe('WardrobeApiService', () => {
   });
 
   describe('Error message extraction (readMessage with HTTP 400, 401, 500)', () => {
+    it('explains a timeout without encouraging an immediate duplicate submission', () => {
+      expect(readMessage(new TimeoutError(), 'Fallback')).toBe(
+        'Wardrobe AI took too long to respond. Check whether your change was saved before trying again.'
+      );
+    });
     it('should extract error message from HTTP 400 Bad Request response body', () => {
       const http400Error = {
         status: 400,
