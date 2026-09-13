@@ -96,7 +96,7 @@ describe('Getting started', () => {
     const router = TestBed.inject(Router);
     const routes = fixture.debugElement.queryAll(By.directive(RouterLink))
       .map((element) => router.serializeUrl(element.injector.get(RouterLink).urlTree!));
-    expect(routes).toEqual(['/tabs/wardrobe', '/tabs/add', '/tabs/builder', '/tabs/outfits', '/tabs/settings']);
+    expect(routes).toEqual(['/tabs/wardrobe', '/tabs/add?returnUrl=%2Ftabs%2Fgetting-started&guideReturnUrl=%2Ftabs%2Fwardrobe', '/tabs/builder', '/tabs/outfits', '/tabs/settings']);
     expect(fixture.nativeElement.querySelector('.step-status')).toBeNull();
     fixture.destroy();
   });

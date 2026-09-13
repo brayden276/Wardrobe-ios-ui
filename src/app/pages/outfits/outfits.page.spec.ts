@@ -14,7 +14,7 @@ import { OfflineDataService } from '../../offline-data.service';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import { OutfitsPage } from './outfits.page';
 import { emptyItemForm } from '../page-helpers';
-import { Router } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 
 describe('Saved outfit workflows', () => {
   let page: OutfitsPage;
@@ -109,6 +109,17 @@ describe('Saved outfit workflows', () => {
     http.verify();
     localStorage.removeItem(favouriteKey);
     localStorage.removeItem(`${favouriteKey}_synced`);
+  });
+
+  it('reopens the originating outfit after returning from a garment', async () => {
+    spyOnProperty(TestBed.inject(ActivatedRoute).snapshot, 'queryParamMap', 'get')
+      .and.returnValue(convertToParamMap({ outfitId: outfit.id }));
+    spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+    const loading = page.ionViewWillEnter();
+    http.expectOne(`${baseUrl}/api/lookups/wardrobe`).flush({ categories: [] });
+    http.expectOne(`${baseUrl}/api/outfits?includePending=true`).flush({ outfits: [outfit] });
+    await loading;
+    expect(page.selectedOutfit?.id).toBe(outfit.id);
   });
 
   it('imports existing device favourites once, merges remote favourites and honours later remote removals', async () => {
@@ -367,7 +378,9 @@ describe('Saved outfit workflows', () => {
     expect(favouriteButton.textContent).toContain('Favourited');
     const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
     modal.querySelector<HTMLButtonElement>('.garment-detail-row')!.click();
-    expect(navigate).toHaveBeenCalledWith(['/tabs/wardrobe', 'piece-1']);
+    expect(navigate).toHaveBeenCalledWith(['/tabs/wardrobe', 'piece-1'], {
+      queryParams: { returnUrl: '/tabs/outfits', outfitId: detailOutfit.id }
+    });
     expect(fixture.componentInstance.selectedOutfit).toBeNull();
     await modal.dismiss();
     fixture.destroy();

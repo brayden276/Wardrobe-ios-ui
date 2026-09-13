@@ -1,5 +1,6 @@
 import { Component, ElementRef, OnDestroy, ViewChild, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { returnPage } from '../page-navigation';
 import { Capacitor } from '@capacitor/core';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { ActionSheetController, AlertController } from '@ionic/angular';
@@ -38,6 +39,42 @@ type PreparedUploadFile = {
 export class AddItemPage implements OnDestroy {
   private readonly api = inject(WardrobeApiService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private addedForReturn = 0;
+  private uploadReturnUrl = '/tabs/wardrobe';
+
+  get returnDestination(): { url: string; label: string } {
+    return returnPage(this.route.snapshot.queryParamMap.get('returnUrl'));
+  }
+
+  get hasReturnContext(): boolean {
+    return this.returnDestination.url !== '/tabs/wardrobe';
+  }
+
+  get missingPieces(): string {
+    return this.returnDestination.url === '/tabs/builder'
+      ? (this.route.snapshot.queryParamMap.get('missing') ?? '').slice(0, 180) : '';
+  }
+
+  async returnToSource(): Promise<void> {
+    if (this.isScanning) return;
+    await this.navigateToSource();
+  }
+
+  private async navigateToSource(): Promise<void> {
+    try {
+      const navigated = await this.router.navigate([this.returnDestination.url], {
+        queryParams: this.returnDestination.url === '/tabs/getting-started'
+          ? { returnUrl: this.route.snapshot.queryParamMap.get('guideReturnUrl') === '/tabs/settings'
+            ? '/tabs/settings' : returnPage(this.route.snapshot.queryParamMap.get('guideReturnUrl')).url }
+          : { newlyAddedCount: this.addedForReturn || null }
+      });
+      if (navigated) this.addedForReturn = 0;
+      else this.statusMessage = `Could not return to ${this.returnDestination.label}. Please try again using the back button.`;
+    } catch {
+      this.statusMessage = `Could not return to ${this.returnDestination.label}. Please try again using the back button.`;
+    }
+  }
   private readonly actionSheet = inject(ActionSheetController);
   private readonly alertController = inject(AlertController);
   @ViewChild('cameraInput') private readonly cameraInput?: ElementRef<HTMLInputElement>;
@@ -278,6 +315,7 @@ export class AddItemPage implements OnDestroy {
     if (this.isScanning || !this.batchFiles.length) {
       return;
     }
+    this.uploadReturnUrl = this.returnDestination.url;
 
     this.isSaving = true;
     this.statusMessage = 'Checking photo-processing permission...';
@@ -464,6 +502,7 @@ export class AddItemPage implements OnDestroy {
         await this.completeUpload(totalItemsCreated);
         return;
       }
+      if (this.uploadReturnUrl !== '/tabs/wardrobe') this.addedForReturn += totalItemsCreated;
 
       const remainingFiles: PreparedUploadFile[] = [];
       const remainingUrls: string[] = [];
@@ -556,11 +595,17 @@ export class AddItemPage implements OnDestroy {
   }
 
   private async completeUpload(count: number, itemId?: string): Promise<void> {
+    if (this.uploadReturnUrl !== '/tabs/wardrobe') this.addedForReturn += count;
     // Clear acknowledged uploads before navigation so a navigation failure cannot invite a duplicate upload.
     this.clearBatchSelection();
     this.statusMessage = `${count} garment${count === 1 ? '' : 's'} added. Cleaned previews may still be processing.`;
     void successFeedback();
     if (!this.isViewActive || this.destroyed) return;
+    if (this.uploadReturnUrl !== this.returnDestination.url) return;
+    if (this.hasReturnContext) {
+      await this.navigateToSource();
+      return;
+    }
     try {
       const navigated = itemId
         ? await this.router.navigate(['/tabs/wardrobe', itemId], { queryParams: { mode: 'edit', newlyAdded: 'true' } })

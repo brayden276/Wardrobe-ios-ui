@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { fakeAsync, flushMicrotasks, TestBed, tick } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { RouterTestingModule } from '@angular/router/testing';
 import { IonicModule } from '@ionic/angular';
@@ -46,6 +46,16 @@ describe('Item preview recovery', () => {
   });
 
   afterEach(() => page.ngOnDestroy());
+
+  it('returns to the originating outfit instead of losing the lookbook context', async () => {
+    Object.defineProperty(TestBed.inject(ActivatedRoute).snapshot, 'queryParamMap', {
+      value: convertToParamMap({ returnUrl: '/tabs/outfits', outfitId: 'look-1' })
+    });
+    const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+    expect(page.returnDestination.label).toBe('Outfits');
+    await page.returnToSource();
+    expect(navigate).toHaveBeenCalledWith(['/tabs/outfits'], { queryParams: { outfitId: 'look-1' } });
+  });
 
   it('retries a failed final image fetch without overwriting the edit draft', fakeAsync(() => {
     void page.ionViewWillEnter();

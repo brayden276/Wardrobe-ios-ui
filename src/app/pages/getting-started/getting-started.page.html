@@ -19,7 +19,7 @@
         <h2>Add your clothes <span *ngIf="progress?.hasItems" class="step-status">Started</span></h2>
         <p>Use <strong>Add</strong> to take a photo or select photos from your library. Good lighting and a plain background make garments easier to recognise.</p>
         <p>Try a top, bottoms and shoes, or a dress and shoes. After adding each item, check its details and correct anything the AI missed.</p>
-        <ion-button routerLink="/tabs/add">{{ progress?.hasItems ? 'Add More Clothes' : 'Add Your First Clothes' }}</ion-button>
+          <ion-button routerLink="/tabs/add" [queryParams]="{ returnUrl: '/tabs/getting-started', guideReturnUrl: returnUrl }">{{ progress?.hasItems ? 'Add More Clothes' : 'Add Your First Clothes' }}</ion-button>
       </li>
       <li>
         <h2>Build and save a look <span *ngIf="progress?.hasOutfits" class="step-status">Saved</span></h2>

@@ -1,5 +1,5 @@
 import { Component, HostListener, OnDestroy, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ActionSheetController, AlertController, ToastController } from '@ionic/angular';
 import { OutfitDto, WardrobeLookupsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
@@ -29,6 +29,7 @@ export class OutfitsPage implements OnDestroy {
   private readonly api = inject(WardrobeApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly alertController = inject(AlertController);
   private readonly actionSheetController = inject(ActionSheetController);
   private readonly toastController = inject(ToastController);
@@ -158,6 +159,12 @@ export class OutfitsPage implements OnDestroy {
     this.isViewActive = true;
     this.loadFavorites();
     await this.load();
+    const outfitId = this.route.snapshot.queryParamMap.get('outfitId');
+    const outfit = this.outfits.find(candidate => candidate.id === outfitId);
+    if (outfit && this.isViewActive) this.open(outfit);
+    if (outfitId) {
+      void this.router.navigate([], { relativeTo: this.route, queryParams: { outfitId: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    }
   }
 
   ionViewWillLeave(): void {
@@ -389,8 +396,11 @@ export class OutfitsPage implements OnDestroy {
 
   viewGarmentDetail(itemId: string, event?: Event): void {
     event?.stopPropagation();
+    const outfitId = this.selectedOutfit?.id;
     this.close();
-    void this.router.navigate(['/tabs/wardrobe', itemId]);
+    void this.router.navigate(['/tabs/wardrobe', itemId], {
+      queryParams: { returnUrl: '/tabs/outfits', outfitId }
+    });
   }
 
   open(outfit: OutfitDto, event?: Event): void {

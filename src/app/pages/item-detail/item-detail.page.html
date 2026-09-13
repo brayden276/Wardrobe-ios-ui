@@ -1,7 +1,10 @@
 <ion-header translucent="true" class="ion-no-border ios-detail-header">
   <ion-toolbar>
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/tabs/wardrobe" text="Wardrobe"></ion-back-button>
+      <ion-back-button *ngIf="returnDestination.url === '/tabs/wardrobe'" defaultHref="/tabs/wardrobe" text="Wardrobe"></ion-back-button>
+      <ion-button *ngIf="returnDestination.url !== '/tabs/wardrobe'" (click)="returnToSource()" [disabled]="isSaving || isDeleting">
+        <ion-icon name="chevron-back-outline" slot="start"></ion-icon>{{ returnDestination.label }}
+      </ion-button>
     </ion-buttons>
     <ion-title>{{ item?.name || 'Garment' }}</ion-title>
     <ion-buttons slot="end" *ngIf="item">

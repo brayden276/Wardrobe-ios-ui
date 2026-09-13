@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { Capacitor } from '@capacitor/core';
 import { CameraWeb } from '@capacitor/camera/dist/esm/web';
@@ -48,6 +48,51 @@ describe('Photo upload recovery', () => {
   afterEach(async () => {
     page.ngOnDestroy();
     await Preferences.remove({ key: 'wardrobe-ai-gemini-consent' });
+  });
+
+  function withBuilderContext(): void {
+    spyOnProperty(TestBed.inject(ActivatedRoute).snapshot, 'queryParamMap', 'get')
+      .and.returnValue(convertToParamMap({ returnUrl: '/tabs/builder', missing: 'bottoms or a dress and shoes' }));
+  }
+
+  it('explains what is missing and offers a return to the preserved outfit draft', async () => {
+    withBuilderContext();
+    const fixture = TestBed.createComponent(AddItemPage);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.upload-context').textContent).toContain('bottoms or a dress and shoes');
+    expect(fixture.nativeElement.textContent).toContain('Your outfit draft is kept');
+    expect(fixture.nativeElement.querySelector('[aria-label="Back to Outfit Studio"]')).not.toBeNull();
+    fixture.destroy();
+  });
+
+  it('returns to the builder after upload instead of opening the generic item editor', async () => {
+    withBuilderContext();
+    await select([await photo()]);
+    await page.uploadSelectedPhotos();
+    expect(page.batchFiles.length).toBe(0);
+    expect(navigate).toHaveBeenCalledWith(['/tabs/builder'], { queryParams: { newlyAddedCount: 1 } });
+  });
+
+  it('returns without an upload while retaining selected photos', async () => {
+    withBuilderContext();
+    await select([await photo()]);
+    await page.returnToSource();
+    expect(page.batchFiles.length).toBe(1);
+    expect(api.createItem).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith(['/tabs/builder'], { queryParams: { newlyAddedCount: null } });
+  });
+
+  it('keeps acknowledged success available for a return retry after navigation fails', async () => {
+    withBuilderContext();
+    await select([await photo()]);
+    navigate.and.rejectWith(new Error('Navigation interrupted'));
+    await page.uploadSelectedPhotos();
+    expect(page.batchFiles.length).toBe(0);
+    expect(page.statusMessage).toContain('Could not return to Outfit Studio');
+    navigate.and.resolveTo(true);
+    await page.returnToSource();
+    expect(api.createItem).toHaveBeenCalledTimes(1);
+    expect(navigate.calls.mostRecent().args).toEqual([['/tabs/builder'], { queryParams: { newlyAddedCount: 1 } }]);
   });
 
   it('keeps selected previews usable when leaving and returning to the tab', async () => {

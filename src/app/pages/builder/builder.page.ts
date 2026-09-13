@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { OutfitBuilderStateService } from '../../outfit-builder-state.service';
 import { AlertController, ToastController } from '@ionic/angular';
 import { GeneratedOutfitDto, OutfitDto, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
 import { WardrobeApiService } from '../../wardrobe-api.service';
@@ -54,6 +55,10 @@ export class BuilderPage {
   private readonly alertController = inject(AlertController);
   private readonly toastController = inject(ToastController);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly draftState = inject(OutfitBuilderStateService);
+  private draftOwner: string | null | undefined;
+  private isViewActive = false;
   builderMode: BuilderMode = 'generate';
   query = '';
   readonly occasionOptions = ['Work', 'Dinner', 'Brunch', 'Weekend'];
@@ -68,6 +73,7 @@ export class BuilderPage {
   manualCanSave = false;
   manualHint = '';
   wardrobeHint = '';
+  missingPieces = '';
   items: WardrobeItemDto[] = [];
   results: GeneratedOutfitDto[] = [];
   lookups: WardrobeLookupsDto | null = null;
@@ -151,6 +157,38 @@ export class BuilderPage {
   }
 
   async ionViewWillEnter(): Promise<void> {
+    this.isViewActive = true;
+    if (this.draftOwner !== this.draftState.accountId) {
+      if (this.draftOwner !== undefined) {
+        this.builderMode = 'generate';
+        this.query = '';
+        this.occasion = 'Dinner';
+        this.dressCode = 'Smart casual';
+        this.selectedAvoids = [];
+        this.requiredItemId = null;
+        this.manualName = 'Manual outfit';
+        this.manualItemIds = [];
+        this.results = [];
+        this.lastGeneratedPrompt = '';
+        this.hasGeneratedSearchRun = false;
+        this.savedGeneratedOutfits.clear();
+        this.savedGeneratedOutfitKeys.clear();
+        this.wornGeneratedOutfitKeys.clear();
+        this.failedGeneratedOutfitKeys.clear();
+        this.items = [];
+        this.lookups = null;
+        this.updateGeneratedOutfitCards();
+      }
+      this.draftOwner = this.draftState.accountId;
+      const draft = this.draftState.read();
+      if (draft) {
+        const { savedOutfits, wornOutfitKeys, ...fields } = draft;
+        Object.assign(this, fields);
+        this.savedGeneratedOutfits = new Map(savedOutfits);
+        this.savedGeneratedOutfitKeys = new Set(this.savedGeneratedOutfits.keys());
+        this.wornGeneratedOutfitKeys = new Set(wornOutfitKeys);
+      }
+    }
     this.message = '';
     this.isLoadingWardrobe = true;
     try {
@@ -163,6 +201,12 @@ export class BuilderPage {
       this.rebuildItemIndexes();
       this.pruneBuilderSelections();
       this.updateBuilderItemViews();
+      this.updateGeneratedOutfitCards();
+      const addedCount = Number(this.route.snapshot.queryParamMap.get('newlyAddedCount'));
+      if (Number.isInteger(addedCount) && addedCount > 0) {
+        this.message = `${addedCount} garment${addedCount === 1 ? '' : 's'} added. Your outfit draft is ready to continue.`;
+        void this.router.navigate([], { relativeTo: this.route, queryParams: { newlyAddedCount: null }, queryParamsHandling: 'merge', replaceUrl: true });
+      }
     } catch (error) {
       this.message = readMessage(error, 'Could not load wardrobe items.');
     } finally {
@@ -174,6 +218,35 @@ export class BuilderPage {
     this.builderMode = mode;
     this.message = '';
     void lightImpact();
+  }
+
+  ionViewWillLeave(): void {
+    this.isViewActive = false;
+    this.rememberDraft();
+  }
+
+  private rememberDraft(): void {
+    this.draftState.save({
+      builderMode: this.builderMode, query: this.query, occasion: this.occasion, dressCode: this.dressCode,
+      selectedAvoids: this.selectedAvoids, requiredItemId: this.requiredItemId,
+      manualName: this.manualName, manualItemIds: this.manualItemIds,
+      results: this.results, lastGeneratedPrompt: this.lastGeneratedPrompt,
+      hasGeneratedSearchRun: this.hasGeneratedSearchRun,
+      savedOutfits: [...this.savedGeneratedOutfits], wornOutfitKeys: [...this.wornGeneratedOutfitKeys]
+    }, this.draftOwner ?? null);
+  }
+
+  async addPieces(): Promise<void> {
+    if (this.isBusy) return;
+    this.rememberDraft();
+    try {
+      const navigated = await this.router.navigate(['/tabs/add'], {
+        queryParams: { returnUrl: '/tabs/builder', missing: this.missingPieces || null }
+      });
+      if (!navigated) this.message = 'Could not open Add Garment. Your outfit draft is still here.';
+    } catch {
+      this.message = 'Could not open Add Garment. Your outfit draft is still here.';
+    }
   }
 
   clearQuery(): void {
@@ -303,6 +376,7 @@ export class BuilderPage {
       void warningFeedback();
     } finally {
       this.isBuildingOutfits = false;
+      if (!this.isViewActive) this.rememberDraft();
     }
   }
 
@@ -348,6 +422,7 @@ export class BuilderPage {
       void warningFeedback();
     } finally {
       this.isSavingManualOutfit = false;
+      if (!this.isViewActive) this.rememberDraft();
     }
   }
 
@@ -374,6 +449,7 @@ export class BuilderPage {
     } finally {
       this.savingGeneratedOutfitKeys.delete(key);
       this.updateGeneratedOutfitCards();
+      if (!this.isViewActive) this.rememberDraft();
     }
   }
 
@@ -616,14 +692,14 @@ export class BuilderPage {
     const categories = new Set(this.items.map((item) => item.categoryId === 'shoes' ? 'footwear' : this.manualCategory(item)));
     const hasBase = categories.has('dresses') || categories.has('one_pieces')
       || (categories.has('tops') && categories.has('bottoms'));
+    this.missingPieces = [
+      ...(!hasBase ? [categories.has('tops') ? 'bottoms or a dress' : categories.has('bottoms') ? 'a top or a dress' : 'a top and bottoms, or a dress'] : []),
+      ...(!categories.has('footwear') ? ['shoes'] : [])
+    ].join(' and ');
     if (!this.items.length || (hasBase && categories.has('footwear'))) {
       this.wardrobeHint = '';
     } else {
-      const missing = [
-        ...(!hasBase ? [categories.has('tops') ? 'bottoms or a dress' : categories.has('bottoms') ? 'a top or a dress' : 'a top and bottoms, or a dress'] : []),
-        ...(!categories.has('footwear') ? ['shoes'] : [])
-      ];
-      this.wardrobeHint = `For a complete look, add ${missing.join(' and ')}. You can still use the pieces you have or save a partial look in Manual Canvas.`;
+      this.wardrobeHint = `For a complete look, add ${this.missingPieces}. You can still use the pieces you have or save a partial look in Manual Canvas.`;
     }
   }
 
@@ -704,6 +780,7 @@ export class BuilderPage {
     } finally {
       this.savingGeneratedOutfitKeys.delete(key);
       this.updateGeneratedOutfitCards();
+      if (!this.isViewActive) this.rememberDraft();
     }
   }
 
@@ -746,6 +823,7 @@ export class BuilderPage {
 
   viewGarmentDetail(itemId: string): void {
     void lightImpact();
-    void this.router.navigate(['/tabs/wardrobe', itemId]);
+    this.rememberDraft();
+    void this.router.navigate(['/tabs/wardrobe', itemId], { queryParams: { returnUrl: '/tabs/builder' } });
   }
 }

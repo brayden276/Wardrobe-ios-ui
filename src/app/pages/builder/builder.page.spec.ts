@@ -2,12 +2,14 @@ import { CommonModule } from '@angular/common';
 import { TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { RouterTestingModule } from '@angular/router/testing';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { AlertController, IonicModule, ToastController } from '@ionic/angular';
 import { Preferences } from '@capacitor/preferences';
 import { LazyImageDirective } from '../../lazy-image.directive';
 import { WardrobeApiService } from '../../wardrobe-api.service';
 import { GeneratedOutfitDto, OutfitDto, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
 import { BuilderPage } from './builder.page';
+import { AuthService } from '../../auth.service';
 
 describe('Builder first use', () => {
   let page: BuilderPage;
@@ -50,6 +52,66 @@ describe('Builder first use', () => {
     page.query = 'Everyday';
     await page.search();
   }
+
+  it('carries missing pieces and a return path to Add without losing the draft', async () => {
+    api.getItems.and.resolveTo([item('Top', 'tops')]);
+    await page.ionViewWillEnter();
+    page.query = 'A cool evening';
+    page.occasion = 'Work';
+    page.requiredItemId = 'Top';
+    const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+    await page.addPieces();
+    expect(navigate).toHaveBeenCalledWith(['/tabs/add'], { queryParams: {
+      returnUrl: '/tabs/builder', missing: 'bottoms or a dress and shoes'
+    } });
+    page.ionViewWillLeave();
+    const restored = TestBed.runInInjectionContext(() => new BuilderPage());
+    await restored.ionViewWillEnter();
+    expect(restored.query).toBe('A cool evening');
+    expect(restored.occasion).toBe('Work');
+    expect(restored.requiredItemId).toBe('Top');
+  });
+
+  it('restores manual choices and saved suggestion state after tab recreation', async () => {
+    await generate();
+    await page.save(suggestion);
+    page.setBuilderMode('manual');
+    page.manualName = 'My weekend';
+    page.toggleManualItem('Top');
+    page.ionViewWillLeave();
+    const restored = TestBed.runInInjectionContext(() => new BuilderPage());
+    await restored.ionViewWillEnter();
+    expect(restored.builderMode).toBe('manual');
+    expect(restored.manualName).toBe('My weekend');
+    expect(restored.manualItemIds).toEqual(['Top']);
+    expect(restored.resultCards[0].saveState).toBe('saved');
+    await restored.save(suggestion);
+    expect(api.saveOutfit).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not restore another account\'s draft into a retained page', async () => {
+    await generate();
+    page.query = 'Private wardrobe notes';
+    page.ionViewWillLeave();
+    TestBed.inject(AuthService).session!.user.id = 'another-user';
+    await page.ionViewWillEnter();
+    expect(page.query).toBe('');
+    expect(page.results).toEqual([]);
+    expect(page.manualItemIds).toEqual([]);
+  });
+
+  it('refreshes missing pieces and acknowledges uploads without generating automatically', async () => {
+    await generate();
+    api.searchOutfits.calls.reset();
+    const params = spyOnProperty(TestBed.inject(ActivatedRoute).snapshot, 'queryParamMap', 'get');
+    params.and.returnValue(convertToParamMap({ newlyAddedCount: '2' }));
+    api.getItems.and.resolveTo([item('Top', 'tops'), item('Bottoms', 'bottoms'), item('Shoes', 'footwear')]);
+    spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+    await page.ionViewWillEnter();
+    expect(page.wardrobeHint).toBe('');
+    expect(page.message).toContain('2 garments added');
+    expect(api.searchOutfits).not.toHaveBeenCalled();
+  });
 
   it('keeps previewless suggestions and reuses the saved outfit when wearing it', async () => {
     await generate();
@@ -144,7 +206,8 @@ describe('Builder first use', () => {
     TestBed.configureTestingModule({
       declarations: [BuilderPage, LazyImageDirective],
       imports: [CommonModule, FormsModule, IonicModule.forRoot(), RouterTestingModule],
-      providers: [BuilderPage, { provide: WardrobeApiService, useValue: api }]
+      providers: [BuilderPage, { provide: WardrobeApiService, useValue: api },
+        { provide: AuthService, useValue: { session: { user: { id: 'builder-user' } } } }]
     });
     page = TestBed.inject(BuilderPage);
   });

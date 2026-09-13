@@ -147,7 +147,7 @@ export class AnalyticsPage {
 
   openItemDetail(item: WardrobeItemDto): void {
     this.closeCategoryModal();
-    this.router.navigateByUrl(`/tabs/wardrobe/${item.id}`);
+    this.router.navigateByUrl(`/tabs/wardrobe/${item.id}?returnUrl=/tabs/analytics`);
   }
 
   private formatCurrency(value: number, minDecimals = 4, maxDecimals = 4): string {

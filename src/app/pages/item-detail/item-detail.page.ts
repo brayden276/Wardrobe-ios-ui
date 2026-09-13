@@ -1,5 +1,6 @@
 import { Component, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { returnPage } from '../page-navigation';
 import { ActionSheetController, AlertController } from '@ionic/angular';
 import { ImageGenerationStreamUpdate, UpdateWardrobeItemRequest, WardrobeItemDto, WardrobeLookupsDto } from '../../models';
 import { ImageGenerationStatusStream, WardrobeApiService } from '../../wardrobe-api.service';
@@ -39,6 +40,22 @@ export class ItemDetailPage implements OnDestroy {
   isArchiving = false;
   isEditModalOpen = false;
   activeImageLayer: 'display' | 'original' = 'display';
+  get returnDestination(): { url: string; label: string } {
+    return returnPage(this.route.snapshot.queryParamMap.get('returnUrl'));
+  }
+
+  async returnToSource(): Promise<void> {
+    if (this.isSaving || this.isDeleting) return;
+    try {
+      const navigated = await this.router.navigate([this.returnDestination.url], {
+        queryParams: { outfitId: this.returnDestination.url === '/tabs/outfits'
+          ? this.route.snapshot.queryParamMap.get('outfitId') : null }
+      });
+      if (!navigated) this.message = `Could not return to ${this.returnDestination.label}. Please try again.`;
+    } catch {
+      this.message = `Could not return to ${this.returnDestination.label}. Please try again.`;
+    }
+  }
   isDeleting = false;
   private imageGenerationStatusStream: ImageGenerationStatusStream | null = null;
   private readonly imageGenerationPollingIntervalMs = 1800;

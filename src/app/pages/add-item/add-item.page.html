@@ -1,5 +1,10 @@
 <ion-header translucent="true" class="ion-no-border ios-nav-header">
   <ion-toolbar>
+    <ion-buttons slot="start" *ngIf="hasReturnContext">
+      <ion-button (click)="returnToSource()" [disabled]="isScanning" [attr.aria-label]="'Back to ' + returnDestination.label">
+        <ion-icon name="chevron-back-outline" slot="start"></ion-icon>{{ returnDestination.label }}
+      </ion-button>
+    </ion-buttons>
     <ion-title>Add Garment</ion-title>
     <ion-buttons slot="end" *ngIf="batchFiles.length && !isScanning">
       <ion-button fill="clear" color="primary" (click)="clearBatchSelection()">Clear</ion-button>
@@ -9,6 +14,11 @@
 
 <ion-content class="app-content" [fullscreen]="true">
   <div class="screen add-item-screen">
+    <article class="panel upload-context" *ngIf="hasReturnContext">
+      <h2 class="plain-title">{{ returnDestination.url === '/tabs/builder' ? 'Complete your outfit' : 'Add to your wardrobe' }}</h2>
+      <p *ngIf="missingPieces">Add {{ missingPieces }} to give this look the pieces it needs.</p>
+      <p class="muted">{{ returnDestination.url === '/tabs/builder' ? 'Your outfit draft is kept. After uploading, return to Outfit Studio to choose your new pieces or generate again.' : 'After uploading, you will return to ' + returnDestination.label + '.' }}</p>
+    </article>
     <!-- Hidden file inputs for web fallback -->
     <input #cameraInput class="file-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*" capture="environment" (change)="handleCameraFileSelection($event)">
     <input #batchInput class="file-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*" multiple (change)="handlePhotoSelection($event)">
@@ -54,7 +64,7 @@
         <ion-spinner *ngIf="isScanning" name="crescent"></ion-spinner>
         {{ isScanning ? scanningStatusText : statusMessage }}
       </p>
-      <ion-button *ngIf="statusMessage && !isScanning" fill="outline" routerLink="/tabs/wardrobe">View Wardrobe</ion-button>
+      <ion-button *ngIf="statusMessage && !isScanning && !hasReturnContext" fill="outline" routerLink="/tabs/wardrobe">View Wardrobe</ion-button>
       <div class="ai-status-pill">
         <ion-icon name="sparkles-outline"></ion-icon>
         <span>Automated classification & cutout</span>
